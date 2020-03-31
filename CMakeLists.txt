@@ -5,6 +5,7 @@ include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckStructHasMember)
 include(CheckCXXSourceCompiles)
+include(GNUInstallDirs)
 
 project(tdscpp VERSION 1.0)
 
@@ -191,5 +192,5 @@ target_compile_options(tdscpp PRIVATE
      $<$<CXX_COMPILER_ID:MSVC>:
           /W4>)
 
-install(TARGETS tdscpp DESTINATION lib)
+install(TARGETS tdscpp DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
 install(FILES tdscpp.h DESTINATION include)
