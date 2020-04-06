@@ -48,7 +48,8 @@ struct conn_context {
 
 namespace tds {
 	Conn::Conn(const string& server, const string& username, const string& password, const string& app,
-               const msg_handler& message_handler, const msg_handler& error_handler) {
+			   const msg_handler& message_handler, const msg_handler& error_handler,
+			   const tbl_handler& table_handler) {
 #ifdef _WIN32
 		if (tds_socket_init())
 			throw runtime_error("tds_socket_init failed.");
@@ -87,6 +88,7 @@ namespace tds {
 			try {
 				this->message_handler = message_handler;
 				this->error_handler = error_handler;
+				this->table_handler = table_handler;
 
 				context->msg_handler = [](const TDSCONTEXT* context, TDSSOCKET* sock, TDSMESSAGE* msg) {
 					auto cc = (conn_context*)context;
@@ -517,7 +519,7 @@ namespace tds {
 			throw runtime_error("tds_submit_execute failed.");
 	}
 
-	bool Query::fetch_row() {
+	bool Query::fetch_row(bool call_callbacks) {
 		TDSRET rc;
 		TDS_INT result_type;
 
@@ -526,6 +528,9 @@ namespace tds {
 
 			switch (result_type) {
 				case TDS_ROWFMT_RESULT:
+				{
+					list<pair<string, server_type>> ls;
+
 					cols.clear();
 					cols.reserve(tds.sock->current_results->num_cols);
 
@@ -533,8 +538,16 @@ namespace tds {
 						string name = dstr_to_string(tds.sock->current_results->columns[i]->column_name);
 
 						cols.emplace_back(name, (server_type)tds.sock->current_results->columns[i]->column_type);
+
+						if (call_callbacks && tds.table_handler)
+							ls.emplace_back(name, (server_type)tds.sock->current_results->columns[i]->column_type);
 					}
+
+					if (call_callbacks && tds.table_handler)
+						tds.table_handler(ls);
+
 					break;
+				}
 
 				case TDS_COMPUTE_RESULT:
 				case TDS_ROW_RESULT:
