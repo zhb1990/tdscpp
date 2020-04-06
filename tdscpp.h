@@ -59,9 +59,9 @@ struct tds_result_info;
 #endif
 
 namespace tds {
-	typedef void (*msg_handler)(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
+	typedef std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
 							    const std::string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
-							    uint8_t severity, int oserr);
+							    uint8_t severity, int oserr)> msg_handler;
 
 	// taken from freetds
 	enum class server_type {
@@ -144,7 +144,7 @@ namespace tds {
 	class TDSCPP Conn {
 	public:
 		Conn(const std::string& server, const std::string& username, const std::string& password, const std::string& app = "",
-				msg_handler message_handler = nullptr, msg_handler error_handler = nullptr);
+			 const msg_handler& message_handler = nullptr, const msg_handler& error_handler = nullptr);
 		~Conn();
 		void bcp(const std::string_view& table, const std::vector<std::string>& np, const std::vector<std::vector<std::optional<std::string>>>& vp);
 		uint16_t spid() const;

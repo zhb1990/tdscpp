@@ -47,7 +47,8 @@ struct conn_context {
 #include "popvis.h"
 
 namespace tds {
-	Conn::Conn(const string& server, const string& username, const string& password, const string& app, msg_handler message_handler, msg_handler error_handler) {
+	Conn::Conn(const string& server, const string& username, const string& password, const string& app,
+               const msg_handler& message_handler, const msg_handler& error_handler) {
 #ifdef _WIN32
 		if (tds_socket_init())
 			throw runtime_error("tds_socket_init failed.");
