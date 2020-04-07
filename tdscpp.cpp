@@ -49,7 +49,7 @@ struct conn_context {
 namespace tds {
 	Conn::Conn(const string& server, const string& username, const string& password, const string& app,
 			   const msg_handler& message_handler, const msg_handler& error_handler,
-			   const tbl_handler& table_handler) {
+			   const tbl_handler& table_handler, const tbl_row_handler& row_handler) {
 #ifdef _WIN32
 		if (tds_socket_init())
 			throw runtime_error("tds_socket_init failed.");
@@ -89,6 +89,7 @@ namespace tds {
 				this->message_handler = message_handler;
 				this->error_handler = error_handler;
 				this->table_handler = table_handler;
+				this->row_handler = row_handler;
 
 				context->msg_handler = [](const TDSCONTEXT* context, TDSSOCKET* sock, TDSMESSAGE* msg) {
 					auto cc = (conn_context*)context;
@@ -529,7 +530,7 @@ namespace tds {
 			switch (result_type) {
 				case TDS_ROWFMT_RESULT:
 				{
-					list<pair<string, server_type>> ls;
+					vector<pair<string, server_type>> ls;
 
 					cols.clear();
 					cols.reserve(tds.sock->current_results->num_cols);
@@ -623,6 +624,9 @@ namespace tds {
 								}
 							}
 						}
+
+						if (call_callbacks && tds.row_handler)
+							tds.row_handler(cols);
 
 						return true;
 					}

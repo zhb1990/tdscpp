@@ -21,7 +21,6 @@
 #include <vector>
 #include <optional>
 #include <functional>
-#include <list>
 
 struct tds_context;
 struct tds_socket;
@@ -134,20 +133,22 @@ namespace tds {
 		SYB5BIGTIME = 188,	/* 0xBC */
 	};
 
-	typedef std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
-							    const std::string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
-							    uint8_t severity, int oserr)> msg_handler;
-	typedef std::function<void(const std::list<std::pair<std::string, server_type>>& columns)> tbl_handler;
-
 	class Proc;
 	class Query;
 	class Trans;
+	class Field;
+
+	typedef std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
+							    const std::string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
+							    uint8_t severity, int oserr)> msg_handler;
+	typedef std::function<void(const std::vector<std::pair<std::string, server_type>>& columns)> tbl_handler;
+	typedef std::function<void(const std::vector<Field>& columns)> tbl_row_handler;
 
 	class TDSCPP Conn {
 	public:
 		Conn(const std::string& server, const std::string& username, const std::string& password, const std::string& app = "",
 			 const msg_handler& message_handler = nullptr, const msg_handler& error_handler = nullptr,
-			 const tbl_handler& table_handler = nullptr);
+			 const tbl_handler& table_handler = nullptr, const tbl_row_handler& row_handler = nullptr);
 		~Conn();
 		void bcp(const std::string_view& table, const std::vector<std::string>& np, const std::vector<std::vector<std::optional<std::string>>>& vp);
 		uint16_t spid() const;
@@ -174,6 +175,7 @@ namespace tds {
 		msg_handler message_handler;
 		msg_handler error_handler;
 		tbl_handler table_handler;
+		tbl_row_handler row_handler;
 		mutable int in_dtor = 0;
 	};
 
