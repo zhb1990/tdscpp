@@ -153,6 +153,7 @@ namespace tds {
 		void bcp(const std::string_view& table, const std::vector<std::string>& np, const std::vector<std::vector<std::optional<std::string>>>& vp);
 		uint16_t spid() const;
 		void kill();
+		void cancel();
 
 		template<typename... Args>
 		void run(const std::string& s, const Args&... args) const;

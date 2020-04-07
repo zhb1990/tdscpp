@@ -879,4 +879,8 @@ namespace tds {
 
 		tds_deinit_bcpinfo(&bcph.bcpinfo);
 	}
+
+	void Conn::cancel() {
+		tds_send_cancel(sock);
+	}
 }
