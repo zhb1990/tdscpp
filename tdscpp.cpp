@@ -49,7 +49,13 @@ struct conn_context {
 namespace tds {
 	Conn::Conn(const string& server, const string& username, const string& password, const string& app,
 			   const msg_handler& message_handler, const msg_handler& error_handler,
-			   const tbl_handler& table_handler, const tbl_row_handler& row_handler) {
+			   const tbl_handler& table_handler, const tbl_row_handler& row_handler,
+			   const tbl_row_count_handler& row_count_handler) :
+			   message_handler(message_handler),
+			   error_handler(error_handler),
+			   table_handler(table_handler),
+			   row_handler(row_handler),
+			   row_count_handler(row_count_handler) {
 #ifdef _WIN32
 		if (tds_socket_init())
 			throw runtime_error("tds_socket_init failed.");
@@ -86,11 +92,6 @@ namespace tds {
 				context->locale->date_fmt = strdup(STD_DATETIME_FMT);
 
 			try {
-				this->message_handler = message_handler;
-				this->error_handler = error_handler;
-				this->table_handler = table_handler;
-				this->row_handler = row_handler;
-
 				context->msg_handler = [](const TDSCONTEXT* context, TDSSOCKET* sock, TDSMESSAGE* msg) {
 					auto cc = (conn_context*)context;
 
@@ -630,6 +631,11 @@ namespace tds {
 
 						return true;
 					}
+
+				case TDS_DONEINPROC_RESULT:
+					if (tds.sock->rows_affected != TDS_NO_COUNT && call_callbacks && tds.row_count_handler)
+						tds.row_count_handler(tds.sock->rows_affected);
+					break;
 
 				default:
 					break;

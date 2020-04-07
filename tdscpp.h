@@ -143,12 +143,14 @@ namespace tds {
 							    uint8_t severity, int oserr)> msg_handler;
 	typedef std::function<void(const std::vector<std::pair<std::string, server_type>>& columns)> tbl_handler;
 	typedef std::function<void(const std::vector<Field>& columns)> tbl_row_handler;
+	typedef std::function<void(unsigned int count)> tbl_row_count_handler;
 
 	class TDSCPP Conn {
 	public:
 		Conn(const std::string& server, const std::string& username, const std::string& password, const std::string& app = "",
 			 const msg_handler& message_handler = nullptr, const msg_handler& error_handler = nullptr,
-			 const tbl_handler& table_handler = nullptr, const tbl_row_handler& row_handler = nullptr);
+			 const tbl_handler& table_handler = nullptr, const tbl_row_handler& row_handler = nullptr,
+			 const tbl_row_count_handler& row_count_handler = nullptr);
 		~Conn();
 		void bcp(const std::string_view& table, const std::vector<std::string>& np, const std::vector<std::vector<std::optional<std::string>>>& vp);
 		uint16_t spid() const;
@@ -176,6 +178,7 @@ namespace tds {
 		msg_handler error_handler;
 		tbl_handler table_handler;
 		tbl_row_handler row_handler;
+		tbl_row_count_handler row_count_handler;
 		mutable int in_dtor = 0;
 	};
 
