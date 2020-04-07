@@ -28,7 +28,6 @@ struct tds_message;
 struct tds_login;
 struct tds_column;
 struct tds_dynamic;
-struct tds_bcpinfo;
 struct tds_result_info;
 
 #ifdef _WIN32
