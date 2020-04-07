@@ -133,7 +133,6 @@ namespace tds {
 		SYB5BIGTIME = 188,	/* 0xBC */
 	};
 
-	class Proc;
 	class Query;
 	class Trans;
 	class Field;
@@ -159,7 +158,6 @@ namespace tds {
 		template<typename... Args>
 		void run(const std::string& s, const Args&... args) const;
 
-		friend Proc;
 		friend Query;
 		friend Trans;
 
@@ -180,11 +178,6 @@ namespace tds {
 		tbl_row_handler row_handler;
 		tbl_row_count_handler row_count_handler;
 		mutable int in_dtor = 0;
-	};
-
-	class TDSCPP Proc {
-	public:
-		Proc(const Conn& tds, const std::string& q, const std::function<void(uint64_t)>& rows_func = nullptr);
 	};
 
 	class TDSCPP Date {

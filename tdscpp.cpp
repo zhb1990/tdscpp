@@ -205,43 +205,6 @@ namespace tds {
 		return 0;
 	}
 
-	Proc::Proc(const Conn& tds, const string& q, const function<void(uint64_t)>& rows_func) {
-		TDSRET rc;
-		TDS_INT result_type;
-
-		rc = tds_submit_query(tds.sock, q.c_str());
-		if (TDS_FAILED(rc))
-			throw runtime_error("tds_submit_query failed.");
-
-		while ((rc = tds_process_tokens(tds.sock, &result_type, nullptr, TDS_TOKEN_RESULTS)) == TDS_SUCCESS) {
-			const int stop_mask = TDS_STOPAT_ROWFMT | TDS_RETURN_DONE | TDS_RETURN_ROW | TDS_RETURN_COMPUTE;
-
-			switch (result_type) {
-				case TDS_COMPUTE_RESULT:
-				case TDS_ROW_RESULT:
-					while ((rc = tds_process_tokens(tds.sock, &result_type, nullptr, stop_mask)) == TDS_SUCCESS) {
-						if (result_type != TDS_ROW_RESULT && result_type != TDS_COMPUTE_RESULT)
-							break;
-
-						if (!tds.sock->current_results)
-							continue;
-					}
-					break;
-
-				case TDS_DONE_RESULT:
-					if (rows_func && tds.sock->rows_affected != TDS_NO_COUNT)
-						rows_func(tds.sock->rows_affected);
-				break;
-
-				default:
-					break;
-			}
-		}
-
-		if (TDS_FAILED(rc))
-			throw runtime_error("tds_process_tokens failed.");
-	}
-
 	Field::operator int64_t() const {
 		if (null)
 			return 0;
