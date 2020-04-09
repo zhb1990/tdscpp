@@ -25,7 +25,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_definitions(TDSCPP_EXPORT)
-add_compile_definitions(_THREAD_SAFE)
 
 if(NOT WIN32)
 set(UNIXODBC 1)

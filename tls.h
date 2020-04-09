@@ -25,7 +25,7 @@
 #endif
 
 #ifdef HAVE_GNUTLS
-#  if defined(_THREAD_SAFE) && defined(TDS_HAVE_PTHREAD_MUTEX)
+#  if defined(TDS_HAVE_PTHREAD_MUTEX)
 #    include "thread.h"
 #    ifndef GNUTLS_USE_NETTLE
 #      include <gcrypt.h>
