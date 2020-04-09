@@ -26,7 +26,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_definitions(TDSCPP_EXPORT)
 add_compile_definitions(_THREAD_SAFE)
-add_compile_definitions(UNIXODBC)
+
+if(NOT WIN32)
+set(UNIXODBC 1)
+endif()
 
 check_include_files(arpa/inet.h HAVE_ARPA_INET_H)
 check_include_files(dirent.h HAVE_DIRENT_H)
