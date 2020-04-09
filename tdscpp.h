@@ -387,6 +387,23 @@ namespace tds {
 	private:
 		struct tds_socket* sock = nullptr;
 	};
+
+	static __inline std::string escape(const std::string_view& sv) {
+		std::string s{"["};
+
+		s.reserve(sv.length() + 2);
+
+		for (const auto& c : sv) {
+			if (c == ']')
+				s += "]]";
+			else
+				s += c;
+		}
+
+		s += "]";
+
+		return s;
+	}
 }
 
 #ifdef _MSC_VER
