@@ -136,12 +136,12 @@ namespace tds {
 	class Trans;
 	class Field;
 
-	typedef std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
-							    const std::string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
-							    uint8_t severity, int oserr)> msg_handler;
-	typedef std::function<void(const std::vector<std::pair<std::string, server_type>>& columns)> tbl_handler;
-	typedef std::function<void(const std::vector<Field>& columns)> tbl_row_handler;
-	typedef std::function<void(unsigned int count)> tbl_row_count_handler;
+	using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
+							const std::string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
+							uint8_t severity, int oserr)>;
+	using tbl_handler = std::function<void(const std::vector<std::pair<std::string, server_type>>& columns)>;
+	using tbl_row_handler = std::function<void(const std::vector<Field>& columns)>;
+	using tbl_row_count_handler = std::function<void(unsigned int count)>;
 
 	class TDSCPP Conn {
 	public:
