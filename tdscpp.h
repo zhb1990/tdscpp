@@ -154,6 +154,7 @@ namespace tds {
 		uint16_t spid() const;
 		void kill();
 		void cancel();
+		bool is_dead() const;
 
 		template<typename... Args>
 		void run(const std::string& s, const Args&... args) const;

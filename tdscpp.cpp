@@ -883,4 +883,8 @@ namespace tds {
 	void Conn::cancel() {
 		tds_send_cancel(sock);
 	}
+
+	bool Conn::is_dead() const {
+		return sock->state == TDS_DEAD;
+	}
 }
