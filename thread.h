@@ -24,7 +24,7 @@
 
 #undef TDS_HAVE_MUTEX
 
-#if defined(TDS_HAVE_PTHREAD_MUTEX)
+#if defined(TDS_HAVE_PTHREAD_MUTEX) && !defined(__MINGW32__)
 
 #include "tds_sysdep_public.h"
 #include <pthread.h>
