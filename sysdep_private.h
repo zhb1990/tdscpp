@@ -101,8 +101,6 @@ typedef DWORD pid_t;
 /* use macros to use new style names */
 #if defined(__MSVCRT__) || defined(_MSC_VER)
 /* Use API as always present and not causing problems */
-#undef getpid
-#define getpid()           GetCurrentProcessId()
 #define strdup(s)          _strdup(s)
 #define unlink(f)          _unlink(f)
 #define putenv(s)          _putenv(s)

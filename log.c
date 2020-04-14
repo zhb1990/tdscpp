@@ -218,7 +218,12 @@ tdsdump_start(FILE *file, const char *fname, int line)
 	if (tds_debug_flags & TDS_DBGFLAG_PID) {
 		if (started)
 			*pbuf++ = ' ';
+
+#ifdef _WIN32
+		pbuf += sprintf(pbuf, "%d", GetCurrentProcessId());
+#else
 		pbuf += sprintf(pbuf, "%d", (int) getpid());
+#endif
 		started = 1;
 	}
 

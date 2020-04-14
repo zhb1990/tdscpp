@@ -724,7 +724,13 @@ tds_send_login(TDSSOCKET * tds, const TDSLOGIN * login)
 	} else {
 		tds_put_login_string(tds, tds_dstr_cstr(&login->password), TDS_MAXNAME);
 	}
+
+#ifdef _WIN32
+	sprintf(blockstr, "%d", GetCurrentProcessId());
+#else
 	sprintf(blockstr, "%d", (int) getpid());
+#endif
+
 	tds_put_login_string(tds, blockstr, TDS_MAXNAME);	/* host process */
 #ifdef WORDS_BIGENDIAN
 	if (tds->conn->emul_little_endian) {
@@ -1010,7 +1016,11 @@ tds7_send_login(TDSSOCKET * tds, const TDSLOGIN * login)
 
 	tds_put_n(tds, client_progver, sizeof(client_progver));	/* client program version ? */
 
+#ifdef _WIN32
+	tds_put_int(tds, GetCurrentProcessId());
+#else
 	tds_put_int(tds, getpid());	/* process id of this process */
+#endif
 
 	tds_put_n(tds, connection_id, sizeof(connection_id));
 
@@ -1199,8 +1209,14 @@ tds71_do_login(TDSSOCKET * tds, TDSLOGIN* login)
 #endif
 	/* instance */
 	tds_put_n(tds, instance_name, instance_name_len);
+
 	/* pid */
+#ifdef _WIN32
+	tds_put_int(tds, GetCurrentProcessId());
+#else
 	tds_put_int(tds, getpid());
+#endif
+
 	/* MARS (1 enabled) */
 	if (IS_TDS72_PLUS(tds->conn))
 #if ENABLE_ODBC_MARS

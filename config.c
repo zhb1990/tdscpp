@@ -157,7 +157,11 @@ tds_read_config_info(TDSSOCKET * tds, TDSLOGIN * login, TDSLOCALE * locale)
 		if (*s) {
 			opened = tdsdump_open(s);
 		} else {
+#ifdef _WIN32
+			pid = GetCurrentProcessId();
+#else
 			pid = getpid();
+#endif
 			if (asprintf(&path, pid_config_logpath, (int) pid) >= 0) {
 				if (*path) {
 					opened = tdsdump_open(path);
@@ -799,7 +803,13 @@ tds_config_env_tdsdump(TDSLOGIN * login)
 
 	if (!strlen(s)) {
 		char *path;
+
+#ifdef _WIN32
+		int pid = GetCurrentProcessId();
+#else
 		pid_t pid = getpid();
+#endif
+
 		if (asprintf(&path, pid_logpath, (int) pid) < 0)
 			return 0;
 		if (!tds_dstr_set(&login->dump_file, path)) {
