@@ -57,6 +57,10 @@ struct tds_result_info;
 #pragma warning(disable: 4251)
 #endif
 
+#if !defined(_MSC_VER) && __cplusplus < 201703
+#error "C++17 required."
+#endif
+
 namespace tds {
 	// taken from freetds
 	enum class server_type {
