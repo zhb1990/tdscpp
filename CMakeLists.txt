@@ -196,9 +196,8 @@ target_compile_options(tdscpp PRIVATE
      $<$<CXX_COMPILER_ID:MSVC>:
           /W4>)
 
-set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER "tdscpp.h")
-
 install(TARGETS tdscpp EXPORT tdscpp-targets DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
+install(FILES tdscpp.h DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR})
 
 install(EXPORT tdscpp-targets DESTINATION lib/cmake/tdscpp)
 
