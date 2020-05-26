@@ -6,6 +6,7 @@ include(CheckSymbolExists)
 include(CheckStructHasMember)
 include(CheckCXXSourceCompiles)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 project(tdscpp VERSION 1.0)
 
@@ -195,5 +196,15 @@ target_compile_options(tdscpp PRIVATE
      $<$<CXX_COMPILER_ID:MSVC>:
           /W4>)
 
-install(TARGETS tdscpp DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
-install(FILES tdscpp.h DESTINATION include)
+set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER "tdscpp.h")
+
+install(TARGETS tdscpp EXPORT tdscpp-targets DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
+
+install(EXPORT tdscpp-targets DESTINATION lib/cmake/tdscpp)
+
+configure_package_config_file(
+    "tdscppConfig.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/tdscppConfig.cmake"
+    INSTALL_DESTINATION "lib/cmake/tdscpp"
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tdscppConfig.cmake" DESTINATION "lib/cmake/tdscpp")
