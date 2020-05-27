@@ -24,6 +24,7 @@ find_package(Threads)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 add_definitions(-DTDSCPP_EXPORT)
 
