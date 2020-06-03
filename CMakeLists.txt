@@ -129,6 +129,10 @@ set(HAVE_PTHREAD 1)
 set(TDS_HAVE_PTHREAD_MUTEX 1)
 endif()
 
+if(WIN32)
+set(HAVE_SSPI 1)
+endif()
+
 check_cxx_source_compiles("static void __attribute__((destructor)) my_uninit(void) {} int main() { return 0; }" TDS_ATTRIBUTE_DESTRUCTOR)
 
 check_struct_has_member("struct tm" "tm_zone" "time.h" HAVE_STRUCT_TM_TM_ZONE)
@@ -168,6 +172,7 @@ set(SRC_FILES tdscpp.cpp
     replacement_iconv.c
     sec_negotiate.c
     socketpair.c
+    sspi.c
     stream.c
     strlcpy.c
     tds_cond.c

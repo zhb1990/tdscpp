@@ -195,7 +195,7 @@
 #define HAVE_SQLSETPOSIROW 1
 
 /* Defined if not --disable-sspi and SSPI detected */
-/* #undef HAVE_SSPI */
+#cmakedefine HAVE_SSPI 1
 
 /* Define to 1 if you have the <stdbool.h> header file. */
 #cmakedefine HAVE_STDBOOL_H 1
