@@ -130,9 +130,16 @@ namespace tds {
 					if (!con)
 						throw runtime_error("tds_read_config_info failed.");
 
-					if (TDS_FAILED(tds_connect_and_login(sock, con))) {
+					auto ret = tds_connect_and_login(sock, con);
+
+					if (TDS_FAILED(ret)) {
+						char s[255];
+
 						tds_free_login(con);
-						throw runtime_error("tds_connect_and_login failed.");
+
+						sprintf(s, "tds_connect_and_login failed (%u).", ret);
+
+						throw runtime_error(s);
 					}
 
 					tds_free_login(con);
