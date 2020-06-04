@@ -283,7 +283,7 @@ namespace tds {
 
 	class TDSCPP Param {
 	public:
-		Param(const std::string& s) : null(false), s(s) {
+		Param(const std::string_view& s) : null(false), s(s) {
 		}
 
 		Param(nullptr_t) : null(true) {
@@ -295,7 +295,7 @@ namespace tds {
 
 	class binary_string {
 	public:
-		binary_string(std::string s) {
+		binary_string(const std::string_view& s) {
 			this->s = s;
 		}
 
@@ -343,8 +343,11 @@ namespace tds {
 			add_param2(i, (int64_t)v);
 		}
 
-		void add_param2(unsigned int i, const std::string& param) {
-			add_param2(i, std::string_view(param));
+		template<typename T>
+		void add_param2(unsigned int i, T* t) = delete;
+
+		void add_param2(unsigned int i, const char* t) {
+			add_param2(i, std::string_view(t));
 		}
 
 		template<typename T>
