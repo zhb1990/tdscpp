@@ -823,6 +823,67 @@ namespace tds {
 	};
 #include "popvis.h"
 
+	static void bcp_send_record(TDSSOCKET* tds, TDSBCPINFO* bcpinfo, tds_bcp_get_col_data get_col_data, int offset) {
+		TDSCOLUMN *bindcol;
+		int i;
+
+		if (tds->out_flag != TDS_BULK)
+			throw runtime_error("tds->out_flag != TDS_BULK");
+
+		if (tds_set_state(tds, TDS_WRITING) != TDS_WRITING)
+			throw runtime_error("failed to change state to TDS_WRITING");
+
+		tds_put_byte(tds, TDS_ROW_TOKEN);   /* 0xd1 */
+
+		for (i = 0; i < bcpinfo->bindinfo->num_cols; i++) {
+			TDS_INT save_size;
+			unsigned char *save_data;
+			TDSBLOB blob;
+			TDSRET rc;
+
+			bindcol = bcpinfo->bindinfo->columns[i];
+
+			/*
+			* Don't send the (meta)data for timestamp columns or
+			* identity columns unless indentity_insert is enabled.
+			*/
+
+			if ((!bcpinfo->identity_insert_on && bindcol->column_identity) ||
+				bindcol->column_timestamp ||
+				bindcol->column_computed) {
+				continue;
+			}
+
+			rc = get_col_data(bcpinfo, bindcol, offset);
+			if (TDS_FAILED(rc))
+				throw runtime_error("get_col_data failed for column " + to_string(i + 1));
+
+			save_size = bindcol->column_cur_size;
+			save_data = bindcol->column_data;
+
+			if (bindcol->bcp_column_data->is_null)
+				bindcol->column_cur_size = -1;
+			else if (is_blob_col(bindcol)) {
+				bindcol->column_cur_size = bindcol->bcp_column_data->datalen;
+				memset(&blob, 0, sizeof(blob));
+				blob.textvalue = (TDS_CHAR*)bindcol->bcp_column_data->data;
+				bindcol->column_data = (unsigned char*)&blob;
+			} else {
+				bindcol->column_cur_size = bindcol->bcp_column_data->datalen;
+				bindcol->column_data = bindcol->bcp_column_data->data;
+			}
+
+			rc = bindcol->funcs->put_data(tds, bindcol, 1);
+			bindcol->column_cur_size = save_size;
+			bindcol->column_data = save_data;
+
+			if (TDS_FAILED(rc))
+				throw runtime_error("put_data failed for column " + to_string(i + 1));
+		}
+
+		tds_set_state(tds, TDS_SENDING);
+	}
+
 	void Conn::bcp(const string_view& table, const vector<string>& np, const vector<vector<optional<string>>>& vp) {
 		bcp_holder bcph;
 
@@ -872,8 +933,7 @@ namespace tds {
 			};
 
 			for (unsigned int i = 0; i < vp.size(); i++) {
-				if (TDS_FAILED(tds_bcp_send_record(sock, &bcph.bcpinfo, gcd, nullptr, i)))
-					throw runtime_error("tds_bcp_send_record failed.");
+				bcp_send_record(sock, &bcph.bcpinfo, gcd, i);
 			}
 
 			int rows_copied;
