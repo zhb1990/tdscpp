@@ -133,11 +133,14 @@ namespace tds {
 					auto ret = tds_connect_and_login(sock, con);
 
 					if (TDS_FAILED(ret)) {
+						if (ret == -TDSEFCON)
+							throw runtime_error("Unable to login.");
+
 						char s[255];
 
 						tds_free_login(con);
 
-						sprintf(s, "tds_connect_and_login failed (%u).", ret);
+						sprintf(s, "tds_connect_and_login failed (%i).", ret);
 
 						throw runtime_error(s);
 					}
