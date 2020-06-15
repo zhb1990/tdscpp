@@ -22,14 +22,9 @@
 #include <optional>
 #include <functional>
 
-struct tds_context;
 struct tds_socket;
-struct tds_message;
-struct tds_login;
-struct tds_column;
 struct tds_dynamic;
 struct tds_result_info;
-struct tds_bcpinfo;
 
 #ifdef _WIN32
 
@@ -148,6 +143,8 @@ namespace tds {
 	using tbl_row_handler = std::function<void(const std::vector<Field>& columns)>;
 	using tbl_row_count_handler = std::function<void(unsigned int count)>;
 
+	class Conn_impl;
+
 	class TDSCPP Conn {
 	public:
 		Conn(const std::string& server, const std::string& username, const std::string& password, const std::string& app = "",
@@ -168,23 +165,7 @@ namespace tds {
 		friend Trans;
 
 	private:
-		void bcp_get_column_data(struct tds_column* bindcol, int offset);
-		int handle_msg(struct tds_message* msg);
-		int handle_err(struct tds_message* msg);
-		void bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset);
-
-		struct tds_login* login = nullptr;
-		struct tds_context* context = nullptr;
-		struct tds_socket* sock = nullptr;
-
-		std::vector<std::string> bcp_names;
-		const std::vector<std::vector<std::optional<std::string>>>* bcp_data;
-		msg_handler message_handler;
-		msg_handler error_handler;
-		tbl_handler table_handler;
-		tbl_row_handler row_handler;
-		tbl_row_count_handler row_count_handler;
-		mutable int in_dtor = 0;
+		Conn_impl* impl;
 	};
 
 	class TDSCPP Date {

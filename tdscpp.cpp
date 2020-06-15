@@ -21,6 +21,7 @@
 #include <functional>
 #include "pushvis.h"
 #include "tdscpp.h"
+#include "tdscpp-private.h"
 #include "popvis.h"
 #include <sstream>
 #include <iomanip>
@@ -42,12 +43,20 @@ using namespace std;
 #include "pushvis.h"
 struct conn_context {
 	struct tds_context ctx;
-	tds::Conn* conn;
+	tds::Conn_impl* conn;
 };
 #include "popvis.h"
 
 namespace tds {
 	Conn::Conn(const string& server, const string& username, const string& password, const string& app,
+		const msg_handler& message_handler, const msg_handler& error_handler,
+		const tbl_handler& table_handler, const tbl_row_handler& row_handler,
+		const tbl_row_count_handler& row_count_handler) {
+		impl = new Conn_impl(server, username, password, app, message_handler, error_handler,
+							  table_handler, row_handler, row_count_handler);
+	}
+
+	Conn_impl::Conn_impl(const string& server, const string& username, const string& password, const string& app,
 			   const msg_handler& message_handler, const msg_handler& error_handler,
 			   const tbl_handler& table_handler, const tbl_row_handler& row_handler,
 			   const tbl_row_count_handler& row_count_handler) :
@@ -160,7 +169,7 @@ namespace tds {
 		}
 	}
 
-	Conn::~Conn() {
+	Conn_impl::~Conn_impl() {
 		if (sock)
 			tds_free_socket(sock);
 
@@ -171,11 +180,19 @@ namespace tds {
 			tds_free_login(login);
 	}
 
+	Conn::~Conn() {
+		delete impl;
+	}
+
 	uint16_t Conn::spid() const {
+		return impl->spid();
+	}
+
+	uint16_t Conn_impl::spid() const {
 		return sock->conn->spid;
 	}
 
-	void Conn::kill() {
+	void Conn_impl::kill() {
 		if (sock->conn->s != INVALID_SOCKET)
 #ifdef _WIN32
 			closesocket(sock->conn->s);
@@ -184,7 +201,11 @@ namespace tds {
 #endif
 	}
 
-	int Conn::handle_msg(struct tds_message* msg) {
+	void Conn::kill() {
+		impl->kill();
+	}
+
+	int Conn_impl::handle_msg(struct tds_message* msg) {
 		try {
 			if (message_handler) {
 				message_handler(msg->server ? msg->server : "", msg->message ? msg->message : "", msg->proc_name ? msg->proc_name : "",
@@ -202,7 +223,7 @@ namespace tds {
 		return 0;
 	}
 
-	int Conn::handle_err(struct tds_message* msg) {
+	int Conn_impl::handle_err(struct tds_message* msg) {
 		if (error_handler) {
 			error_handler(msg->server ? msg->server : "", msg->message ? msg->message : "", msg->proc_name ? msg->proc_name : "",
 						  msg->sql_state ? msg->sql_state : "", msg->msgno, msg->line_number, msg->state, msg->priv_msg_type,
@@ -369,7 +390,7 @@ namespace tds {
 			throw runtime_error("tds_alloc_param_result failed.");
 
 		dyn_params = params;
-		tds_set_param_type(tds.sock->conn, params->columns[i], XSYBNVARCHAR);
+		tds_set_param_type(tds.impl->sock->conn, params->columns[i], XSYBNVARCHAR);
 		params->columns[i]->column_size = static_cast<TDS_INT>(param.size());
 		params->columns[i]->column_cur_size = static_cast<TDS_INT>(param.size());
 		params->columns[i]->column_varint_size = 8;
@@ -388,7 +409,7 @@ namespace tds {
 			throw runtime_error("tds_alloc_param_result failed.");
 
 		dyn_params = params;
-		tds_set_param_type(tds.sock->conn, params->columns[i], XSYBVARBINARY);
+		tds_set_param_type(tds.impl->sock->conn, params->columns[i], XSYBVARBINARY);
 		params->columns[i]->column_size = static_cast<TDS_INT>(param.s.size());
 		params->columns[i]->column_cur_size = static_cast<TDS_INT>(param.s.size());
 		params->columns[i]->column_varint_size = 8;
@@ -407,7 +428,7 @@ namespace tds {
 			throw runtime_error("tds_alloc_param_result failed.");
 
 		dyn_params = params;
-		tds_set_param_type(tds.sock->conn, params->columns[i], SYBINT8);
+		tds_set_param_type(tds.impl->sock->conn, params->columns[i], SYBINT8);
 		params->columns[i]->column_cur_size = sizeof(v);
 
 		tds_alloc_param_data(params->columns[i]);
@@ -422,7 +443,7 @@ namespace tds {
 			throw runtime_error("tds_alloc_param_result failed.");
 
 		dyn_params = params;
-		tds_set_param_type(tds.sock->conn, params->columns[i], SYBVARCHAR);
+		tds_set_param_type(tds.impl->sock->conn, params->columns[i], SYBVARCHAR);
 
 		if (p.null) {
 			params->columns[i]->column_size = -1;
@@ -444,7 +465,7 @@ namespace tds {
 			throw runtime_error("tds_alloc_param_result failed.");
 
 		dyn_params = params;
-		tds_set_param_type(tds.sock->conn, params->columns[i], SYBVARCHAR);
+		tds_set_param_type(tds.impl->sock->conn, params->columns[i], SYBVARCHAR);
 
 		params->columns[i]->column_size = -1;
 		params->columns[i]->column_cur_size = -1;
@@ -460,7 +481,7 @@ namespace tds {
 			throw runtime_error("tds_alloc_param_result failed.");
 
 		dyn_params = params;
-		tds_set_param_type(tds.sock->conn, params->columns[i], SYBFLT8);
+		tds_set_param_type(tds.impl->sock->conn, params->columns[i], SYBFLT8);
 
 		params->columns[i]->column_size = sizeof(double);
 		params->columns[i]->column_cur_size = sizeof(double);
@@ -480,16 +501,16 @@ namespace tds {
 		TDSRET rc;
 		TDS_INT result_type;
 
-		rc = tds_submit_prepare(tds.sock, q.c_str(), nullptr, &dyn, dyn_params);
+		rc = tds_submit_prepare(tds.impl->sock, q.c_str(), nullptr, &dyn, dyn_params);
 		if (TDS_FAILED(rc))
 			throw runtime_error("tds_submit_prepare failed.");
 
-		while ((rc = tds_process_tokens(tds.sock, &result_type, nullptr, TDS_TOKEN_RESULTS)) == TDS_SUCCESS) {
+		while ((rc = tds_process_tokens(tds.impl->sock, &result_type, nullptr, TDS_TOKEN_RESULTS)) == TDS_SUCCESS) {
 		}
 
 		dyn->params = dyn_params;
 
-		rc = tds_submit_execute(tds.sock, dyn);
+		rc = tds_submit_execute(tds.impl->sock, dyn);
 		if (TDS_FAILED(rc))
 			throw runtime_error("tds_submit_execute failed.");
 	}
@@ -498,7 +519,7 @@ namespace tds {
 		TDSRET rc;
 		TDS_INT result_type;
 
-		while ((rc = tds_process_tokens(tds.sock, &result_type, nullptr, TDS_TOKEN_RESULTS)) == TDS_SUCCESS) {
+		while ((rc = tds_process_tokens(tds.impl->sock, &result_type, nullptr, TDS_TOKEN_RESULTS)) == TDS_SUCCESS) {
 			const int stop_mask = TDS_STOPAT_ROWFMT | TDS_RETURN_DONE | TDS_RETURN_ROW | TDS_RETURN_COMPUTE;
 
 			switch (result_type) {
@@ -507,28 +528,28 @@ namespace tds {
 					vector<pair<string, server_type>> ls;
 
 					cols.clear();
-					cols.reserve(tds.sock->current_results->num_cols);
+					cols.reserve(tds.impl->sock->current_results->num_cols);
 
-					for (unsigned int i = 0; i < tds.sock->current_results->num_cols; i++) {
-						string name = dstr_to_string(tds.sock->current_results->columns[i]->column_name);
+					for (unsigned int i = 0; i < tds.impl->sock->current_results->num_cols; i++) {
+						string name = dstr_to_string(tds.impl->sock->current_results->columns[i]->column_name);
 
-						cols.emplace_back(name, (server_type)tds.sock->current_results->columns[i]->column_type);
+						cols.emplace_back(name, (server_type)tds.impl->sock->current_results->columns[i]->column_type);
 
-						if (call_callbacks && tds.table_handler)
-							ls.emplace_back(name, (server_type)tds.sock->current_results->columns[i]->column_type);
+						if (call_callbacks && tds.impl->table_handler)
+							ls.emplace_back(name, (server_type)tds.impl->sock->current_results->columns[i]->column_type);
 					}
 
-					if (call_callbacks && tds.table_handler)
-						tds.table_handler(ls);
+					if (call_callbacks && tds.impl->table_handler)
+						tds.impl->table_handler(ls);
 
 					break;
 				}
 
 				case TDS_COMPUTE_RESULT:
 				case TDS_ROW_RESULT:
-					if ((rc = tds_process_tokens(tds.sock, &result_type, nullptr, stop_mask)) == TDS_SUCCESS) {
-						for (unsigned int i = 0; i < tds.sock->current_results->num_cols; i++) {
-							auto& col = tds.sock->current_results->columns[i];
+					if ((rc = tds_process_tokens(tds.impl->sock, &result_type, nullptr, stop_mask)) == TDS_SUCCESS) {
+						for (unsigned int i = 0; i < tds.impl->sock->current_results->num_cols; i++) {
+							auto& col = tds.impl->sock->current_results->columns[i];
 
 							// FIXME - other types
 							cols[i].null = col->column_cur_size < 0;
@@ -581,7 +602,7 @@ namespace tds {
 
 									ctype = tds_get_conversion_type(col->column_type, col->column_size);
 
-									len = tds_convert(tds.sock->conn->tds_ctx, ctype, (TDS_CHAR*)col->column_data,
+									len = tds_convert(tds.impl->sock->conn->tds_ctx, ctype, (TDS_CHAR*)col->column_data,
 													  col->column_cur_size, SYBVARCHAR, &cr);
 
 									if (len < 0)
@@ -599,15 +620,15 @@ namespace tds {
 							}
 						}
 
-						if (call_callbacks && tds.row_handler)
-							tds.row_handler(cols);
+						if (call_callbacks && tds.impl->row_handler)
+							tds.impl->row_handler(cols);
 
 						return true;
 					}
 
 				case TDS_DONEINPROC_RESULT:
-					if (tds.sock->rows_affected != TDS_NO_COUNT && call_callbacks && tds.row_count_handler)
-						tds.row_count_handler(tds.sock->rows_affected);
+					if (tds.impl->sock->rows_affected != TDS_NO_COUNT && call_callbacks && tds.impl->row_count_handler)
+						tds.impl->row_count_handler(tds.impl->sock->rows_affected);
 					break;
 
 				default:
@@ -622,19 +643,19 @@ namespace tds {
 		TDSRET rc;
 		TDS_INT result_type;
 
-		tds.in_dtor++;
+		tds.impl->in_dtor++;
 
-		while ((rc = tds_process_tokens(tds.sock, &result_type, nullptr, TDS_TOKEN_RESULTS)) == TDS_SUCCESS) {
+		while ((rc = tds_process_tokens(tds.impl->sock, &result_type, nullptr, TDS_TOKEN_RESULTS)) == TDS_SUCCESS) {
 			const int stop_mask = TDS_STOPAT_ROWFMT | TDS_RETURN_DONE | TDS_RETURN_ROW | TDS_RETURN_COMPUTE;
 
 			switch (result_type) {
 				case TDS_COMPUTE_RESULT:
 				case TDS_ROW_RESULT:
-					while ((rc = tds_process_tokens(tds.sock, &result_type, nullptr, stop_mask)) == TDS_SUCCESS) {
+					while ((rc = tds_process_tokens(tds.impl->sock, &result_type, nullptr, stop_mask)) == TDS_SUCCESS) {
 						if (result_type != TDS_ROW_RESULT && result_type != TDS_COMPUTE_RESULT)
 							break;
 
-						if (!tds.sock->current_results)
+						if (!tds.impl->sock->current_results)
 							continue;
 					}
 					break;
@@ -644,9 +665,9 @@ namespace tds {
 			}
 		}
 
-		tds_release_cur_dyn(tds.sock);
+		tds_release_cur_dyn(tds.impl->sock);
 
-		tds.in_dtor--;
+		tds.impl->in_dtor--;
 	}
 
 	Date::Date(unsigned int year, unsigned int month, unsigned int day) {
@@ -752,7 +773,7 @@ namespace tds {
 		return d.to_string() + "T" + t.to_string();
 	}
 
-	Trans::Trans(const Conn& tds) : sock(tds.sock) {
+	Trans::Trans(const Conn& tds) : sock(tds.impl->sock) {
 		if (TDS_FAILED(tds_submit_begin_tran(sock)))
 			throw runtime_error("tds_submit_begin_tran failed.");
 
@@ -907,7 +928,7 @@ namespace tds {
 		}
 	}
 
-	void Conn::bcp_get_column_data(TDSCOLUMN* bindcol, int offset) {
+	void Conn_impl::bcp_get_column_data(TDSCOLUMN* bindcol, int offset) {
 		if (bindcol->column_bindlen == 0) {
 			bindcol->bcp_column_data->datalen = 0;
 			bindcol->bcp_column_data->is_null = bindcol->column_nullable;
@@ -956,7 +977,7 @@ namespace tds {
 		}
 	}
 
-	void Conn::bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset) {
+	void Conn_impl::bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset) {
 		TDSCOLUMN *bindcol;
 		int i;
 
@@ -1028,7 +1049,7 @@ namespace tds {
 		if (!tds_dstr_copyn(&bcpinfo.tablename, table.data(), table.length()))
 			throw runtime_error("tds_dstr_copyn failed.");
 
-		if (TDS_FAILED(tds_bcp_init(sock, &bcpinfo)))
+		if (TDS_FAILED(tds_bcp_init(impl->sock, &bcpinfo)))
 			throw runtime_error("tds_bcp_init failed.");
 
 		try {
@@ -1050,18 +1071,17 @@ namespace tds {
 				i++;
 			}
 
-			if (TDS_FAILED(tds_bcp_start_copy_in(sock, &bcpinfo)))
+			if (TDS_FAILED(tds_bcp_start_copy_in(impl->sock, &bcpinfo)))
 				throw runtime_error("tds_bcp_start_copy_in failed.");
 
-			bcp_names = np;
-			bcp_data = &vp;
+			impl->bcp_data = &vp;
 
 			for (unsigned int i = 0; i < vp.size(); i++) {
-				bcp_send_record(&bcpinfo, i);
+				impl->bcp_send_record(&bcpinfo, i);
 			}
 
 			int rows_copied;
-			if (TDS_FAILED(tds_bcp_done(sock, &rows_copied)))
+			if (TDS_FAILED(tds_bcp_done(impl->sock, &rows_copied)))
 				throw runtime_error("tds_bcp_done failed.");
 		} catch (...) {
 			tds_deinit_bcpinfo(&bcpinfo);
@@ -1072,10 +1092,10 @@ namespace tds {
 	}
 
 	void Conn::cancel() {
-		tds_send_cancel(sock);
+		tds_send_cancel(impl->sock);
 	}
 
 	bool Conn::is_dead() const {
-		return sock->state == TDS_DEAD;
+		return impl->sock->state == TDS_DEAD;
 	}
 }
