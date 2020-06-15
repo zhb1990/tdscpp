@@ -15,6 +15,7 @@ option(ENABLE_ODBC_WIDE    "Enable ODBC wide character support" ON)
 option(ENABLE_KRB5         "Enable Kerberos support" OFF)
 option(ENABLE_ODBC_MARS    "Enable MARS" ON)
 option(ENABLE_EXTRA_CHECKS "Enable internal extra checks, DO NOT USE in production" OFF)
+option(BUILD_SAMPLE        "Build sample program" ON)
 
 if(WITH_OPENSSL)
 find_package(OpenSSL)
@@ -221,3 +222,13 @@ configure_package_config_file(
 )
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/tdscppConfig.cmake" DESTINATION "lib/cmake/tdscpp")
+
+# ----------------------------------------
+
+if(BUILD_SAMPLE)
+	set(TEST_SRC_FILES tdscpp-test.cpp)
+
+	add_executable(tdscpp-test ${TEST_SRC_FILES})
+	target_link_libraries(tdscpp-test tdscpp)
+	install(TARGETS tdscpp-test DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
