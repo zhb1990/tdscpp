@@ -775,6 +775,135 @@ namespace tds {
 		committed = true;
 	}
 
+	static string type_to_string(enum server_type type, int size) {
+		switch (type) {
+			case server_type::SYBINTN:
+				switch (size) {
+					case 1:
+						return "TINYINT";
+
+					case 2:
+						return "SMALLINT";
+
+					case 4:
+						return "INT";
+
+					case 8:
+						return "BIGINT";
+
+					default:
+						return "INTN, size " + to_string(size);
+				}
+
+			case server_type::SYBINT1:
+				return "TINYINT";
+
+			case server_type::SYBINT2:
+				return "SMALLINT";
+
+			case server_type::SYBINT4:
+				return "INT";
+
+			case server_type::SYBFLT8:
+			case server_type::SYBFLTN:
+				return "FLOAT";
+
+			case server_type::SYBDATETIME:
+				return "DATETIME";
+
+			case server_type::SYBBIT:
+			case server_type::SYBBITN:
+				return "BIT";
+
+			case server_type::SYBTEXT:
+				return "TEXT";
+
+			case server_type::SYBNTEXT:
+				return "NTEXT";
+
+			case server_type::SYBIMAGE:
+				return "IMAGE";
+
+			case server_type::SYBMONEY4:
+				return "SMALLMONEY";
+
+			case server_type::SYBMONEY:
+			case server_type::SYBMONEYN:
+				return "MONEY";
+
+			case server_type::SYBDATETIME4:
+				return "SMALLDATETIME";
+
+			case server_type::SYBREAL:
+				return "REAL";
+
+			case server_type::SYBNUMERIC:
+				return "NUMERIC";
+
+			case server_type::SYBDECIMAL:
+				return "DECIMAL";
+
+			case server_type::SYBINT8:
+				return "BIGINT";
+
+			case server_type::XSYBCHAR:
+			case server_type::SYBCHAR:
+				return "CHAR(" + to_string(size / 4) + ")";
+
+			case server_type::XSYBVARCHAR:
+			case server_type::SYBVARCHAR:
+				if (size == 0x7FFFFFFF)
+					return "VARCHAR(MAX)";
+				else
+					return "VARCHAR(" + to_string(size / 4) + ")";
+
+			case server_type::XSYBNVARCHAR:
+			case server_type::SYBNVARCHAR:
+				return "NVARCHAR(" + to_string(size / 4) + ")";
+
+			case server_type::XSYBNCHAR:
+				return "NCHAR(" + to_string(size / 4) + ")";
+
+			case server_type::SYBVARBINARY:
+			case server_type::XSYBVARBINARY:
+				if (size == 0x3FFFFFFF)
+					return "VARBINARY(MAX)";
+				else
+					return "VARBINARY(" + to_string(size) + ")";
+
+			case server_type::SYBBINARY:
+			case server_type::XSYBBINARY:
+				return "BINARY(" + to_string(size) + ")";
+
+			case server_type::SYBUNIQUE:
+				return "UNIQUEIDENTIFIER";
+
+			case server_type::SYBVARIANT:
+				return "SQL_VARIANT";
+
+			case server_type::SYBMSUDT:
+				return "UDT";
+
+			case server_type::SYBMSXML:
+				return "XML";
+
+			case server_type::SYBMSDATE:
+				return "DATE";
+
+			case server_type::SYBMSTIME:
+				return "TIME";
+
+			case server_type::SYBMSDATETIME2:
+				return "DATETIME2";
+
+			case server_type::SYBMSDATETIMEOFFSET:
+				return "DATETIMEOFFSET";
+
+			default:
+				return "type " + to_string((int)type) + ", length " + to_string(size);
+		}
+	}
+
 	int Conn::bcp_get_column_data(TDSCOLUMN* bindcol, int offset) {
 		if (bindcol->column_bindlen == 0) {
 			bindcol->bcp_column_data->datalen = 0;
@@ -800,15 +929,17 @@ namespace tds {
 		else if (variable) {
 			CONV_RESULT cr;
 
-			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v->c_str(), static_cast<TDS_UINT>(v->length()), dest_type, &cr) < 0)
-				throw runtime_error("tds_convert failed.");
+			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v.value().c_str(), static_cast<TDS_UINT>(v.value().length()), dest_type, &cr) < 0)
+				throw runtime_error("Error converting \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
 
 			free(bindcol->bcp_column_data->data);
 			bindcol->bcp_column_data->data = (TDS_UCHAR*)cr.c;
 			bindcol->bcp_column_data->datalen = static_cast<TDS_INT>(v->length());
 		} else {
-			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v->c_str(), static_cast<TDS_UINT>(v->length()), dest_type, (CONV_RESULT*)bindcol->bcp_column_data->data) < 0)
-				throw runtime_error("tds_convert failed.");
+			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v.value().c_str(), static_cast<TDS_UINT>(v.value().length()),
+				dest_type, (CONV_RESULT*)bindcol->bcp_column_data->data) < 0) {
+				throw runtime_error("Error converting \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
+			}
 
 			bindcol->bcp_column_data->datalen = bindcol->column_size;
 		}
