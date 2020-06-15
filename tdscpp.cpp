@@ -933,8 +933,16 @@ namespace tds {
 				throw runtime_error("Error converting \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
 
 			free(bindcol->bcp_column_data->data);
+			bindcol->bcp_column_data->data = nullptr;
+
+			if (((enum server_type)dest_type == server_type::SYBCHAR || (enum server_type)dest_type == server_type::SYBVARCHAR) &&
+				bindcol->column_size != 0x7FFFFFFF && // MAX
+				v.value().length() > (unsigned int)(bindcol->column_size / 4)) {
+				throw runtime_error("Converting \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + " would result in truncation.");
+			}
+
 			bindcol->bcp_column_data->data = (TDS_UCHAR*)cr.c;
-			bindcol->bcp_column_data->datalen = static_cast<TDS_INT>(v->length());
+			bindcol->bcp_column_data->datalen = static_cast<TDS_INT>(v.value().length());
 		} else {
 			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v.value().c_str(), static_cast<TDS_UINT>(v.value().length()),
 				dest_type, (CONV_RESULT*)bindcol->bcp_column_data->data) < 0) {
