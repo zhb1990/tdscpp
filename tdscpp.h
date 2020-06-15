@@ -29,6 +29,7 @@ struct tds_login;
 struct tds_column;
 struct tds_dynamic;
 struct tds_result_info;
+struct tds_bcpinfo;
 
 #ifdef _WIN32
 
@@ -170,6 +171,7 @@ namespace tds {
 		int bcp_get_column_data(struct tds_column* bindcol, int offset);
 		int handle_msg(struct tds_message* msg);
 		int handle_err(struct tds_message* msg);
+		void bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset);
 
 		struct tds_login* login = nullptr;
 		struct tds_context* context = nullptr;

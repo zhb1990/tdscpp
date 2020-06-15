@@ -816,24 +816,17 @@ namespace tds {
 		return TDS_SUCCESS;
 	}
 
-#include "pushvis.h"
-	struct bcp_holder {
-		struct tds_bcpinfo bcpinfo;
-		Conn* conn;
-	};
-#include "popvis.h"
-
-	static void bcp_send_record(TDSSOCKET* tds, TDSBCPINFO* bcpinfo, tds_bcp_get_col_data get_col_data, int offset) {
+	void Conn::bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset) {
 		TDSCOLUMN *bindcol;
 		int i;
 
-		if (tds->out_flag != TDS_BULK)
-			throw runtime_error("tds->out_flag != TDS_BULK");
+		if (sock->out_flag != TDS_BULK)
+			throw runtime_error("sock->out_flag != TDS_BULK");
 
-		if (tds_set_state(tds, TDS_WRITING) != TDS_WRITING)
+		if (tds_set_state(sock, TDS_WRITING) != TDS_WRITING)
 			throw runtime_error("failed to change state to TDS_WRITING");
 
-		tds_put_byte(tds, TDS_ROW_TOKEN);   /* 0xd1 */
+		tds_put_byte(sock, TDS_ROW_TOKEN);   /* 0xd1 */
 
 		for (i = 0; i < bcpinfo->bindinfo->num_cols; i++) {
 			TDS_INT save_size;
@@ -854,7 +847,7 @@ namespace tds {
 				continue;
 			}
 
-			rc = get_col_data(bcpinfo, bindcol, offset);
+			rc = bcp_get_column_data(bindcol, offset);
 			if (TDS_FAILED(rc))
 				throw runtime_error("get_col_data failed for column " + to_string(i + 1));
 
@@ -873,7 +866,7 @@ namespace tds {
 				bindcol->column_data = bindcol->bcp_column_data->data;
 			}
 
-			rc = bindcol->funcs->put_data(tds, bindcol, 1);
+			rc = bindcol->funcs->put_data(sock, bindcol, 1);
 			bindcol->column_cur_size = save_size;
 			bindcol->column_data = save_data;
 
@@ -881,24 +874,23 @@ namespace tds {
 				throw runtime_error("put_data failed for column " + to_string(i + 1));
 		}
 
-		tds_set_state(tds, TDS_SENDING);
+		tds_set_state(sock, TDS_SENDING);
 	}
 
 	void Conn::bcp(const string_view& table, const vector<string>& np, const vector<vector<optional<string>>>& vp) {
-		bcp_holder bcph;
+		struct tds_bcpinfo bcpinfo;
 
-		memset(&bcph.bcpinfo, 0, sizeof(struct tds_bcpinfo));
-		bcph.conn = this;
+		memset(&bcpinfo, 0, sizeof(struct tds_bcpinfo));
 
-		tds_dstr_init(&bcph.bcpinfo.tablename);
+		tds_dstr_init(&bcpinfo.tablename);
 
-		bcph.bcpinfo.direction = TDS_BCP_IN;
-		bcph.bcpinfo.bind_count = 0;
+		bcpinfo.direction = TDS_BCP_IN;
+		bcpinfo.bind_count = 0;
 
-		if (!tds_dstr_copyn(&bcph.bcpinfo.tablename, table.data(), table.length()))
+		if (!tds_dstr_copyn(&bcpinfo.tablename, table.data(), table.length()))
 			throw runtime_error("tds_dstr_copyn failed.");
 
-		if (TDS_FAILED(tds_bcp_init(sock, &bcph.bcpinfo)))
+		if (TDS_FAILED(tds_bcp_init(sock, &bcpinfo)))
 			throw runtime_error("tds_bcp_init failed.");
 
 		try {
@@ -906,10 +898,10 @@ namespace tds {
 			for (const auto& n : np) {
 				bool found = false;
 
-				for (unsigned int j = 0; j < bcph.bcpinfo.bindinfo->num_cols; j++) {
-					if (bcph.bcpinfo.bindinfo->columns[j]->column_name->dstr_size == n.length() && !memcmp(bcph.bcpinfo.bindinfo->columns[j]->column_name->dstr_s, n.c_str(), n.length())) {
+				for (unsigned int j = 0; j < bcpinfo.bindinfo->num_cols; j++) {
+					if (bcpinfo.bindinfo->columns[j]->column_name->dstr_size == n.length() && !memcmp(bcpinfo.bindinfo->columns[j]->column_name->dstr_s, n.c_str(), n.length())) {
 						found = true;
-						bcph.bcpinfo.bindinfo->columns[j]->column_bindlen = i + 1;
+						bcpinfo.bindinfo->columns[j]->column_bindlen = i + 1;
 						break;
 					}
 				}
@@ -920,31 +912,25 @@ namespace tds {
 				i++;
 			}
 
-			if (TDS_FAILED(tds_bcp_start_copy_in(sock, &bcph.bcpinfo)))
+			if (TDS_FAILED(tds_bcp_start_copy_in(sock, &bcpinfo)))
 				throw runtime_error("tds_bcp_start_copy_in failed.");
 
 			bcp_names = np;
 			bcp_data = &vp;
 
-			auto gcd = [](TDSBCPINFO* bcpinfo, TDSCOLUMN* bindcol, int offset) {
-				auto bcph = CONTAINING_RECORD(bcpinfo, struct bcp_holder, bcpinfo);
-
-				return bcph->conn->bcp_get_column_data(bindcol, offset);
-			};
-
 			for (unsigned int i = 0; i < vp.size(); i++) {
-				bcp_send_record(sock, &bcph.bcpinfo, gcd, i);
+				bcp_send_record(&bcpinfo, i);
 			}
 
 			int rows_copied;
 			if (TDS_FAILED(tds_bcp_done(sock, &rows_copied)))
 				throw runtime_error("tds_bcp_done failed.");
 		} catch (...) {
-			tds_deinit_bcpinfo(&bcph.bcpinfo);
+			tds_deinit_bcpinfo(&bcpinfo);
 			throw;
 		}
 
-		tds_deinit_bcpinfo(&bcph.bcpinfo);
+		tds_deinit_bcpinfo(&bcpinfo);
 	}
 
 	void Conn::cancel() {
