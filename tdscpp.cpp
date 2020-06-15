@@ -435,28 +435,6 @@ namespace tds {
 		memcpy(params->columns[i]->column_data, &v, sizeof(v));
 	}
 
-	void Query::add_param2(unsigned int i, const Param& p) {
-		TDSPARAMINFO* params;
-
-		params = tds_alloc_param_result(dyn_params);
-		if (!params)
-			throw runtime_error("tds_alloc_param_result failed.");
-
-		dyn_params = params;
-		tds_set_param_type(tds.impl->sock->conn, params->columns[i], SYBVARCHAR);
-
-		if (p.null) {
-			params->columns[i]->column_size = -1;
-			params->columns[i]->column_cur_size = -1;
-		} else {
-			params->columns[i]->column_size = static_cast<TDS_INT>(p.s.size());
-			params->columns[i]->column_cur_size = static_cast<TDS_INT>(p.s.size());
-		}
-
-		tds_alloc_param_data(params->columns[i]);
-		memcpy(params->columns[i]->column_data, p.s.c_str(), p.s.size());
-	}
-
 	void Query::add_param2(unsigned int i, nullptr_t) {
 		TDSPARAMINFO* params;
 
