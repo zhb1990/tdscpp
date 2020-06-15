@@ -168,7 +168,7 @@ namespace tds {
 		friend Trans;
 
 	private:
-		int bcp_get_column_data(struct tds_column* bindcol, int offset);
+		void bcp_get_column_data(struct tds_column* bindcol, int offset);
 		int handle_msg(struct tds_message* msg);
 		int handle_err(struct tds_message* msg);
 		void bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset);

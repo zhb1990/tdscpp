@@ -904,11 +904,11 @@ namespace tds {
 		}
 	}
 
-	int Conn::bcp_get_column_data(TDSCOLUMN* bindcol, int offset) {
+	void Conn::bcp_get_column_data(TDSCOLUMN* bindcol, int offset) {
 		if (bindcol->column_bindlen == 0) {
 			bindcol->bcp_column_data->datalen = 0;
 			bindcol->bcp_column_data->is_null = bindcol->column_nullable;
-			return TDS_SUCCESS;
+			return;
 		}
 
 		unsigned int n = bindcol->column_bindlen - 1;
@@ -919,7 +919,7 @@ namespace tds {
 		if (!v.has_value() && bindcol->column_nullable) {
 			bindcol->bcp_column_data->datalen = 0;
 			bindcol->bcp_column_data->is_null = true;
-			return TDS_SUCCESS;
+			return;
 		}
 
 		bindcol->bcp_column_data->is_null = 0;
@@ -951,8 +951,6 @@ namespace tds {
 
 			bindcol->bcp_column_data->datalen = bindcol->column_size;
 		}
-
-		return TDS_SUCCESS;
 	}
 
 	void Conn::bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset) {
@@ -986,9 +984,7 @@ namespace tds {
 				continue;
 			}
 
-			rc = bcp_get_column_data(bindcol, offset);
-			if (TDS_FAILED(rc))
-				throw runtime_error("get_col_data failed for column " + to_string(i + 1));
+			bcp_get_column_data(bindcol, offset);
 
 			save_size = bindcol->column_cur_size;
 			save_data = bindcol->column_data;
