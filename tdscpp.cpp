@@ -382,7 +382,7 @@ namespace tds {
 		return string(ds->dstr_s, ds->dstr_size);
 	}
 
-	void Query::add_param2(unsigned int i, const string_view& param) {
+	void Query_impl::add_param2(unsigned int i, const string_view& param) {
 		TDSPARAMINFO* params;
 
 		params = tds_alloc_param_result(dyn_params);
@@ -401,7 +401,11 @@ namespace tds {
 		blob->textvalue = (TDS_CHAR*)param.data();
 	}
 
-	void Query::add_param2(unsigned int i, const binary_string& param) {
+	void Query::add_param2(unsigned int i, const string_view& param) {
+		impl->add_param2(i, param);
+	}
+
+	void Query_impl::add_param2(unsigned int i, const binary_string& param) {
 		TDSPARAMINFO* params;
 
 		params = tds_alloc_param_result(dyn_params);
@@ -420,7 +424,11 @@ namespace tds {
 		blob->textvalue = (TDS_CHAR*)param.s.data();
 	}
 
-	void Query::add_param2(unsigned int i, int64_t v) {
+	void Query::add_param2(unsigned int i, const binary_string& param) {
+		impl->add_param2(i, param);
+	}
+
+	void Query_impl::add_param2(unsigned int i, int64_t v) {
 		TDSPARAMINFO* params;
 
 		params = tds_alloc_param_result(dyn_params);
@@ -435,7 +443,11 @@ namespace tds {
 		memcpy(params->columns[i]->column_data, &v, sizeof(v));
 	}
 
-	void Query::add_param2(unsigned int i, nullptr_t) {
+	void Query::add_param2(unsigned int i, int64_t v) {
+		impl->add_param2(i, v);
+	}
+
+	void Query_impl::add_param2(unsigned int i, nullptr_t) {
 		TDSPARAMINFO* params;
 
 		params = tds_alloc_param_result(dyn_params);
@@ -451,7 +463,11 @@ namespace tds {
 		tds_alloc_param_data(params->columns[i]);
 	}
 
-	void Query::add_param2(unsigned int i, double d) {
+	void Query::add_param2(unsigned int i, nullptr_t) {
+		impl->add_param2(i, nullptr);
+	}
+
+	void Query_impl::add_param2(unsigned int i, double d) {
 		TDSPARAMINFO* params;
 
 		params = tds_alloc_param_result(dyn_params);
@@ -468,6 +484,10 @@ namespace tds {
 		memcpy(params->columns[i]->column_data, &d, sizeof(d));
 	}
 
+	void Query::add_param2(unsigned int i, double d) {
+		impl->add_param2(i, d);
+	}
+
 	void Query::add_param2(unsigned int i, const vector<string>& v) {
 		for (const auto& s : v) {
 			add_param2(i, s);
@@ -475,7 +495,7 @@ namespace tds {
 		}
 	}
 
-	void Query::end_query(const std::string& q) {
+	void Query_impl::end_query(const std::string& q) {
 		TDSRET rc;
 		TDS_INT result_type;
 
@@ -493,7 +513,11 @@ namespace tds {
 			throw runtime_error("tds_submit_execute failed.");
 	}
 
-	bool Query::fetch_row(bool call_callbacks) {
+	void Query::end_query(const std::string& q) {
+		impl->end_query(q);
+	}
+
+	bool Query_impl::fetch_row(bool call_callbacks) {
 		TDSRET rc;
 		TDS_INT result_type;
 
@@ -617,7 +641,11 @@ namespace tds {
 		return false;
 	}
 
-	Query::~Query() {
+	bool Query::fetch_row(bool call_callbacks) {
+		return impl->fetch_row(call_callbacks);
+	}
+
+	Query_impl::~Query_impl() {
 		TDSRET rc;
 		TDS_INT result_type;
 
@@ -646,6 +674,10 @@ namespace tds {
 		tds_release_cur_dyn(tds.impl->sock);
 
 		tds.impl->in_dtor--;
+	}
+
+	Query::~Query() {
+		delete impl;
 	}
 
 	Date::Date(unsigned int year, unsigned int month, unsigned int day) {
@@ -1079,5 +1111,17 @@ namespace tds {
 
 	bool Conn::is_dead() const {
 		return impl->sock->state == TDS_DEAD;
+	}
+
+	void Query::init(const Conn& tds) {
+		impl = new Query_impl(tds);
+	}
+
+	const Field& Query::operator[](unsigned int i) const {
+		return impl->operator[](i);
+	}
+
+	size_t Query::num_columns() const {
+		return impl->num_columns();
 	}
 }

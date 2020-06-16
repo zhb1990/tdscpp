@@ -7,6 +7,8 @@ struct tds_message;
 struct tds_login;
 struct tds_column;
 struct tds_bcpinfo;
+struct tds_dynamic;
+struct tds_result_info;
 
 namespace tds {
 	class Conn_impl {
@@ -35,5 +37,34 @@ namespace tds {
 		tbl_row_handler row_handler;
 		tbl_row_count_handler row_count_handler;
 		mutable int in_dtor = 0;
+	};
+
+	class Query_impl {
+	public:
+		Query_impl(const Conn& tds) : tds(tds) {
+		}
+
+		~Query_impl();
+
+		const Field& operator[](unsigned int i) const {
+			return cols.at(i);
+		}
+
+		size_t num_columns() const {
+			return cols.size();
+		}
+
+		void add_param2(unsigned int i, const std::string_view& param);
+		void add_param2(unsigned int i, const binary_string& param);
+		void add_param2(unsigned int i, int64_t v);
+		void add_param2(unsigned int i, nullptr_t);
+		void add_param2(unsigned int i, double d);
+		void end_query(const std::string& q);
+		bool fetch_row(bool call_callbacks);
+
+		const Conn& tds;
+		std::vector<Field> cols;
+		struct tds_dynamic* dyn = nullptr;
+		struct tds_result_info* dyn_params = nullptr;
 	};
 };

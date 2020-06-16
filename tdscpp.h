@@ -23,8 +23,6 @@
 #include <functional>
 
 struct tds_socket;
-struct tds_dynamic;
-struct tds_result_info;
 
 #ifdef _WIN32
 
@@ -144,6 +142,7 @@ namespace tds {
 	using tbl_row_count_handler = std::function<void(unsigned int count)>;
 
 	class Conn_impl;
+	class Query_impl;
 
 	class TDSCPP Conn {
 	public:
@@ -161,6 +160,7 @@ namespace tds {
 		template<typename... Args>
 		void run(const std::string& s, const Args&... args) const;
 
+		friend Query_impl;
 		friend Query;
 		friend Trans;
 
@@ -253,7 +253,7 @@ namespace tds {
 		std::string name;
 		server_type type;
 
-		friend Query;
+		friend Query_impl;
 
 	private:
 		std::string strval;
@@ -275,12 +275,14 @@ namespace tds {
 
 	class TDSCPP Query {
 	public:
-		Query(const Conn& tds, const std::string& q) : tds(tds) {
+		Query(const Conn& tds, const std::string& q) {
+			init(tds);
 			end_query(q);
 		}
 
 		template<typename... Args>
-		Query(const Conn& tds, const std::string& q, const Args&... args) : tds(tds) {
+		Query(const Conn& tds, const std::string& q, const Args&... args) {
+			init(tds);
 			add_param(0, args...);
 			end_query(q);
 		}
@@ -288,16 +290,12 @@ namespace tds {
 		~Query();
 
 		bool fetch_row(bool call_callbacks = false);
-
-		const Field& operator[](unsigned int i) const {
-			return cols.at(i);
-		}
-
-		size_t num_columns() const {
-			return cols.size();
-		}
+		const Field& operator[](unsigned int i) const;
+		size_t num_columns() const;
 
 	private:
+		void init(const Conn& tds);
+
 		void add_param2(unsigned int i, const std::string_view& param);
 		void add_param2(unsigned int i, int64_t v);
 		void add_param2(unsigned int i, const binary_string& bs);
@@ -341,10 +339,7 @@ namespace tds {
 
 		void end_query(const std::string& q);
 
-		std::vector<Field> cols;
-		const Conn& tds;
-		struct tds_dynamic* dyn = nullptr;
-		struct tds_result_info* dyn_params = nullptr;
+		Query_impl* impl;
 	};
 
 	template<typename... Args>
