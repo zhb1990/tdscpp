@@ -205,6 +205,10 @@ target_compile_options(tdscpp PRIVATE
 
 set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER tdscpp.h)
 
+if(NOT MSVC)
+    target_link_options(tdscpp PUBLIC -static-libgcc)
+endif()
+
 install(TARGETS tdscpp
     EXPORT tdscpp-targets
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
