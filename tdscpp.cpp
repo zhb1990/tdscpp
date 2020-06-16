@@ -932,7 +932,7 @@ namespace tds {
 			CONV_RESULT cr;
 
 			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v.value().c_str(), static_cast<TDS_UINT>(v.value().length()), dest_type, &cr) < 0)
-				throw runtime_error("Error converting \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
+				throw runtime_error("Cannot convert \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
 
 			free(bindcol->bcp_column_data->data);
 			bindcol->bcp_column_data->data = nullptr;
@@ -948,7 +948,7 @@ namespace tds {
 		} else {
 			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v.value().c_str(), static_cast<TDS_UINT>(v.value().length()),
 				dest_type, (CONV_RESULT*)bindcol->bcp_column_data->data) < 0) {
-				throw runtime_error("Error converting \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
+				throw runtime_error("Cannot convert \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
 			}
 
 			bindcol->bcp_column_data->datalen = bindcol->column_size;
@@ -968,47 +968,51 @@ namespace tds {
 		tds_put_byte(sock, TDS_ROW_TOKEN);   /* 0xd1 */
 
 		for (i = 0; i < bcpinfo->bindinfo->num_cols; i++) {
-			TDS_INT save_size;
-			unsigned char *save_data;
-			TDSBLOB blob;
-			TDSRET rc;
+			try {
+				TDS_INT save_size;
+				unsigned char *save_data;
+				TDSBLOB blob;
+				TDSRET rc;
 
-			bindcol = bcpinfo->bindinfo->columns[i];
+				bindcol = bcpinfo->bindinfo->columns[i];
 
-			/*
-			* Don't send the (meta)data for timestamp columns or
-			* identity columns unless indentity_insert is enabled.
-			*/
+				/*
+				* Don't send the (meta)data for timestamp columns or
+				* identity columns unless indentity_insert is enabled.
+				*/
 
-			if ((!bcpinfo->identity_insert_on && bindcol->column_identity) ||
-				bindcol->column_timestamp ||
-				bindcol->column_computed) {
-				continue;
+				if ((!bcpinfo->identity_insert_on && bindcol->column_identity) ||
+					bindcol->column_timestamp ||
+					bindcol->column_computed) {
+					continue;
+				}
+
+				bcp_get_column_data(bindcol, offset);
+
+				save_size = bindcol->column_cur_size;
+				save_data = bindcol->column_data;
+
+				if (bindcol->bcp_column_data->is_null)
+					bindcol->column_cur_size = -1;
+				else if (is_blob_col(bindcol)) {
+					bindcol->column_cur_size = bindcol->bcp_column_data->datalen;
+					memset(&blob, 0, sizeof(blob));
+					blob.textvalue = (TDS_CHAR*)bindcol->bcp_column_data->data;
+					bindcol->column_data = (unsigned char*)&blob;
+				} else {
+					bindcol->column_cur_size = bindcol->bcp_column_data->datalen;
+					bindcol->column_data = bindcol->bcp_column_data->data;
+				}
+
+				rc = bindcol->funcs->put_data(sock, bindcol, 1);
+				bindcol->column_cur_size = save_size;
+				bindcol->column_data = save_data;
+
+				if (TDS_FAILED(rc))
+					throw runtime_error("put_data failed");
+			} catch (const exception& e) {
+				throw runtime_error("Error at record " + to_string(offset + 1) + ", column " + to_string(i + 1) + ": " + e.what());
 			}
-
-			bcp_get_column_data(bindcol, offset);
-
-			save_size = bindcol->column_cur_size;
-			save_data = bindcol->column_data;
-
-			if (bindcol->bcp_column_data->is_null)
-				bindcol->column_cur_size = -1;
-			else if (is_blob_col(bindcol)) {
-				bindcol->column_cur_size = bindcol->bcp_column_data->datalen;
-				memset(&blob, 0, sizeof(blob));
-				blob.textvalue = (TDS_CHAR*)bindcol->bcp_column_data->data;
-				bindcol->column_data = (unsigned char*)&blob;
-			} else {
-				bindcol->column_cur_size = bindcol->bcp_column_data->datalen;
-				bindcol->column_data = bindcol->bcp_column_data->data;
-			}
-
-			rc = bindcol->funcs->put_data(sock, bindcol, 1);
-			bindcol->column_cur_size = save_size;
-			bindcol->column_data = save_data;
-
-			if (TDS_FAILED(rc))
-				throw runtime_error("put_data failed for column " + to_string(i + 1));
 		}
 
 		tds_set_state(sock, TDS_SENDING);
