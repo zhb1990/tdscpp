@@ -19,10 +19,8 @@
 #include <vector>
 #include <optional>
 #include <functional>
-#include "pushvis.h"
 #include "tdscpp.h"
 #include "tdscpp-private.h"
-#include "popvis.h"
 #include <sstream>
 #include <iomanip>
 #include "config.h"
@@ -35,6 +33,7 @@ extern "C" {
 #endif
 
 using namespace std;
+using json = nlohmann::json;
 
 #ifndef CONTAINING_RECORD
 #define CONTAINING_RECORD(address, type, field) ((type *)((uint8_t*)(address) - (uintptr_t)(&((type *)0)->field)))
@@ -317,6 +316,28 @@ namespace tds {
 				return strval;
 		}
 	}
+
+#ifdef WITH_JSON
+	Field::operator json() const {
+		if (null)
+			return nullptr;
+
+		switch (type) {
+			case server_type::SYBINTN:
+				return operator int64_t();
+
+			case server_type::SYBFLT8:
+			case server_type::SYBFLTN:
+				return operator double();
+
+			case server_type::SYBBITN:
+				return intval ? true : false;
+
+			default:
+				return operator string();
+		}
+	}
+#endif
 
 	Field::operator Date() const {
 		switch (type) {
