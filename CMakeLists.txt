@@ -11,6 +11,7 @@ include(CMakePackageConfigHelpers)
 project(tdscpp VERSION 1.0)
 
 option(WITH_OPENSSL        "Link in OpenSSL if found" ON)
+option(WITH_JSON           "Include JSON support" ON)
 option(ENABLE_ODBC_WIDE    "Enable ODBC wide character support" ON)
 option(ENABLE_KRB5         "Enable Kerberos support" OFF)
 option(ENABLE_ODBC_MARS    "Enable MARS" ON)
@@ -20,6 +21,10 @@ option(BUILD_SAMPLE        "Build sample program" ON)
 if(WITH_OPENSSL)
 find_package(OpenSSL)
 endif(WITH_OPENSSL)
+
+if(WITH_JSON)
+find_package(nlohmann_json REQUIRED)
+endif()
 
 find_package(Threads)
 
@@ -139,7 +144,12 @@ check_cxx_source_compiles("static void __attribute__((destructor)) my_uninit(voi
 check_struct_has_member("struct tm" "tm_zone" "time.h" HAVE_STRUCT_TM_TM_ZONE)
 check_struct_has_member("struct tm" "__tm_zone" "time.h" HAVE_STRUCT_TM___TM_ZONE)
 
+if(WITH_JSON)
+set(TDSCPP_WITH_JSON 1)
+endif()
+
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/tdscpp.h.in ${CMAKE_CURRENT_BINARY_DIR}/tdscpp.h)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -203,7 +213,7 @@ target_compile_options(tdscpp PRIVATE
      $<$<CXX_COMPILER_ID:MSVC>:
           /W4>)
 
-set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER tdscpp.h)
+set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_BINARY_DIR}/tdscpp.h)
 
 if(NOT MSVC)
     target_link_options(tdscpp PUBLIC -static-libgcc)

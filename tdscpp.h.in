@@ -22,6 +22,12 @@
 #include <optional>
 #include <functional>
 
+#cmakedefine TDSCPP_WITH_JSON
+
+#ifdef TDSCPP_WITH_JSON
+#include <nlohmann/json.hpp>
+#endif
+
 struct tds_socket;
 
 #ifdef _WIN32
@@ -212,6 +218,9 @@ namespace tds {
 		}
 
 		operator std::string() const;
+#ifdef TDSCPP_WITH_JSON
+		operator nlohmann::json() const;
+#endif
 		explicit operator int64_t() const;
 		explicit operator double() const;
 
