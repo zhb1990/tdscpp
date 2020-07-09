@@ -273,6 +273,10 @@ namespace tds {
 		bool null;
 	};
 
+#ifdef TDSCPP_WITH_JSON
+	void TDSCPP to_json(nlohmann::json& j, const Field& f);
+#endif
+
 	class binary_string {
 	public:
 		binary_string(const std::string_view& s) {

@@ -33,7 +33,10 @@ extern "C" {
 #endif
 
 using namespace std;
+
+#ifdef WITH_JSON
 using json = nlohmann::json;
+#endif
 
 #ifndef CONTAINING_RECORD
 #define CONTAINING_RECORD(address, type, field) ((type *)((uint8_t*)(address) - (uintptr_t)(&((type *)0)->field)))
@@ -1149,4 +1152,33 @@ namespace tds {
 	size_t Query::num_columns() const {
 		return impl->num_columns();
 	}
+
+#ifdef WITH_JSON
+	void to_json(json& j, const Field& f) {
+		if (f.is_null()) {
+			j = nullptr;
+			return;
+		}
+
+		switch (f.type) {
+			case server_type::SYBINTN:
+				j = (int64_t)f;
+			break;
+
+			case server_type::SYBFLT8:
+			case server_type::SYBFLTN:
+				j = (double)f;
+			break;
+
+			case server_type::SYBBITN:
+			case server_type::SYBBIT:
+				j = (int64_t)f != 0;
+			break;
+
+			default:
+				j = (string)f;
+			break;
+		}
+	}
+#endif
 }
