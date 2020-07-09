@@ -254,6 +254,7 @@ namespace tds {
 
 			case server_type::SYBINTN:
 			case server_type::SYBBITN:
+			case server_type::SYBBIT:
 				return intval;
 
 			default:
@@ -273,6 +274,7 @@ namespace tds {
 			case server_type::SYBMSDATE:
 			case server_type::SYBINTN:
 			case server_type::SYBBITN:
+			case server_type::SYBBIT:
 				return static_cast<double>(operator int64_t());
 
 			case server_type::SYBMSTIME:
@@ -310,6 +312,7 @@ namespace tds {
 				return to_string(doubval);
 
 			case server_type::SYBBITN:
+			case server_type::SYBBIT:
 				return intval ? "true" : "false";
 
 			default:
@@ -331,6 +334,7 @@ namespace tds {
 				return operator double();
 
 			case server_type::SYBBITN:
+			case server_type::SYBBIT:
 				return intval ? true : false;
 
 			default:
@@ -616,7 +620,7 @@ namespace tds {
 									cols[i].doubval = *reinterpret_cast<float*>(col->column_data);
 								} else if (cols[i].type == server_type::SYBFLT8 || (cols[i].type == server_type::SYBFLTN && col->column_cur_size == 8)) {
 									cols[i].doubval = *reinterpret_cast<double*>(col->column_data);
-								} else if (cols[i].type == server_type::SYBBITN) {
+								} else if (cols[i].type == server_type::SYBBITN || cols[i].type == server_type::SYBBIT) {
 									cols[i].intval = col->column_data[0] & 0x1;
 								} else {
 									CONV_RESULT cr;
