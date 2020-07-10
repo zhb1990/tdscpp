@@ -871,6 +871,7 @@ namespace tds {
 				return "FLOAT";
 
 			case server_type::SYBDATETIME:
+			case server_type::SYBDATETIMN:
 				return "DATETIME";
 
 			case server_type::SYBBIT:
