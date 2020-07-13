@@ -1204,6 +1204,7 @@ struct tds_socket
 	1 mean we have to send cancel packet, 2 already sent. */
 
 	TDS_INT8 rows_affected;		/**< rows updated/deleted/inserted/selected, TDS_NO_COUNT if not valid */
+	TDS_USMALLINT curcmd;
 	TDS_INT query_timeout;
 
 	TDSDYNAMIC *cur_dyn;		/**< dynamic structure in use */

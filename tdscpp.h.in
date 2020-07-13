@@ -145,7 +145,7 @@ namespace tds {
 							uint8_t severity, int oserr)>;
 	using tbl_handler = std::function<void(const std::vector<std::pair<std::string, server_type>>& columns)>;
 	using tbl_row_handler = std::function<void(const std::vector<Field>& columns)>;
-	using tbl_row_count_handler = std::function<void(unsigned int count)>;
+	using tbl_row_count_handler = std::function<void(unsigned int count, uint16_t curcmd)>;
 
 	class Conn_impl;
 	class Query_impl;

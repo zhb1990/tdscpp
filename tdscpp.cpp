@@ -658,7 +658,7 @@ namespace tds {
 
 				case TDS_DONEINPROC_RESULT:
 					if (tds.impl->sock->rows_affected != TDS_NO_COUNT && call_callbacks && tds.impl->row_count_handler)
-						tds.impl->row_count_handler(tds.impl->sock->rows_affected);
+						tds.impl->row_count_handler(tds.impl->sock->rows_affected, tds.impl->sock->curcmd);
 					break;
 
 				default:

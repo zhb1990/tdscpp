@@ -2084,7 +2084,7 @@ tds_process_end(TDSSOCKET * tds, int marker, int *flags_parm)
 
 	tmp = tds_get_usmallint(tds);
 
-	tds_get_smallint(tds);	/* state */
+	tds->curcmd = tds_get_smallint(tds);
 
 	more_results = (tmp & TDS_DONE_MORE_RESULTS) != 0;
 	was_cancelled = (tmp & TDS_DONE_CANCELLED) != 0;
