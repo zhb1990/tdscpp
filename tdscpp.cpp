@@ -817,10 +817,12 @@ namespace tds {
 
 		if (TDS_FAILED(tds_process_simple_query(sock)))
 			throw runtime_error("tds_process_simple_query failed.");
+
+		trans_no = sock->conn->tds72_transaction;
 	}
 
 	Trans::~Trans() {
-		if (!committed) {
+		if (!committed && sock->conn->tds72_transaction == trans_no) {
 			if (TDS_SUCCEED(tds_submit_rollback(sock, 0))) {
 				tds_process_simple_query(sock);
 			}

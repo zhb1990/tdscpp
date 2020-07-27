@@ -1091,7 +1091,7 @@ struct tds_connection
 	TDSICONV **char_convs;
 
 	TDS_UCHAR collation[5];
-	TDS_UCHAR tds72_transaction[8];
+	uint64_t tds72_transaction;
 
 	TDS_CAPABILITIES capabilities;
 	unsigned int emul_little_endian:1;

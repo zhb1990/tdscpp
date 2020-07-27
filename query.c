@@ -317,7 +317,7 @@ tds_start_query_head(TDSSOCKET *tds, unsigned char packet_type, TDSHEADERS * hea
 		tds_put_int(tds, 4 + 18 + qn_len);             /* total length */
 		tds_put_int(tds, 18);                          /* length: transaction descriptor */
 		tds_put_smallint(tds, 2);                      /* type: transaction descriptor */
-		tds_put_n(tds, tds->conn->tds72_transaction, 8);  /* transaction */
+		tds_put_n(tds, &tds->conn->tds72_transaction, sizeof(uint64_t));  /* transaction */
 		tds_put_int(tds, 1);                           /* request count */
 		if (qn_len != 0) {
 			tds_put_int(tds, qn_len);                      /* length: query notification */

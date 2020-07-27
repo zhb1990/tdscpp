@@ -372,6 +372,7 @@ namespace tds {
 
 	private:
 		struct tds_socket* sock = nullptr;
+		uint64_t trans_no;
 	};
 
 	static __inline std::string escape(const std::string_view& sv) {

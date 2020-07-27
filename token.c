@@ -2241,17 +2241,29 @@ tds_process_env_chg(TDSSOCKET * tds)
 	}
 
 	if (type == TDS_ENV_BEGINTRANS) {
-		/* TODO check size */
 		size = tds_get_byte(tds);
-		tds_get_n(tds, tds->conn->tds72_transaction, 8);
+
+		memset(&tds->conn->tds72_transaction, 0, sizeof(uint64_t));
+		tds_get_n(tds, &tds->conn->tds72_transaction, size < sizeof(uint64_t) ? size : sizeof(uint64_t));
+
+		if (size > sizeof(uint64_t))
+			tds_get_n(tds, NULL, sizeof(uint64_t) - size);
+
 		tds_get_n(tds, NULL, tds_get_byte(tds));
 		return TDS_SUCCESS;
 	}
 
 	if (type == TDS_ENV_COMMITTRANS || type == TDS_ENV_ROLLBACKTRANS) {
-		memset(tds->conn->tds72_transaction, 0, 8);
+		size = tds_get_byte(tds);
+
+		memset(&tds->conn->tds72_transaction, 0, sizeof(uint64_t));
+		tds_get_n(tds, &tds->conn->tds72_transaction, size < sizeof(uint64_t) ? size : sizeof(uint64_t));
+
+		if (size > sizeof(uint64_t))
+			tds_get_n(tds, NULL, sizeof(uint64_t) - size);
+
 		tds_get_n(tds, NULL, tds_get_byte(tds));
-		tds_get_n(tds, NULL, tds_get_byte(tds));
+
 		return TDS_SUCCESS;
 	}
 
