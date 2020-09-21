@@ -1107,7 +1107,7 @@ namespace tds {
 				}
 
 				if (!found)
-					throw formatted_error("Could not find column \"{}\".", n);
+					throw formatted_error("Could not find column \"{}\" in {}.", table);
 
 				i++;
 			}
