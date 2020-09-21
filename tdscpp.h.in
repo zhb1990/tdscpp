@@ -313,7 +313,7 @@ namespace tds {
 		void add_param2(unsigned int i, int64_t v);
 		void add_param2(unsigned int i, const binary_string& bs);
 		void add_param2(unsigned int i, const std::vector<std::string>& v);
-		void add_param2(unsigned int i, nullptr_t);
+		void add_param2(unsigned int i, std::nullptr_t);
 		void add_param2(unsigned int i, double f);
 
 		void add_param2(unsigned int i, int32_t v) {
