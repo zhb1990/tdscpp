@@ -27,6 +27,7 @@ find_package(nlohmann_json REQUIRED)
 endif()
 
 find_package(Threads)
+find_package(fmt REQUIRED)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -206,6 +207,8 @@ endif(OPENSSL_FOUND)
 if(WIN32)
 target_link_libraries(tdscpp wsock32 ws2_32)
 endif()
+
+target_link_libraries(tdscpp fmt::fmt-header-only)
 
 target_compile_options(tdscpp PRIVATE
      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:

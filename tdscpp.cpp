@@ -147,13 +147,9 @@ namespace tds {
 						if (ret == -TDSEFCON)
 							throw runtime_error("Unable to login.");
 
-						char s[255];
-
 						tds_free_login(con);
 
-						sprintf(s, "tds_connect_and_login failed (%i).", ret);
-
-						throw runtime_error(s);
+						throw formatted_error("tds_connect_and_login failed ({}).", ret);
 					}
 
 					tds_free_login(con);
@@ -636,7 +632,7 @@ namespace tds {
 													  col->column_cur_size, SYBVARCHAR, &cr);
 
 									if (len < 0)
-										throw runtime_error("Failed converting type " + to_string((unsigned int)cols[i].type) + " to string.");
+										throw formatted_error("Failed converting type {} to string.", (unsigned int)cols[i].type);
 
 									try {
 										cols[i].strval = string(cr.c, len);
@@ -995,7 +991,7 @@ namespace tds {
 			CONV_RESULT cr;
 
 			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v.value().c_str(), static_cast<TDS_UINT>(v.value().length()), dest_type, &cr) < 0)
-				throw runtime_error("Cannot convert \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
+				throw formatted_error("Cannot convert \"{}\" to {}.", v.value(), type_to_string((enum server_type)bindcol->column_type, bindcol->column_size));
 
 			free(bindcol->bcp_column_data->data);
 			bindcol->bcp_column_data->data = nullptr;
@@ -1003,7 +999,7 @@ namespace tds {
 			if (((enum server_type)dest_type == server_type::SYBCHAR || (enum server_type)dest_type == server_type::SYBVARCHAR) &&
 				bindcol->column_size != 0x7FFFFFFF && // MAX
 				v.value().length() > (unsigned int)(bindcol->column_size / 4)) {
-				throw runtime_error("Converting \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + " would result in truncation.");
+				throw formatted_error("Converting \"{}\" to {} would result in truncation.", v.value(), type_to_string((enum server_type)bindcol->column_type, bindcol->column_size));
 			}
 
 			bindcol->bcp_column_data->data = (TDS_UCHAR*)cr.c;
@@ -1011,7 +1007,7 @@ namespace tds {
 		} else {
 			if (tds_convert(sock->conn->tds_ctx, SYBVARCHAR, v.value().c_str(), static_cast<TDS_UINT>(v.value().length()),
 				dest_type, (CONV_RESULT*)bindcol->bcp_column_data->data) < 0) {
-				throw runtime_error("Cannot convert \"" + v.value() + "\" to " + type_to_string((enum server_type)bindcol->column_type, bindcol->column_size) + ".");
+				throw formatted_error("Cannot convert \"{}\" to {}.", v.value(), type_to_string((enum server_type)bindcol->column_type, bindcol->column_size));
 			}
 
 			bindcol->bcp_column_data->datalen = bindcol->column_size;
@@ -1074,7 +1070,7 @@ namespace tds {
 				if (TDS_FAILED(rc))
 					throw runtime_error("put_data failed");
 			} catch (const exception& e) {
-				throw runtime_error("Error at record " + to_string(offset + 1) + ", column " + to_string(i + 1) + ": " + e.what());
+				throw formatted_error("Error at record {}, column {}: {}", offset + 1, i + 1, e.what());
 			}
 		}
 
@@ -1111,7 +1107,7 @@ namespace tds {
 				}
 
 				if (!found)
-					throw runtime_error("Could not find column \"" + n + "\".");
+					throw formatted_error("Could not find column \"{}\".", n);
 
 				i++;
 			}

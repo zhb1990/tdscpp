@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tdscpp.h"
+#include <fmt/format.h>
 
 struct tds_context;
 struct tds_message;
@@ -67,4 +68,19 @@ namespace tds {
 		struct tds_dynamic* dyn = nullptr;
 		struct tds_result_info* dyn_params = nullptr;
 	};
+};
+
+class formatted_error : public std::exception {
+public:
+	template<typename... Args>
+	formatted_error(const std::string_view& s, Args&&... args) {
+		msg = fmt::format(s, std::forward<Args>(args)...);
+	}
+
+	const char* what() const noexcept {
+		return msg.c_str();
+	}
+
+private:
+	std::string msg;
 };
