@@ -49,6 +49,25 @@ struct conn_context {
 };
 #include "popvis.h"
 
+template<>
+struct fmt::formatter<DSTR> {
+	constexpr auto parse(format_parse_context& ctx) {
+		auto it = ctx.begin();
+
+		if (*it != '}')
+			throw format_error("invalid format");
+
+		it++;
+
+		return it;
+	}
+
+	template<typename format_context>
+	auto format(const DSTR& d, format_context& ctx) {
+		return format_to(ctx.out(), "{}", string_view(d->dstr_s, d->dstr_size));
+	}
+};
+
 namespace tds {
 	Conn::Conn(const string& server, const string& username, const string& password, const string& app,
 		const msg_handler& message_handler, const msg_handler& error_handler,
@@ -1015,9 +1034,6 @@ namespace tds {
 	}
 
 	void Conn_impl::bcp_send_record(struct tds_bcpinfo* bcpinfo, int offset) {
-		TDSCOLUMN *bindcol;
-		int i;
-
 		if (sock->out_flag != TDS_BULK)
 			throw runtime_error("sock->out_flag != TDS_BULK");
 
@@ -1026,14 +1042,14 @@ namespace tds {
 
 		tds_put_byte(sock, TDS_ROW_TOKEN);   /* 0xd1 */
 
-		for (i = 0; i < bcpinfo->bindinfo->num_cols; i++) {
+		for (unsigned int i = 0; i < bcpinfo->bindinfo->num_cols; i++) {
+			auto bindcol = bcpinfo->bindinfo->columns[i];
+
 			try {
 				TDS_INT save_size;
 				unsigned char *save_data;
 				TDSBLOB blob;
 				TDSRET rc;
-
-				bindcol = bcpinfo->bindinfo->columns[i];
 
 				/*
 				* Don't send the (meta)data for timestamp columns or
@@ -1070,7 +1086,8 @@ namespace tds {
 				if (TDS_FAILED(rc))
 					throw runtime_error("put_data failed");
 			} catch (const exception& e) {
-				throw formatted_error("Error at record {}, column {}: {}", offset + 1, i + 1, e.what());
+				throw formatted_error("Error at record {}, column {} ({}): {}",
+									  offset + 1, i + 1, bindcol->column_name, e.what());
 			}
 		}
 
