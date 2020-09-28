@@ -72,8 +72,8 @@ namespace tds {
 
 class formatted_error : public std::exception {
 public:
-	template<typename... Args>
-	formatted_error(const std::string_view& s, Args&&... args) {
+	template<typename T, typename... Args>
+	formatted_error(const T& s, Args&&... args) {
 		msg = fmt::format(s, std::forward<Args>(args)...);
 	}
 
