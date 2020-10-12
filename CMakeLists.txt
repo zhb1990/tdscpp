@@ -249,3 +249,9 @@ if(BUILD_SAMPLE)
 	target_link_libraries(tdscpp-test tdscpp)
 	install(TARGETS tdscpp-test DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
+
+# ----------------------------------------
+
+set(NEW_SRC_FILES newtds.cpp)
+
+add_executable(newtds ${NEW_SRC_FILES})
