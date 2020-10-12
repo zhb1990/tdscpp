@@ -255,3 +255,6 @@ endif()
 set(NEW_SRC_FILES newtds.cpp)
 
 add_executable(newtds ${NEW_SRC_FILES})
+
+find_package(fmt REQUIRED)
+target_link_libraries(newtds fmt::fmt-header-only)
