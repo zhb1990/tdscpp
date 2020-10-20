@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <codecvt>
+#include <list>
 #include <fmt/format.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -8,10 +9,14 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
+#define DEBUG_SHOW_MSGS
+
 using namespace std;
 
 static const string db_server = "luthien", db_user = "sa", db_password = "Password1$";
 static const uint16_t db_port = 1433;
+
+static const uint32_t tds_74_version = 0x4000074;
 
 class formatted_error : public exception {
 public:
@@ -281,6 +286,12 @@ static u16string utf8_to_utf16(const string_view& sv) {
     return convert.from_bytes(sv.data(), sv.data() + sv.length());
 }
 
+static string utf16_to_utf8(const u16string_view& sv) {
+    wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
+
+    return convert.to_bytes(sv.data(), sv.data() + sv.length());
+}
+
 class tds {
 public:
     tds(const string& server, uint16_t port, const string_view& user, const string_view& password) {
@@ -455,7 +466,20 @@ private:
             throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
 
         parse_result_message(payload);
-        // FIXME - parse
+
+        for (auto it = msgs.begin(); it != msgs.end(); it++) {
+            auto& msg = *it;
+
+            if (msg.first == tds_token::LOGINACK) {
+                handle_loginack_msg(msg.second);
+                msgs.erase(it);
+                return;
+            }
+        }
+
+        // FIXME - wait until timeout for LOGINACK message (might not be in first packet?)
+
+        throw formatted_error(FMT_STRING("Did not receive LOGINACK message from server."));
     }
 
     void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
@@ -750,8 +774,40 @@ private:
         }
     }
 
+    void handle_loginack_msg(string_view sv) {
+        uint8_t interface, server_name_len;
+        uint32_t tds_version, server_version;
+        u16string_view server_name;
+
+        if (sv.length() < 10)
+            throw runtime_error("Short LOGINACK message.");
+
+        server_name_len = (uint8_t)sv[5];
+
+        if (sv.length() < 10 + (server_name_len * sizeof(char16_t)))
+            throw runtime_error("Short LOGINACK message.");
+
+        interface = (uint8_t)sv[0];
+        tds_version = *(uint32_t*)&sv[1];
+        server_name = u16string_view((char16_t*)&sv[6], server_name_len);
+        server_version = *(uint32_t*)&sv[6 + (server_name_len * sizeof(char16_t))];
+
+#ifdef DEBUG_SHOW_MSGS
+        while (!server_name.empty() && server_name.back() == 0) {
+            server_name = server_name.substr(0, server_name.length() - 1);
+        }
+
+        fmt::print("LOGINACK: interface = {}, TDS version = {:x}, server = {}, server version = {}.{}.{}\n",
+                   interface, tds_version, utf16_to_utf8(server_name), server_version & 0xff, (server_version & 0xff00) >> 8,
+                   ((server_version & 0xff0000) >> 8) | (server_version >> 24));
+#endif
+
+        if (tds_version != tds_74_version)
+            throw formatted_error(FMT_STRING("Server not using TDS 7.4. Version was {:x}, expected {:x}."), tds_version, tds_74_version);
+    }
+
     int sock = 0;
-    vector<pair<tds_token, string>> msgs;
+    list<pair<tds_token, string>> msgs;
 };
 
 int main() {
