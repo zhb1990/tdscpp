@@ -28,7 +28,7 @@ private:
     string msg;
 };
 
-enum class newtds_msg : uint8_t {
+enum class tds_msg : uint8_t {
     sql_batch = 1,
     pretds7_login,
     rpc,
@@ -43,7 +43,7 @@ enum class newtds_msg : uint8_t {
 };
 
 struct tds_header {
-    enum newtds_msg type;
+    enum tds_msg type;
     uint8_t status;
     uint16_t length;
     uint16_t spid;
@@ -53,7 +53,7 @@ struct tds_header {
 
 static_assert(sizeof(tds_header) == 8, "tds_header has wrong size");
 
-enum class newtds_login_opt_type : uint8_t {
+enum class tds_login_opt_type : uint8_t {
     version = 0,
     encryption,
     instopt,
@@ -66,9 +66,9 @@ enum class newtds_login_opt_type : uint8_t {
 };
 
 struct login_opt {
-    login_opt(enum newtds_login_opt_type type, const string_view& payload) : type(type), payload(payload) { }
+    login_opt(enum tds_login_opt_type type, const string_view& payload) : type(type), payload(payload) { }
 
-    enum newtds_login_opt_type type;
+    enum tds_login_opt_type type;
     string payload;
 };
 
@@ -84,7 +84,7 @@ static_assert(sizeof(login_opt_version) == 6, "login_opt_version has wrong size"
 #pragma pack(push,1)
 
 struct tds_login_opt {
-    enum newtds_login_opt_type type;
+    enum tds_login_opt_type type;
     uint16_t offset;
     uint16_t length;
 };
@@ -154,9 +154,9 @@ static u16string utf8_to_utf16(const string_view& sv) {
     return convert.from_bytes(sv.data(), sv.data() + sv.length());
 }
 
-class newtds {
+class tds {
 public:
-    newtds(const string& server, uint16_t port, const string_view& user, const string_view& password) {
+    tds(const string& server, uint16_t port, const string_view& user, const string_view& password) {
         connect(server, port);
 
         send_prelogin_msg();
@@ -164,7 +164,7 @@ public:
         send_login_msg(user, password);
     }
 
-    ~newtds() {
+    ~tds() {
         if (sock != 0)
             close(sock);
     }
@@ -240,7 +240,7 @@ private:
         lov.build = 0;
         lov.subbuild = 0;
 
-        opts.emplace_back(newtds_login_opt_type::version, string_view{(char*)&lov, sizeof(lov)});
+        opts.emplace_back(tds_login_opt_type::version, string_view{(char*)&lov, sizeof(lov)});
 
         // encryption
         // FIXME - actually support encryption
@@ -248,19 +248,19 @@ private:
 
         enc = tds_encryption_type::ENCRYPT_NOT_SUP;
 
-        opts.emplace_back(newtds_login_opt_type::encryption, string_view{(char*)&enc, sizeof(enc)});
+        opts.emplace_back(tds_login_opt_type::encryption, string_view{(char*)&enc, sizeof(enc)});
 
         // instopt
 
         // needs trailing zero
-        opts.emplace_back(newtds_login_opt_type::instopt, string_view{instance, sizeof(instance)});
+        opts.emplace_back(tds_login_opt_type::instopt, string_view{instance, sizeof(instance)});
 
         // MARS
 
         mars = 0;
-        opts.emplace_back(newtds_login_opt_type::mars, string_view{(char*)&mars, sizeof(mars)});
+        opts.emplace_back(tds_login_opt_type::mars, string_view{(char*)&mars, sizeof(mars)});
 
-        size = (sizeof(tds_login_opt) * opts.size()) + sizeof(enum newtds_login_opt_type);
+        size = (sizeof(tds_login_opt) * opts.size()) + sizeof(enum tds_login_opt_type);
         off = size;
 
         for (const auto& opt : opts) {
@@ -282,18 +282,18 @@ private:
             tlo++;
         }
 
-        tlo->type = newtds_login_opt_type::terminator;
+        tlo->type = tds_login_opt_type::terminator;
 
-        send_msg(newtds_msg::prelogin, msg);
+        send_msg(tds_msg::prelogin, msg);
 
         {
-            enum newtds_msg type;
+            enum tds_msg type;
             string payload;
 
             wait_for_msg(type, payload);
             // FIXME - timeout
 
-            if (type != newtds_msg::tabular_result)
+            if (type != tds_msg::tabular_result)
                 throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
 
             // FIXME - parse payload for anything we care about (in particular, what server says about encryption)
@@ -301,7 +301,7 @@ private:
     }
 
     void send_login_msg(const string_view& user, const string_view& password) {
-        enum newtds_msg type;
+        enum tds_msg type;
         string payload;
 
         // FIXME - support SSPI
@@ -505,10 +505,10 @@ private:
         msg->sspi_long_offset = 0;
         msg->sspi_long_length = 0;
 
-        send_msg(newtds_msg::tds7_login, payload);
+        send_msg(tds_msg::tds7_login, payload);
     }
 
-    void send_msg(enum newtds_msg type, const string_view& msg) {
+    void send_msg(enum tds_msg type, const string_view& msg) {
         string payload;
 
         payload.resize(msg.length() + sizeof(tds_header));
@@ -534,7 +534,7 @@ private:
             throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
     }
 
-    void wait_for_msg(enum newtds_msg& type, string& payload) {
+    void wait_for_msg(enum tds_msg& type, string& payload) {
         tds_header h;
 
         auto ret = recv(sock, &h, sizeof(tds_header), MSG_WAITALL);
@@ -579,7 +579,7 @@ private:
 
 int main() {
     try {
-        newtds n(db_server, db_port, db_user, db_password);
+        tds n(db_server, db_port, db_user, db_password);
     } catch (const exception& e) {
         cerr << "Exception: " << e.what() << endl;
         return 1;
