@@ -292,14 +292,28 @@ static string utf16_to_utf8(const u16string_view& sv) {
     return convert.to_bytes(sv.data(), sv.data() + sv.length());
 }
 
+using msg_handler = function<void(const string_view& server, const string_view& message, const string_view& proc_name,
+                                  const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
+                                  uint8_t severity, int oserr)>;
+
 class tds {
 public:
-    tds(const string& server, uint16_t port, const string_view& user, const string_view& password) {
+    tds(const string& server, uint16_t port, const string_view& user, const string_view& password,
+        const msg_handler& message_handler = nullptr) {
         connect(server, port);
 
         send_prelogin_msg();
 
         send_login_msg(user, password);
+
+        while (!msgs.empty()) {
+            auto& msg = msgs.front();
+
+            if (message_handler && msg.first == tds_token::INFO)
+                handle_info_msg(msg.second, message_handler);
+
+            msgs.pop_front();
+        }
     }
 
     ~tds() {
@@ -806,13 +820,69 @@ private:
             throw formatted_error(FMT_STRING("Server not using TDS 7.4. Version was {:x}, expected {:x}."), tds_version, tds_74_version);
     }
 
+    void handle_info_msg(const string_view& sv, const msg_handler& message_handler) {
+        uint16_t msg_len;
+        uint8_t server_name_len, proc_name_len, state, severity;
+        u16string_view msg, server_name, proc_name;
+        int32_t msgno, line_number;
+
+        if (sv.length() < 14)
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least 14)."), sv.length());
+
+        msg_len = *(uint16_t*)&sv[6];
+
+        if (sv.length() < 14 + (msg_len * sizeof(char16_t))) {
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least {})."),
+                                  sv.length(), 14 + (msg_len * sizeof(char16_t)));
+        }
+
+        server_name_len = (uint8_t)sv[8 + (msg_len * sizeof(char16_t))];
+
+        if (sv.length() < 14 + ((msg_len + server_name_len) * sizeof(char16_t))) {
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least {})."),
+                                  sv.length(), 14 + ((msg_len + server_name_len) * sizeof(char16_t)));
+        }
+
+        proc_name_len = (uint8_t)sv[8 + ((msg_len + server_name_len) * sizeof(char16_t))];
+
+        if (sv.length() < 14 + ((msg_len + server_name_len + proc_name_len) * sizeof(char16_t))) {
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least {})."),
+                                  sv.length(), 14 + ((msg_len + server_name_len + proc_name_len) * sizeof(char16_t)));
+        }
+
+        msgno = *(int32_t*)&sv[0];
+        state = (uint8_t)sv[4];
+        severity = (uint8_t)sv[5];
+        msg = u16string_view((char16_t*)&sv[8], msg_len);
+        server_name = u16string_view((char16_t*)&sv[9 + (msg_len * sizeof(char16_t))], server_name_len);
+        proc_name = u16string_view((char16_t*)&sv[10 + ((msg_len + server_name_len) * sizeof(char16_t))], proc_name_len);
+        line_number = *(int32_t*)&sv[10 + ((msg_len + server_name_len + proc_name_len) * sizeof(char16_t))];
+
+        // FIXME - get rid of unused params
+
+        message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), "", msgno, line_number, state, 0, severity, 0);
+    }
+
     int sock = 0;
     list<pair<tds_token, string>> msgs;
 };
 
+static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
+                     const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
+                     uint8_t severity, int oserr) {
+    if (severity > 10)
+        fmt::print("\x1b[31;1mError {}: {}\x1b[0m\n", msgno, message);
+    else if (msgno == 50000) // match SSMS by not displaying message no. if 50000 (RAISERROR etc.)
+        fmt::print("{}\n", message);
+    else
+        fmt::print("{}: {}\n", msgno, message);
+}
+
 int main() {
     try {
-        tds n(db_server, db_port, db_user, db_password);
+        tds n(db_server, db_port, db_user, db_password, show_msg);
+
+        // FIXME
     } catch (const exception& e) {
         cerr << "Exception: " << e.what() << endl;
         return 1;
