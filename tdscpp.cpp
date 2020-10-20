@@ -54,10 +54,8 @@ struct fmt::formatter<DSTR> {
 	constexpr auto parse(format_parse_context& ctx) {
 		auto it = ctx.begin();
 
-		if (*it != '}')
+		if (it != ctx.end() && *it != '}')
 			throw format_error("invalid format");
-
-		it++;
 
 		return it;
 	}
