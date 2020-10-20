@@ -148,6 +148,133 @@ struct tds_login_msg {
 
 static_assert(sizeof(tds_login_msg) == 94, "tds_login_msg has wrong size");
 
+enum class tds_token : uint8_t {
+    OFFSET = 0x78,
+    RETURNSTATUS = 0x79,
+    COLMETADATA = 0x81,
+    ALTMETADATA = 0x88,
+    DATACLASSIFICATION = 0xa3,
+    TABNAME = 0xa4,
+    COLINFO = 0xa5,
+    ORDER = 0xa9,
+    ERROR = 0xaa,
+    INFO = 0xab,
+    RETURNVALUE = 0xac,
+    LOGINACK = 0xad,
+    FEATUREEXTACK = 0xae,
+    ROW = 0xd1,
+    NBCROW = 0xd2,
+    ALTROW = 0xd3,
+    ENVCHANGE = 0xe3,
+    SESSIONSTATE = 0xe4,
+    SSPI = 0xed,
+    FEDAUTHINFO = 0xee,
+    DONE = 0xfd,
+    DONEPROC = 0xfe,
+    DONEINPROC = 0xff
+};
+
+#pragma pack(push,1)
+
+struct tds_done_msg {
+    uint16_t status;
+    uint16_t curcmd;
+    uint64_t rowcount;
+};
+
+#pragma pack(pop)
+
+static_assert(sizeof(tds_done_msg) == 12, "tds_done_msg has wrong size");
+
+template<>
+struct fmt::formatter<enum tds_token> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(enum tds_token t, format_context& ctx) {
+        switch (t) {
+            case tds_token::OFFSET:
+                return format_to(ctx.out(), "OFFSET");
+
+            case tds_token::RETURNSTATUS:
+                return format_to(ctx.out(), "RETURNSTATUS");
+
+            case tds_token::COLMETADATA:
+                return format_to(ctx.out(), "COLMETADATA");
+
+            case tds_token::ALTMETADATA:
+                return format_to(ctx.out(), "ALTMETADATA");
+
+            case tds_token::DATACLASSIFICATION:
+                return format_to(ctx.out(), "DATACLASSIFICATION");
+
+            case tds_token::TABNAME:
+                return format_to(ctx.out(), "TABNAME");
+
+            case tds_token::COLINFO:
+                return format_to(ctx.out(), "COLINFO");
+
+            case tds_token::ORDER:
+                return format_to(ctx.out(), "ORDER");
+
+            case tds_token::ERROR:
+                return format_to(ctx.out(), "ERROR");
+
+            case tds_token::INFO:
+                return format_to(ctx.out(), "INFO");
+
+            case tds_token::RETURNVALUE:
+                return format_to(ctx.out(), "RETURNVALUE");
+
+            case tds_token::LOGINACK:
+                return format_to(ctx.out(), "LOGINACK");
+
+            case tds_token::FEATUREEXTACK:
+                return format_to(ctx.out(), "FEATUREEXTACK");
+
+            case tds_token::ROW:
+                return format_to(ctx.out(), "ROW");
+
+            case tds_token::NBCROW:
+                return format_to(ctx.out(), "NBCROW");
+
+            case tds_token::ALTROW:
+                return format_to(ctx.out(), "ALTROW");
+
+            case tds_token::ENVCHANGE:
+                return format_to(ctx.out(), "ENVCHANGE");
+
+            case tds_token::SESSIONSTATE:
+                return format_to(ctx.out(), "SESSIONSTATE");
+
+            case tds_token::SSPI:
+                return format_to(ctx.out(), "SSPI");
+
+            case tds_token::FEDAUTHINFO:
+                return format_to(ctx.out(), "FEDAUTHINFO");
+
+            case tds_token::DONE:
+                return format_to(ctx.out(), "DONE");
+
+            case tds_token::DONEPROC:
+                return format_to(ctx.out(), "DONEPROC");
+
+            case tds_token::DONEINPROC:
+                return format_to(ctx.out(), "DONEINPROC");
+
+            default:
+                return format_to(ctx.out(), "{:x}", (uint8_t)t);
+        }
+    }
+};
+
 static u16string utf8_to_utf16(const string_view& sv) {
     wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
 
@@ -323,6 +450,11 @@ private:
 
         wait_for_msg(type, payload);
         // FIXME - timeout
+
+        if (type != tds_msg::tabular_result)
+            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+
+        parse_result_message(payload);
         // FIXME - parse
     }
 
@@ -574,7 +706,52 @@ private:
             payload.clear();
     }
 
+    void parse_result_message(string_view sv) {
+        tds_token type;
+
+        while (!sv.empty()) {
+            type = (tds_token)sv[0];
+            sv = sv.substr(1);
+
+            if (sv.length() < sizeof(uint16_t))
+                throw formatted_error(FMT_STRING("Short message ({} bytes, expected at least 2)."), sv.length());
+
+            switch (type) {
+                case tds_token::DONE:
+                    if (sv.length() < sizeof(tds_done_msg))
+                        throw formatted_error(FMT_STRING("Short DONE message ({} bytes, expected {})."), sv.length(), sizeof(tds_done_msg));
+
+                    msgs.emplace_back(type, sv.substr(0, sizeof(tds_done_msg)));
+
+                    sv = sv.substr(sizeof(tds_done_msg));
+                break;
+
+                case tds_token::LOGINACK:
+                case tds_token::INFO:
+                case tds_token::ENVCHANGE:
+                {
+                    auto len = *(uint16_t*)&sv[0];
+
+                    sv = sv.substr(sizeof(uint16_t));
+
+                    if (sv.length() < len)
+                        throw formatted_error(FMT_STRING("Short message ({} bytes, expected {})."), sv.length(), len);
+
+                    msgs.emplace_back(type, sv.substr(0, len));
+
+                    sv = sv.substr(len);
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("Unhandled token type {}."), type);
+            }
+        }
+    }
+
     int sock = 0;
+    vector<pair<tds_token, string>> msgs;
 };
 
 int main() {
