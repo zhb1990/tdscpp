@@ -2,6 +2,7 @@
 #include <string>
 #include <codecvt>
 #include <list>
+#include <span>
 #include <fmt/format.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -187,9 +188,98 @@ struct tds_done_msg {
     uint64_t rowcount;
 };
 
-#pragma pack(pop)
-
 static_assert(sizeof(tds_done_msg) == 12, "tds_done_msg has wrong size");
+
+struct tds_header_trans_desc {
+    uint16_t type;
+    uint64_t descriptor;
+    uint32_t outstanding;
+};
+
+static_assert(sizeof(tds_header_trans_desc) == 14, "tds_header_trans_desc has wrong size");
+
+struct tds_all_headers {
+    uint32_t total_size;
+    uint32_t size;
+    tds_header_trans_desc trans_desc;
+};
+
+static_assert(sizeof(tds_all_headers) == 22, "tds_all_headers has wrong size");
+
+struct tds_rpc_batch {
+    tds_all_headers all_headers;
+    uint16_t proc_id_switch;
+    uint16_t proc_id;
+    uint16_t flags;
+};
+
+static_assert(sizeof(tds_rpc_batch) == 28, "tds_rpc_batch has wrong size");
+
+enum class tds_sql_type : uint8_t {
+    IMAGE = 0x22,
+    TEXT = 0x23,
+    UNIQUEIDENTIFIER = 0x24,
+    INTN = 0x26,
+    DATEN = 0x28,
+    TIMEN = 0x29,
+    DATETIME2N = 0x2A,
+    DATETIMEOFFSETN = 0x2B,
+    SQL_VARIANT = 0x62,
+    NTEXT = 0x63,
+    BITN = 0x68,
+    DECIMAL = 0x6A,
+    NUMERIC = 0x6C,
+    FLTN = 0x6D,
+    MONEYN = 0x6E,
+    DATETIMN = 0x6F,
+    VARBINARY = 0xA5,
+    VARCHAR = 0xA7,
+    BINARY = 0xAD,
+    CHAR = 0xAF,
+    NVARCHAR = 0xE7,
+    NCHAR = 0xEF,
+    UDT = 0xF0,
+    XML = 0xF1,
+};
+
+struct tds_INT_param {
+    uint8_t name_len;
+    uint8_t flags;
+    tds_sql_type type;
+    uint8_t max_length;
+    uint8_t length;
+};
+
+static_assert(sizeof(tds_INT_param) == 5, "tds_INT_param has wrong size");
+
+struct tds_collation {
+    uint32_t lcid : 20;
+    uint32_t ignore_case : 1;
+    uint32_t ignore_accent : 1;
+    uint32_t ignore_width : 1;
+    uint32_t ignore_kana : 1;
+    uint32_t binary : 1;
+    uint32_t binary2 : 1;
+    uint32_t utf8 : 1;
+    uint32_t reserved : 1;
+    uint32_t version : 4;
+    uint8_t sort_id;
+};
+
+static_assert(sizeof(tds_collation) == 5, "tds_collation has wrong size");
+
+struct tds_VARCHAR_param {
+    uint8_t name_len;
+    uint8_t flags;
+    tds_sql_type type;
+    uint16_t max_length;
+    tds_collation collation;
+    uint16_t length;
+};
+
+static_assert(sizeof(tds_VARCHAR_param) == 12, "tds_VARCHAR_param has wrong size");
+
+#pragma pack(pop)
 
 template<>
 struct fmt::formatter<enum tds_token> {
@@ -294,12 +384,13 @@ static string utf16_to_utf8(const u16string_view& sv) {
 
 using msg_handler = function<void(const string_view& server, const string_view& message, const string_view& proc_name,
                                   const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
-                                  uint8_t severity, int oserr)>;
+                                  uint8_t severity, int oserr, bool error)>;
 
+// FIXME - use pimpl
 class tds {
 public:
     tds(const string& server, uint16_t port, const string_view& user, const string_view& password,
-        const msg_handler& message_handler = nullptr) {
+        const msg_handler& message_handler = nullptr) : message_handler(message_handler) {
         connect(server, port);
 
         send_prelogin_msg();
@@ -309,8 +400,8 @@ public:
         while (!msgs.empty()) {
             auto& msg = msgs.front();
 
-            if (message_handler && msg.first == tds_token::INFO)
-                handle_info_msg(msg.second, message_handler);
+            if (message_handler && (msg.first == tds_token::INFO || msg.first == tds_token::ERROR))
+                handle_info_msg(msg.second, msg.first == tds_token::ERROR);
 
             msgs.pop_front();
         }
@@ -321,7 +412,6 @@ public:
             close(sock);
     }
 
-private:
     void connect(const string& server, uint16_t port) {
         struct addrinfo hints;
         struct addrinfo* res;
@@ -704,6 +794,10 @@ private:
             throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
     }
 
+    void send_msg(enum tds_msg type, const span<uint8_t>& msg) {
+        send_msg(type, string_view{(const char*)msg.data(), (const char*)msg.data() + msg.size()});
+    }
+
     void wait_for_msg(enum tds_msg& type, string& payload) {
         tds_header h;
 
@@ -766,6 +860,7 @@ private:
 
                 case tds_token::LOGINACK:
                 case tds_token::INFO:
+                case tds_token::ERROR:
                 case tds_token::ENVCHANGE:
                 {
                     auto len = *(uint16_t*)&sv[0];
@@ -820,7 +915,7 @@ private:
             throw formatted_error(FMT_STRING("Server not using TDS 7.4. Version was {:x}, expected {:x}."), tds_version, tds_74_version);
     }
 
-    void handle_info_msg(const string_view& sv, const msg_handler& message_handler) {
+    void handle_info_msg(const string_view& sv, bool error) {
         uint16_t msg_len;
         uint8_t server_name_len, proc_name_len, state, severity;
         u16string_view msg, server_name, proc_name;
@@ -860,16 +955,126 @@ private:
 
         // FIXME - get rid of unused params
 
-        message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), "", msgno, line_number, state, 0, severity, 0);
+        message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), "", msgno, line_number, state, 0,
+                        severity, 0, error);
     }
 
     int sock = 0;
     list<pair<tds_token, string>> msgs;
+    msg_handler message_handler;
+};
+
+class query {
+public:
+    query(tds& conn, const string_view& q) {
+        // FIXME - allow parameters
+
+        size_t bufsize;
+        u16string params = u"!"; // FIXME (allow to be NULL)
+        u16string stmt = utf8_to_utf16(q);
+
+        bufsize = sizeof(tds_rpc_batch);
+        bufsize += sizeof(tds_INT_param); // handle
+        bufsize += sizeof(tds_VARCHAR_param) + (params.size() * sizeof(char16_t)); // params
+        bufsize += sizeof(tds_VARCHAR_param) + (stmt.size() * sizeof(char16_t));  // stmt
+        bufsize += sizeof(tds_INT_param) + sizeof(int32_t); // options
+
+        vector<uint8_t> buf(bufsize);
+
+        auto header = (tds_rpc_batch*)&buf[0];
+
+        header->all_headers.total_size = sizeof(tds_all_headers);
+        header->all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
+        header->all_headers.trans_desc.type = 2; // transaction descriptor
+        header->all_headers.trans_desc.descriptor = 0;
+        header->all_headers.trans_desc.outstanding = 1;
+        header->proc_id_switch = 0xffff;
+        header->proc_id = 0xb; // sp_prepare
+        header->flags = 0;
+
+        auto handle = (tds_INT_param*)&header[1];
+        handle->name_len = 0;
+        handle->flags = 1; // by reference
+        handle->type = tds_sql_type::INTN;
+        handle->max_length = 4;
+        handle->length = 0; // NULL
+
+        auto p = (tds_VARCHAR_param*)&handle[1];
+        p->name_len = 0;
+        p->flags = 0;
+        p->type = tds_sql_type::NVARCHAR;
+        p->max_length = p->length = params.size() * sizeof(char16_t);
+        p->collation.lcid = 0x0409; // en-US
+        p->collation.ignore_case = 1;
+        p->collation.ignore_accent = 0;
+        p->collation.ignore_width = 1;
+        p->collation.ignore_kana = 1;
+        p->collation.binary = 0;
+        p->collation.binary2 = 0;
+        p->collation.utf8 = 0;
+        p->collation.reserved = 0;
+        p->collation.version = 0;
+        p->collation.sort_id = 52; // nocase.iso
+        memcpy(&p[1], params.data(), p->length);
+
+        auto s = (tds_VARCHAR_param*)((uint8_t*)&p[1] + p->length);
+        s->name_len = 0;
+        s->flags = 0;
+        s->type = tds_sql_type::NVARCHAR;
+        s->max_length = s->length = stmt.size() * sizeof(char16_t);
+        s->collation.lcid = 0x0409; // en-US
+        s->collation.ignore_case = 1;
+        s->collation.ignore_accent = 0;
+        s->collation.ignore_width = 1;
+        s->collation.ignore_kana = 1;
+        s->collation.binary = 0;
+        s->collation.binary2 = 0;
+        s->collation.utf8 = 0;
+        s->collation.reserved = 0;
+        s->collation.version = 0;
+        s->collation.sort_id = 52; // nocase.iso
+        memcpy(&s[1], stmt.data(), s->length);
+
+        auto options = (tds_INT_param*)((uint8_t*)&s[1] + s->length);
+        options->name_len = 0;
+        options->flags = 0;
+        options->type = tds_sql_type::INTN;
+        options->max_length = 4;
+        options->length = sizeof(int32_t);
+        *(uint32_t*)&options[1] = 1; // return metadata
+
+        conn.send_msg(tds_msg::rpc, buf);
+
+        {
+            enum tds_msg type;
+            string payload;
+
+            conn.wait_for_msg(type, payload);
+            // FIXME - timeout
+
+            if (type != tds_msg::tabular_result)
+                throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+
+            conn.parse_result_message(payload);
+        }
+
+        while (!conn.msgs.empty()) {
+            auto& msg = conn.msgs.front();
+
+            if (conn.message_handler && (msg.first == tds_token::INFO || msg.first == tds_token::ERROR))
+                conn.handle_info_msg(msg.second, msg.first == tds_token::ERROR);
+
+            conn.msgs.pop_front();
+        }
+
+        // FIXME - sp_execute
+        // FIXME - sp_unprepare (is this necessary?)
+    }
 };
 
 static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
                      const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
-                     uint8_t severity, int oserr) {
+                     uint8_t severity, int oserr, bool error) {
     if (severity > 10)
         fmt::print("\x1b[31;1mError {}: {}\x1b[0m\n", msgno, message);
     else if (msgno == 50000) // match SSMS by not displaying message no. if 50000 (RAISERROR etc.)
@@ -881,6 +1086,9 @@ static void show_msg(const string_view& server, const string_view& message, cons
 int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
+
+//         query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now, ? AS pi", 42, "Hello"s, 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user]");
 
         // FIXME
     } catch (const exception& e) {
