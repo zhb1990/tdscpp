@@ -279,7 +279,7 @@ struct tds_VARCHAR_param {
 
 static_assert(sizeof(tds_VARCHAR_param) == 12, "tds_VARCHAR_param has wrong size");
 
-struct tds_return_status {
+struct tds_return_value {
     uint16_t param_ordinal;
     uint8_t param_name_len;
     // FIXME - then param name if present
@@ -289,7 +289,7 @@ struct tds_return_status {
     tds_sql_type type;
 };
 
-static_assert(sizeof(tds_return_status) == 11, "tds_return_status has wrong size");
+static_assert(sizeof(tds_return_value) == 11, "tds_return_value has wrong size");
 
 struct tds_colmetadata_col {
     uint32_t user_type;
@@ -1031,29 +1031,29 @@ public:
 
                 case tds_token::RETURNVALUE:
                 {
-                    auto h = (tds_return_status*)&sv[0];
+                    auto h = (tds_return_value*)&sv[0];
 
-                    if (sv.length() < sizeof(tds_return_status))
-                        throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_status));
+                    if (sv.length() < sizeof(tds_return_value))
+                        throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_value));
 
                     // FIXME - param name
 
                     if (is_byte_len_type(h->type)) {
                         uint8_t len;
 
-                        if (sv.length() < sizeof(tds_return_status) + 2)
-                            throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_status) + 2);
+                        if (sv.length() < sizeof(tds_return_value) + 2)
+                            throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_value) + 2);
 
-                        len = *(uint8_t*)(&sv[0] + sizeof(tds_return_status) + 1);
+                        len = *(uint8_t*)(&sv[0] + sizeof(tds_return_value) + 1);
 
-                        if (sv.length() < sizeof(tds_return_status) + 2 + len)
-                            throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected {})."), sv.length(), sizeof(tds_return_status) + 2 + len);
+                        if (sv.length() < sizeof(tds_return_value) + 2 + len)
+                            throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected {})."), sv.length(), sizeof(tds_return_value) + 2 + len);
 
-                        msgs.emplace_back(type, sv.substr(0, sizeof(tds_return_status) + 2 + len));
+                        msgs.emplace_back(type, sv.substr(0, sizeof(tds_return_value) + 2 + len));
 
-                        sv = sv.substr(sizeof(tds_return_status) + 2 + len);
+                        sv = sv.substr(sizeof(tds_return_value) + 2 + len);
                     } else
-                        throw formatted_error(FMT_STRING("Unhandled type {} in RETURNSTATUS message."), h->type);
+                        throw formatted_error(FMT_STRING("Unhandled type {} in RETURNVALUE message."), h->type);
 
                     break;
                 }
@@ -1233,14 +1233,14 @@ public:
         header->proc_id = 0xb; // sp_prepare
         header->flags = 0;
 
-        auto handle = (tds_INT_param*)&header[1];
-        handle->name_len = 0;
-        handle->flags = 1; // by reference
-        handle->type = tds_sql_type::INTN;
-        handle->max_length = 4;
-        handle->length = 0; // NULL
+        auto h = (tds_INT_param*)&header[1];
+        h->name_len = 0;
+        h->flags = 1; // by reference
+        h->type = tds_sql_type::INTN;
+        h->max_length = 4;
+        h->length = 0; // NULL
 
-        auto p = (tds_VARCHAR_param*)&handle[1];
+        auto p = (tds_VARCHAR_param*)&h[1];
         p->name_len = 0;
         p->flags = 0;
         p->type = tds_sql_type::NVARCHAR;
@@ -1303,14 +1303,63 @@ public:
             conn.parse_result_message(payload);
         }
 
+        if (conn.message_handler) {
+            for (const auto& msg : conn.msgs) {
+                if (msg.first == tds_token::INFO || msg.first == tds_token::ERROR)
+                    conn.handle_info_msg(msg.second, msg.first == tds_token::ERROR);
+            }
+        }
+
+        optional<int32_t> handle;
+
         while (!conn.msgs.empty()) {
             auto& msg = conn.msgs.front();
 
-            if (conn.message_handler && (msg.first == tds_token::INFO || msg.first == tds_token::ERROR))
-                conn.handle_info_msg(msg.second, msg.first == tds_token::ERROR);
+            switch (msg.first) {
+                case tds_token::ERROR:
+                    throw formatted_error("sp_prepare failed.");
+
+                case tds_token::RETURNVALUE:
+                {
+                    auto h = (tds_return_value*)msg.second.data();
+
+                    if (h->param_ordinal != 0) // only interested in first param
+                        break;
+
+                    // FIXME - handle param_name_len
+
+                    if (h->type != tds_sql_type::INTN)
+                        throw formatted_error(FMT_STRING("Returned parameter of sp_prepare was {}, expected INTN."), h->type);
+
+                    auto maxlen = *(uint8_t*)&h[1];
+
+                    if (maxlen != 4)
+                        throw formatted_error(FMT_STRING("Returned parameter of sp_prepare was INTN({}), expected INTN(4)."), maxlen, h->type);
+
+                    auto intlen = *((uint8_t*)msg.second.data() + sizeof(tds_return_value) + 1);
+
+                    if (intlen == 0)
+                        throw formatted_error(FMT_STRING("Returned parameter of sp_prepare was NULL."));
+                    else if (intlen != maxlen)
+                        throw formatted_error(FMT_STRING("Returned parameter of sp_prepare was {} bytes, expected {}."), intlen, maxlen);
+
+                    handle = *(int32_t*)((uint8_t*)msg.second.data() + sizeof(tds_return_value) + 2);
+
+                    break;
+                }
+            }
+
+            // FIXME - parse metadata
 
             conn.msgs.pop_front();
         }
+
+        if (!handle.has_value())
+            throw runtime_error("sp_prepare did not return a handle value.");
+
+#ifdef DEBUG_SHOW_MSGS
+        fmt::print("sp_prepare handle is {}.\n", handle.value());
+#endif
 
         // FIXME - sp_execute
         // FIXME - sp_unprepare (is this necessary?)
