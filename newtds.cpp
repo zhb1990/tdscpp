@@ -1313,14 +1313,22 @@ static size_t fixed_len_size(enum tds_sql_type type) {
         case tds_sql_type::BIGINT:
             return 8;
 
+        case tds_sql_type::DATETIME:
+            return 8;
+
+        case tds_sql_type::SMALLDATETIME:
+            return 4;
+
+        case tds_sql_type::SMALLMONEY:
+            return 4;
+
+        case tds_sql_type::MONEY:
+            return 8;
+
         case tds_sql_type::SQL_NULL:
         case tds_sql_type::BIT:
-        case tds_sql_type::SMALLDATETIME:
         case tds_sql_type::REAL:
-        case tds_sql_type::MONEY:
-        case tds_sql_type::DATETIME:
         case tds_sql_type::FLOAT:
-        case tds_sql_type::SMALLMONEY:
             throw formatted_error(FMT_STRING("FIXME - fixed_len_size for {}"), type); // FIXME
 
         default:
