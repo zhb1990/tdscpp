@@ -216,6 +216,7 @@ struct tds_rpc_batch {
 static_assert(sizeof(tds_rpc_batch) == 28, "tds_rpc_batch has wrong size");
 
 enum class tds_sql_type : uint8_t {
+    SQL_NULL = 0x1F,
     IMAGE = 0x22,
     TEXT = 0x23,
     UNIQUEIDENTIFIER = 0x24,
@@ -224,6 +225,15 @@ enum class tds_sql_type : uint8_t {
     TIMEN = 0x29,
     DATETIME2N = 0x2A,
     DATETIMEOFFSETN = 0x2B,
+    TINYINT = 0x30,
+    BIT = 0x32,
+    SMALLINT = 0x34,
+    INT = 0x38,
+    SMALLDATETIME = 0x3A,
+    REAL = 0x3B,
+    MONEY = 0x3C,
+    DATETIME = 0x3D,
+    FLOAT = 0x3E,
     SQL_VARIANT = 0x62,
     NTEXT = 0x63,
     BITN = 0x68,
@@ -232,6 +242,8 @@ enum class tds_sql_type : uint8_t {
     FLTN = 0x6D,
     MONEYN = 0x6E,
     DATETIMN = 0x6F,
+    SMALLMONEY = 0x7A,
+    BIGINT = 0x7F,
     VARBINARY = 0xA5,
     VARCHAR = 0xA7,
     BINARY = 0xAD,
@@ -242,10 +254,14 @@ enum class tds_sql_type : uint8_t {
     XML = 0xF1,
 };
 
-struct tds_INT_param {
+struct tds_param_header {
     uint8_t name_len;
     uint8_t flags;
     tds_sql_type type;
+};
+
+struct tds_INT_param {
+    tds_param_header h;
     uint8_t max_length;
     uint8_t length;
 };
@@ -269,9 +285,7 @@ struct tds_collation {
 static_assert(sizeof(tds_collation) == 5, "tds_collation has wrong size");
 
 struct tds_VARCHAR_param {
-    uint8_t name_len;
-    uint8_t flags;
-    tds_sql_type type;
+    tds_param_header h;
     uint16_t max_length;
     tds_collation collation;
     uint16_t length;
@@ -475,6 +489,42 @@ struct fmt::formatter<enum tds_sql_type> {
 
             case tds_sql_type::XML:
                 return format_to(ctx.out(), "XML");
+
+            case tds_sql_type::SQL_NULL:
+                return format_to(ctx.out(), "NULL");
+
+            case tds_sql_type::TINYINT:
+                return format_to(ctx.out(), "TINYINT");
+
+            case tds_sql_type::BIT:
+                return format_to(ctx.out(), "BIT");
+
+            case tds_sql_type::SMALLINT:
+                return format_to(ctx.out(), "SMALLINT");
+
+            case tds_sql_type::INT:
+                return format_to(ctx.out(), "INT");
+
+            case tds_sql_type::SMALLDATETIME:
+                return format_to(ctx.out(), "SMALLDATETIME");
+
+            case tds_sql_type::REAL:
+                return format_to(ctx.out(), "REAL");
+
+            case tds_sql_type::MONEY:
+                return format_to(ctx.out(), "MONEY");
+
+            case tds_sql_type::DATETIME:
+                return format_to(ctx.out(), "DATETIME");
+
+            case tds_sql_type::FLOAT:
+                return format_to(ctx.out(), "FLOAT");
+
+            case tds_sql_type::SMALLMONEY:
+                return format_to(ctx.out(), "SMALLMONEY");
+
+            case tds_sql_type::BIGINT:
+                return format_to(ctx.out(), "BIGINT");
 
             default:
                 return format_to(ctx.out(), "{:x}", (uint8_t)t);
@@ -1237,14 +1287,415 @@ public:
     msg_handler message_handler;
 };
 
+class tds_param {
+public:
+    tds_param(int32_t i) {
+        init(i, false);
+    }
+
+    tds_param(const optional<int32_t>& i) {
+        init(i.has_value() ? i.value() : 0, !i.has_value());
+    }
+
+    tds_param(const u16string_view& sv) {
+        init(sv, false);
+    }
+
+//     tds_param(const optional<u16string_view>& sv) {
+//         init(sv.has_value() ? sv.value() : u"", !sv.has_value());
+//     }
+
+    void init(int32_t i, bool null) {
+        type = tds_sql_type::INTN;
+
+        val.resize(sizeof(int32_t));
+
+        if (!null)
+            *(int32_t*)val.data() = i;
+        else
+            is_null = true;
+    }
+
+    void init(const u16string_view& sv, bool null) {
+        type = tds_sql_type::NVARCHAR;
+
+        if (null)
+            is_null = true;
+        else {
+            val.resize(sv.length() * sizeof(char16_t));
+            memcpy(val.data(), sv.data(), val.length());
+        }
+    }
+
+    enum tds_sql_type type;
+    string val;
+    bool is_null = false;
+    bool is_output = false;
+};
+
+template<typename T>
+class tds_output_param {
+public:
+    tds_output_param() : p(optional<T>(nullopt)) {
+    }
+
+    tds_param p;
+};
+
+static bool is_fixed_len_type(enum tds_sql_type type) {
+    switch (type) {
+        case tds_sql_type::SQL_NULL:
+        case tds_sql_type::TINYINT:
+        case tds_sql_type::BIT:
+        case tds_sql_type::SMALLINT:
+        case tds_sql_type::INT:
+        case tds_sql_type::SMALLDATETIME:
+        case tds_sql_type::REAL:
+        case tds_sql_type::MONEY:
+        case tds_sql_type::DATETIME:
+        case tds_sql_type::FLOAT:
+        case tds_sql_type::SMALLMONEY:
+        case tds_sql_type::BIGINT:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static size_t fixed_len_size(enum tds_sql_type type) {
+    switch (type) {
+        case tds_sql_type::TINYINT:
+            return 1;
+
+        case tds_sql_type::SMALLINT:
+            return 2;
+
+        case tds_sql_type::INT:
+            return 4;
+
+        case tds_sql_type::BIGINT:
+            return 8;
+
+        case tds_sql_type::SQL_NULL:
+        case tds_sql_type::BIT:
+        case tds_sql_type::SMALLDATETIME:
+        case tds_sql_type::REAL:
+        case tds_sql_type::MONEY:
+        case tds_sql_type::DATETIME:
+        case tds_sql_type::FLOAT:
+        case tds_sql_type::SMALLMONEY:
+            throw formatted_error(FMT_STRING("FIXME - fixed_len_size for {}"), type); // FIXME
+
+        default:
+            return 0;
+    }
+}
+
+class rpc {
+public:
+    template<typename... Args>
+    rpc(tds& conn, const u16string_view& name, Args... args) {
+        params.reserve(sizeof...(args));
+
+        add_param(args...);
+
+        do_rpc(conn, name);
+    }
+
+    rpc(tds& conn, const u16string_view& name) {
+        do_rpc(conn, name);
+    }
+
+    void do_rpc(tds& conn, const u16string_view& name) {
+        size_t bufsize;
+
+        bufsize = sizeof(tds_all_headers) + sizeof(uint16_t) + (name.length() * sizeof(uint16_t)) + sizeof(uint16_t);
+
+        for (const auto& p : params) {
+            if (is_fixed_len_type(p.type))
+                bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
+            else if (is_byte_len_type(p.type))
+                bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
+            else if (p.type == tds_sql_type::NVARCHAR)
+                bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
+            else
+                throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+        }
+
+        vector<uint8_t> buf(bufsize);
+
+        auto all_headers = (tds_all_headers*)&buf[0];
+
+        all_headers->total_size = sizeof(tds_all_headers);
+        all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
+        all_headers->trans_desc.type = 2; // transaction descriptor
+        all_headers->trans_desc.descriptor = 0;
+        all_headers->trans_desc.outstanding = 1;
+
+        auto ptr = (uint8_t*)&all_headers[1];
+
+        *(uint16_t*)ptr = name.length();
+        ptr += sizeof(uint16_t);
+
+        memcpy(ptr, name.data(), name.length() * sizeof(char16_t));
+        ptr += name.length() * sizeof(char16_t);
+
+        *(uint16_t*)ptr = 0; // flags
+        ptr += sizeof(uint16_t);
+
+        for (const auto& p : params) {
+            auto h = (tds_param_header*)ptr;
+
+            h->name_len = 0;
+            h->flags = p.is_output ? 1 : 0;
+            h->type = p.type;
+
+            ptr += sizeof(tds_param_header);
+
+            if (is_fixed_len_type(p.type)) {
+                memcpy(ptr, p.val.data(), p.val.length());
+
+                ptr += p.val.length();
+            } else if (is_byte_len_type(p.type)) {
+                *ptr = p.val.length(); ptr++;
+
+                if (p.is_null) {
+                    *ptr = 0;
+                    ptr++;
+                } else {
+                    *ptr = p.val.length(); ptr++;
+                    memcpy(ptr, p.val.data(), p.val.length());
+                    ptr += p.val.length();
+                }
+            } else if (p.type == tds_sql_type::NVARCHAR) { // FIXME - MAX
+                auto h2 = (tds_VARCHAR_param*)h;
+
+                h2->max_length = p.is_null ? sizeof(char16_t) : p.val.length();
+                h2->collation.lcid = 0x0409; // en-US
+                h2->collation.ignore_case = 1;
+                h2->collation.ignore_accent = 0;
+                h2->collation.ignore_width = 1;
+                h2->collation.ignore_kana = 1;
+                h2->collation.binary = 0;
+                h2->collation.binary2 = 0;
+                h2->collation.utf8 = 0;
+                h2->collation.reserved = 0;
+                h2->collation.version = 0;
+                h2->collation.sort_id = 52; // nocase.iso
+                h2->length = p.is_null ? 0 : p.val.length();
+
+                if (h2->max_length == 0)
+                    h2->max_length = sizeof(char16_t);
+
+                ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
+
+                if (!p.is_null) {
+                    memcpy(ptr, p.val.data(), h2->length);
+                    ptr += h2->length;
+                }
+            } else
+                throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+        }
+
+        conn.send_msg(tds_msg::rpc, buf);
+
+        enum tds_msg type;
+        string payload;
+
+        conn.wait_for_msg(type, payload);
+        // FIXME - timeout
+
+        if (type != tds_msg::tabular_result)
+            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+
+        string_view sv = payload;
+
+        while (!sv.empty()) {
+            auto type = (tds_token)sv[0];
+            sv = sv.substr(1);
+
+            // FIXME - parse unknowns according to numeric value of type
+
+            switch (type) {
+                case tds_token::DONE:
+                case tds_token::DONEINPROC:
+                case tds_token::DONEPROC:
+                    if (sv.length() < sizeof(tds_done_msg))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+
+                    sv = sv.substr(sizeof(tds_done_msg));
+
+                    break;
+
+                case tds_token::INFO:
+                case tds_token::ERROR:
+                case tds_token::ENVCHANGE:
+                {
+                    if (sv.length() < sizeof(uint16_t))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+
+                    auto len = *(uint16_t*)&sv[0];
+
+                    sv = sv.substr(sizeof(uint16_t));
+
+                    if (sv.length() < len)
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+
+                    if (type == tds_token::INFO) {
+                        if (conn.message_handler)
+                            conn.handle_info_msg(sv.substr(0, len), false);
+                    } else if (type == tds_token::ERROR) {
+                        if (conn.message_handler)
+                            conn.handle_info_msg(sv.substr(0, len), true);
+                    }
+
+                    sv = sv.substr(len);
+
+                    break;
+                }
+
+                case tds_token::RETURNSTATUS:
+                {
+                    if (sv.length() < sizeof(int32_t))
+                        throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected 4)."), sv.length());
+
+                    return_status = *(int32_t*)&sv[0];
+
+                    sv = sv.substr(sizeof(int32_t));
+
+                    break;
+                }
+
+                case tds_token::COLMETADATA:
+                {
+                    if (sv.length() < 4)
+                        throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes, expected at least 4)."), sv.length());
+
+                    auto count = *(uint16_t*)&sv[0];
+
+                    if (count == 0) {
+                        sv = sv.substr(4);
+                        break;
+                    }
+
+                    // FIXME - actually parse
+
+                    size_t len = sizeof(uint16_t);
+                    string_view sv2 = sv;
+
+                    sv2 = sv2.substr(sizeof(uint16_t));
+
+                    for (unsigned int i = 0; i < count; i++) {
+                        if (sv2.length() < sizeof(tds_colmetadata_col))
+                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(tds_colmetadata_col));
+
+                        auto c = (tds_colmetadata_col*)&sv2[0];
+
+                        len += sizeof(tds_colmetadata_col);
+                        sv2 = sv2.substr(sizeof(tds_colmetadata_col));
+
+                        if (c->type == tds_sql_type::VARCHAR || c->type == tds_sql_type::NVARCHAR) {
+                            // FIXME - handle MAX
+
+                            if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
+                                throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
+
+                            len += sizeof(uint16_t) + sizeof(tds_collation);
+                            sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                        } else
+                            throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c->type);
+
+                        if (sv2.length() < 1)
+                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+
+                        auto name_len = *(uint8_t*)&sv2[0];
+
+                        sv2 = sv2.substr(1);
+                        len++;
+
+                        if (sv2.length() < name_len * sizeof(char16_t))
+                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), name_len * sizeof(char16_t));
+
+                        sv2 = sv2.substr(name_len * sizeof(char16_t));
+                        len += name_len * sizeof(char16_t);
+                    }
+
+                    sv = sv.substr(len);
+
+                    break;
+                }
+
+                case tds_token::RETURNVALUE:
+                {
+                    auto h = (tds_return_value*)&sv[0];
+
+                    if (sv.length() < sizeof(tds_return_value))
+                        throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_value));
+
+                    // FIXME - param name
+
+                    // FIXME - actually parse
+
+                    if (is_byte_len_type(h->type)) {
+                        uint8_t len;
+
+                        if (sv.length() < sizeof(tds_return_value) + 2)
+                            throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_value) + 2);
+
+                        len = *(uint8_t*)(&sv[0] + sizeof(tds_return_value) + 1);
+
+                        if (sv.length() < sizeof(tds_return_value) + 2 + len)
+                            throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected {})."), sv.length(), sizeof(tds_return_value) + 2 + len);
+
+//                         msgs.emplace_back(type, sv.substr(0, sizeof(tds_return_value) + 2 + len));
+
+                        sv = sv.substr(sizeof(tds_return_value) + 2 + len);
+                    } else
+                        throw formatted_error(FMT_STRING("Unhandled type {} in RETURNVALUE message."), h->type);
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("Unhandled token type {} while executing RPC."), type);
+            }
+        }
+    }
+
+    template<typename T, typename... Args>
+    void add_param(T t, Args... args) {
+        add_param(t);
+        add_param(args...);
+    }
+
+    template<typename T>
+    void add_param(const T& t) {
+        params.emplace_back(t);
+    }
+
+    template<typename T>
+    void add_param(const tds_output_param<T>& t) {
+        params.emplace_back(t.p);
+        params.back().is_output = true;
+    }
+
+    int32_t return_status = 0;
+    vector<tds_param> params;
+};
+
 class query {
 public:
     query(tds& conn, const string_view& q) : conn(conn) {
+        tds_output_param<int32_t> handle;
+
         // FIXME - allow parameters
 
-        auto handle = sp_prepare(u"", utf8_to_utf16(q), 1); // 1 means return metadata
+        rpc(conn, u"sp_prepare", handle, u"", utf8_to_utf16(q), 1); // 1 means return metadata
 
-        sp_execute(handle);
+//         auto handle = sp_prepare(u"", utf8_to_utf16(q), 1); // 1 means return metadata
+//
+//         sp_execute(handle);
 
         // FIXME - sp_unprepare (is this necessary?)
     }
@@ -1273,16 +1724,16 @@ private:
         header->flags = 0;
 
         auto h = (tds_INT_param*)&header[1];
-        h->name_len = 0;
-        h->flags = 1; // by reference
-        h->type = tds_sql_type::INTN;
+        h->h.name_len = 0;
+        h->h.flags = 1; // by reference
+        h->h.type = tds_sql_type::INTN;
         h->max_length = 4;
         h->length = 0; // NULL
 
         auto p = (tds_VARCHAR_param*)&h[1];
-        p->name_len = 0;
-        p->flags = 0;
-        p->type = tds_sql_type::NVARCHAR;
+        p->h.name_len = 0;
+        p->h.flags = 0;
+        p->h.type = tds_sql_type::NVARCHAR;
         p->max_length = p->length = params.size() * sizeof(char16_t);
 
         if (p->max_length == 0)
@@ -1302,9 +1753,9 @@ private:
         memcpy(&p[1], params.data(), p->length);
 
         auto s = (tds_VARCHAR_param*)((uint8_t*)&p[1] + p->length);
-        s->name_len = 0;
-        s->flags = 0;
-        s->type = tds_sql_type::NVARCHAR;
+        s->h.name_len = 0;
+        s->h.flags = 0;
+        s->h.type = tds_sql_type::NVARCHAR;
         s->max_length = s->length = stmt.size() * sizeof(char16_t);
         s->collation.lcid = 0x0409; // en-US
         s->collation.ignore_case = 1;
@@ -1320,9 +1771,9 @@ private:
         memcpy(&s[1], stmt.data(), s->length);
 
         auto opt = (tds_INT_param*)((uint8_t*)&s[1] + s->length);
-        opt->name_len = 0;
-        opt->flags = 0;
-        opt->type = tds_sql_type::INTN;
+        opt->h.name_len = 0;
+        opt->h.flags = 0;
+        opt->h.type = tds_sql_type::INTN;
         opt->max_length = 4;
         opt->length = sizeof(int32_t);
         *(int32_t*)&opt[1] = options;
@@ -1424,9 +1875,9 @@ private:
         header->flags = 0;
 
         auto h = (tds_INT_param*)&header[1];
-        h->name_len = 0;
-        h->flags = 0; // by reference
-        h->type = tds_sql_type::INTN;
+        h->h.name_len = 0;
+        h->h.flags = 0; // by reference
+        h->h.type = tds_sql_type::INTN;
         h->max_length = sizeof(int32_t);
         h->length = sizeof(int32_t);
         *(uint32_t*)&h[1] = handle;
