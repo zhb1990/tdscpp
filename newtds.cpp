@@ -1141,7 +1141,7 @@ public:
         // FIXME - allow parameters
 
         size_t bufsize;
-        u16string params = u"!"; // FIXME (allow to be NULL)
+        u16string params = u""; // FIXME
         u16string stmt = utf8_to_utf16(q);
 
         bufsize = sizeof(tds_rpc_batch);
@@ -1175,6 +1175,10 @@ public:
         p->flags = 0;
         p->type = tds_sql_type::NVARCHAR;
         p->max_length = p->length = params.size() * sizeof(char16_t);
+
+        if (p->max_length == 0)
+            p->max_length = sizeof(char16_t);
+
         p->collation.lcid = 0x0409; // en-US
         p->collation.ignore_case = 1;
         p->collation.ignore_accent = 0;
