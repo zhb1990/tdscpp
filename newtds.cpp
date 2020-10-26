@@ -1207,12 +1207,19 @@ public:
 
 class query {
 public:
-    query(tds& conn, const string_view& q) {
+    query(tds& conn, const string_view& q) : conn(conn) {
         // FIXME - allow parameters
 
+        auto handle = sp_prepare(u"", utf8_to_utf16(q), 1); // 1 means return metadata
+
+        sp_execute(handle);
+
+        // FIXME - sp_unprepare (is this necessary?)
+    }
+
+private:
+    int32_t sp_prepare(const u16string_view& params, const u16string_view& stmt, int32_t options) {
         size_t bufsize;
-        u16string params = u""; // FIXME
-        u16string stmt = utf8_to_utf16(q);
 
         bufsize = sizeof(tds_rpc_batch);
         bufsize += sizeof(tds_INT_param); // handle
@@ -1280,13 +1287,13 @@ public:
         s->collation.sort_id = 52; // nocase.iso
         memcpy(&s[1], stmt.data(), s->length);
 
-        auto options = (tds_INT_param*)((uint8_t*)&s[1] + s->length);
-        options->name_len = 0;
-        options->flags = 0;
-        options->type = tds_sql_type::INTN;
-        options->max_length = 4;
-        options->length = sizeof(int32_t);
-        *(uint32_t*)&options[1] = 1; // return metadata
+        auto opt = (tds_INT_param*)((uint8_t*)&s[1] + s->length);
+        opt->name_len = 0;
+        opt->flags = 0;
+        opt->type = tds_sql_type::INTN;
+        opt->max_length = 4;
+        opt->length = sizeof(int32_t);
+        *(int32_t*)&opt[1] = options;
 
         conn.send_msg(tds_msg::rpc, buf);
 
@@ -1361,9 +1368,63 @@ public:
         fmt::print("sp_prepare handle is {}.\n", handle.value());
 #endif
 
-        // FIXME - sp_execute
-        // FIXME - sp_unprepare (is this necessary?)
+        return handle.value();
     }
+
+    void sp_execute(int32_t handle) {
+        size_t bufsize;
+
+        bufsize = sizeof(tds_rpc_batch);
+        bufsize += sizeof(tds_INT_param) + sizeof(int32_t); // handle
+        // FIXME - parameters
+
+        vector<uint8_t> buf(bufsize);
+
+        auto header = (tds_rpc_batch*)&buf[0];
+
+        header->all_headers.total_size = sizeof(tds_all_headers);
+        header->all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
+        header->all_headers.trans_desc.type = 2; // transaction descriptor
+        header->all_headers.trans_desc.descriptor = 0;
+        header->all_headers.trans_desc.outstanding = 1;
+        header->proc_id_switch = 0xffff;
+        header->proc_id = 0xc; // sp_execute
+        header->flags = 0;
+
+        auto h = (tds_INT_param*)&header[1];
+        h->name_len = 0;
+        h->flags = 0; // by reference
+        h->type = tds_sql_type::INTN;
+        h->max_length = sizeof(int32_t);
+        h->length = sizeof(int32_t);
+        *(uint32_t*)&h[1] = handle;
+
+        conn.send_msg(tds_msg::rpc, buf);
+
+        {
+            enum tds_msg type;
+            string payload;
+
+            conn.wait_for_msg(type, payload);
+            // FIXME - timeout
+
+            if (type != tds_msg::tabular_result)
+                throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+
+            conn.parse_result_message(payload);
+        }
+
+        if (conn.message_handler) {
+            for (const auto& msg : conn.msgs) {
+                if (msg.first == tds_token::INFO || msg.first == tds_token::ERROR)
+                    conn.handle_info_msg(msg.second, msg.first == tds_token::ERROR);
+            }
+        }
+
+        // FIXME
+    }
+
+    tds& conn;
 };
 
 static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
