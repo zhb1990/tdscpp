@@ -3,6 +3,7 @@
 #include <codecvt>
 #include <list>
 #include <span>
+#include <map>
 #include <fmt/format.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -1333,13 +1334,73 @@ public:
     bool is_output = false;
 };
 
-template<typename T>
-class tds_output_param {
-public:
-    tds_output_param() : p(optional<T>(nullopt)) {
+template<>
+struct fmt::formatter<tds_param> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
     }
 
-    tds_param p;
+    template<typename format_context>
+    auto format(const tds_param& p, format_context& ctx) {
+        if (p.is_null)
+            return format_to(ctx.out(), "NULL");
+
+        switch (p.type) {
+            case tds_sql_type::INTN:
+                switch (p.val.length()) {
+                    case 1:
+                        return format_to(ctx.out(), "{}", *(uint8_t*)p.val.data());
+
+                    case 2:
+                        return format_to(ctx.out(), "{}", *(int16_t*)p.val.data());
+
+                    case 4:
+                        return format_to(ctx.out(), "{}", *(int32_t*)p.val.data());
+
+                    case 8:
+                        return format_to(ctx.out(), "{}", *(int64_t*)p.val.data());
+                }
+            break;
+
+            case tds_sql_type::NVARCHAR: {
+                u16string_view sv((char16_t*)p.val.data(), p.val.length() / sizeof(char16_t));
+                auto s = utf16_to_utf8(sv);
+
+                return format_to(ctx.out(), "{}", s);
+            }
+        }
+
+        throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
+    }
+};
+
+template<typename T>
+class tds_output_param : public tds_param {
+public:
+    tds_output_param() : tds_param(optional<T>(nullopt)) {
+    }
+};
+
+template<typename T>
+struct fmt::formatter<tds_output_param<T>> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds_output_param<T>& p, format_context& ctx) {
+        return format_to(ctx.out(), "{}", static_cast<tds_param>(p));
+    }
 };
 
 static bool is_fixed_len_type(enum tds_sql_type type) {
@@ -1395,7 +1456,7 @@ static size_t fixed_len_size(enum tds_sql_type type) {
 class rpc {
 public:
     template<typename... Args>
-    rpc(tds& conn, const u16string_view& name, Args... args) {
+    rpc(tds& conn, const u16string_view& name, Args&&... args) {
         params.reserve(sizeof...(args));
 
         add_param(args...);
@@ -1635,20 +1696,31 @@ public:
 
                     // FIXME - param name
 
-                    // FIXME - actually parse
-
                     if (is_byte_len_type(h->type)) {
                         uint8_t len;
 
                         if (sv.length() < sizeof(tds_return_value) + 2)
                             throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_value) + 2);
 
-                        len = *(uint8_t*)(&sv[0] + sizeof(tds_return_value) + 1);
+                        len = *((uint8_t*)&sv[0] + sizeof(tds_return_value) + 1);
 
                         if (sv.length() < sizeof(tds_return_value) + 2 + len)
                             throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected {})."), sv.length(), sizeof(tds_return_value) + 2 + len);
 
-//                         msgs.emplace_back(type, sv.substr(0, sizeof(tds_return_value) + 2 + len));
+                        if (output_params.count(h->param_ordinal) != 0) {
+                            tds_param& out = *output_params.at(h->param_ordinal);
+
+                            if (len == 0)
+                                out.is_null = true;
+                            else {
+                                out.is_null = false;
+
+                                // FIXME - make sure not unexpected size?
+
+                                out.val.resize(len);
+                                memcpy(out.val.data(), (uint8_t*)&sv[0] + sizeof(tds_return_value) + 2, len);
+                            }
+                        }
 
                         sv = sv.substr(sizeof(tds_return_value) + 2 + len);
                     } else
@@ -1664,24 +1736,27 @@ public:
     }
 
     template<typename T, typename... Args>
-    void add_param(T t, Args... args) {
+    void add_param(T&& t, Args&&... args) {
         add_param(t);
         add_param(args...);
     }
 
     template<typename T>
-    void add_param(const T& t) {
+    void add_param(T&& t) {
         params.emplace_back(t);
     }
 
     template<typename T>
-    void add_param(const tds_output_param<T>& t) {
-        params.emplace_back(t.p);
+    void add_param(tds_output_param<T>& t) {
+        params.emplace_back(static_cast<tds_param>(t));
         params.back().is_output = true;
+
+        output_params[params.size() - 1] = static_cast<tds_param*>(&t);
     }
 
     int32_t return_status = 0;
     vector<tds_param> params;
+    map<unsigned int, tds_param*> output_params;
 };
 
 class query {
@@ -1692,6 +1767,10 @@ public:
         // FIXME - allow parameters
 
         rpc(conn, u"sp_prepare", handle, u"", utf8_to_utf16(q), 1); // 1 means return metadata
+
+#ifdef DEBUG_SHOW_MSGS
+        fmt::print("sp_prepare handle is {}.\n", handle);
+#endif
 
 //         auto handle = sp_prepare(u"", utf8_to_utf16(q), 1); // 1 means return metadata
 //
