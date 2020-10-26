@@ -291,6 +291,14 @@ struct tds_return_status {
 
 static_assert(sizeof(tds_return_status) == 11, "tds_return_status has wrong size");
 
+struct tds_colmetadata_col {
+    uint32_t user_type;
+    uint16_t flags;
+    tds_sql_type type;
+};
+
+static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong size");
+
 #pragma pack(pop)
 
 template<>
@@ -970,6 +978,8 @@ public:
             type = (tds_token)sv[0];
             sv = sv.substr(1);
 
+            // FIXME - look at numeric value of type to determine what to do (when we can)?
+
             switch (type) {
                 case tds_token::DONE:
                 case tds_token::DONEINPROC:
@@ -1044,6 +1054,66 @@ public:
                         sv = sv.substr(sizeof(tds_return_status) + 2 + len);
                     } else
                         throw formatted_error(FMT_STRING("Unhandled type {} in RETURNSTATUS message."), h->type);
+
+                    break;
+                }
+
+                case tds_token::COLMETADATA:
+                {
+                    if (sv.length() < 4)
+                        throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes, expected at least 4)."), sv.length());
+
+                    auto count = *(uint16_t*)&sv[0];
+
+                    if (count == 0) {
+                        msgs.emplace_back(type, sv.substr(0, 4));
+                        sv = sv.substr(4);
+                        break;
+                    }
+
+                    size_t len = sizeof(uint16_t);
+                    string_view sv2 = sv;
+
+                    sv2 = sv2.substr(sizeof(uint16_t));
+
+                    for (unsigned int i = 0; i < count; i++) {
+                        if (sv2.length() < sizeof(tds_colmetadata_col))
+                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(tds_colmetadata_col));
+
+                        auto c = (tds_colmetadata_col*)&sv2[0];
+
+                        len += sizeof(tds_colmetadata_col);
+                        sv2 = sv2.substr(sizeof(tds_colmetadata_col));
+
+                        if (c->type == tds_sql_type::VARCHAR || c->type == tds_sql_type::NVARCHAR) {
+                            // FIXME - handle MAX
+
+                            if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
+                                throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
+
+                            len += sizeof(uint16_t) + sizeof(tds_collation);
+                            sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                        } else
+                            throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c->type);
+
+                        if (sv2.length() < 1)
+                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+
+                        auto name_len = *(uint8_t*)&sv2[0];
+
+                        sv2 = sv2.substr(1);
+                        len++;
+
+                        if (sv2.length() < name_len * sizeof(char16_t))
+                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), name_len * sizeof(char16_t));
+
+                        sv2 = sv2.substr(name_len * sizeof(char16_t));
+                        len += name_len * sizeof(char16_t);
+                    }
+
+                    msgs.emplace_back(type, sv.substr(0, len));
+
+                    sv = sv.substr(len);
 
                     break;
                 }
