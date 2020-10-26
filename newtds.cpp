@@ -279,6 +279,18 @@ struct tds_VARCHAR_param {
 
 static_assert(sizeof(tds_VARCHAR_param) == 12, "tds_VARCHAR_param has wrong size");
 
+struct tds_return_status {
+    uint16_t param_ordinal;
+    uint8_t param_name_len;
+    // FIXME - then param name if present
+    uint8_t status;
+    uint32_t user_type;
+    uint16_t flags;
+    tds_sql_type type;
+};
+
+static_assert(sizeof(tds_return_status) == 11, "tds_return_status has wrong size");
+
 #pragma pack(pop)
 
 template<>
@@ -370,6 +382,98 @@ struct fmt::formatter<enum tds_token> {
     }
 };
 
+template<>
+struct fmt::formatter<enum tds_sql_type> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(enum tds_sql_type t, format_context& ctx) {
+        switch (t) {
+            case tds_sql_type::IMAGE:
+                return format_to(ctx.out(), "IMAGE");
+
+            case tds_sql_type::TEXT:
+                return format_to(ctx.out(), "TEXT");
+
+            case tds_sql_type::UNIQUEIDENTIFIER:
+                return format_to(ctx.out(), "UNIQUEIDENTIFIER");
+
+            case tds_sql_type::INTN:
+                return format_to(ctx.out(), "INTN");
+
+            case tds_sql_type::DATEN:
+                return format_to(ctx.out(), "DATEN");
+
+            case tds_sql_type::TIMEN:
+                return format_to(ctx.out(), "TIMEN");
+
+            case tds_sql_type::DATETIME2N:
+                return format_to(ctx.out(), "DATETIME2N");
+
+            case tds_sql_type::DATETIMEOFFSETN:
+                return format_to(ctx.out(), "DATETIMEOFFSETN");
+
+            case tds_sql_type::SQL_VARIANT:
+                return format_to(ctx.out(), "SQL_VARIANT");
+
+            case tds_sql_type::NTEXT:
+                return format_to(ctx.out(), "NTEXT");
+
+            case tds_sql_type::BITN:
+                return format_to(ctx.out(), "BITN");
+
+            case tds_sql_type::DECIMAL:
+                return format_to(ctx.out(), "DECIMAL");
+
+            case tds_sql_type::NUMERIC:
+                return format_to(ctx.out(), "NUMERIC");
+
+            case tds_sql_type::FLTN:
+                return format_to(ctx.out(), "FLTN");
+
+            case tds_sql_type::MONEYN:
+                return format_to(ctx.out(), "MONEYN");
+
+            case tds_sql_type::DATETIMN:
+                return format_to(ctx.out(), "DATETIMN");
+
+            case tds_sql_type::VARBINARY:
+                return format_to(ctx.out(), "VARBINARY");
+
+            case tds_sql_type::VARCHAR:
+                return format_to(ctx.out(), "VARCHAR");
+
+            case tds_sql_type::BINARY:
+                return format_to(ctx.out(), "BINARY");
+
+            case tds_sql_type::CHAR:
+                return format_to(ctx.out(), "CHAR");
+
+            case tds_sql_type::NVARCHAR:
+                return format_to(ctx.out(), "NVARCHAR");
+
+            case tds_sql_type::NCHAR:
+                return format_to(ctx.out(), "NCHAR");
+
+            case tds_sql_type::UDT:
+                return format_to(ctx.out(), "UDT");
+
+            case tds_sql_type::XML:
+                return format_to(ctx.out(), "XML");
+
+            default:
+                return format_to(ctx.out(), "{:x}", (uint8_t)t);
+        }
+    }
+};
+
 static u16string utf8_to_utf16(const string_view& sv) {
     wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
 
@@ -380,6 +484,27 @@ static string utf16_to_utf8(const u16string_view& sv) {
     wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
 
     return convert.to_bytes(sv.data(), sv.data() + sv.length());
+}
+
+static bool is_byte_len_type(enum tds_sql_type type) {
+    switch (type) {
+        case tds_sql_type::UNIQUEIDENTIFIER:
+        case tds_sql_type::INTN:
+        case tds_sql_type::DECIMAL:
+        case tds_sql_type::NUMERIC:
+        case tds_sql_type::BITN:
+        case tds_sql_type::FLTN:
+        case tds_sql_type::MONEYN:
+        case tds_sql_type::DATETIMN:
+        case tds_sql_type::DATEN:
+        case tds_sql_type::TIMEN:
+        case tds_sql_type::DATETIME2N:
+        case tds_sql_type::DATETIMEOFFSETN:
+            return true;
+
+        default:
+            return false;
+    }
 }
 
 using msg_handler = function<void(const string_view& server, const string_view& message, const string_view& proc_name,
@@ -845,34 +970,80 @@ public:
             type = (tds_token)sv[0];
             sv = sv.substr(1);
 
-            if (sv.length() < sizeof(uint16_t))
-                throw formatted_error(FMT_STRING("Short message ({} bytes, expected at least 2)."), sv.length());
-
             switch (type) {
                 case tds_token::DONE:
+                case tds_token::DONEINPROC:
+                case tds_token::DONEPROC:
+                {
                     if (sv.length() < sizeof(tds_done_msg))
-                        throw formatted_error(FMT_STRING("Short DONE message ({} bytes, expected {})."), sv.length(), sizeof(tds_done_msg));
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
 
                     msgs.emplace_back(type, sv.substr(0, sizeof(tds_done_msg)));
 
                     sv = sv.substr(sizeof(tds_done_msg));
-                break;
+
+                    break;
+                }
 
                 case tds_token::LOGINACK:
                 case tds_token::INFO:
                 case tds_token::ERROR:
                 case tds_token::ENVCHANGE:
                 {
+                    if (sv.length() < sizeof(uint16_t))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+
                     auto len = *(uint16_t*)&sv[0];
 
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short message ({} bytes, expected {})."), sv.length(), len);
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
 
                     msgs.emplace_back(type, sv.substr(0, len));
 
                     sv = sv.substr(len);
+
+                    break;
+                }
+
+                case tds_token::RETURNSTATUS:
+                {
+                    if (sv.length() < sizeof(uint32_t))
+                        throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected 4)."), sv.length());
+
+                    msgs.emplace_back(type, sv.substr(0, sizeof(uint32_t)));
+
+                    sv = sv.substr(sizeof(uint32_t));
+
+                    break;
+                }
+
+                case tds_token::RETURNVALUE:
+                {
+                    auto h = (tds_return_status*)&sv[0];
+
+                    if (sv.length() < sizeof(tds_return_status))
+                        throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_status));
+
+                    // FIXME - param name
+
+                    if (is_byte_len_type(h->type)) {
+                        uint8_t len;
+
+                        if (sv.length() < sizeof(tds_return_status) + 2)
+                            throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_status) + 2);
+
+                        len = *(uint8_t*)(&sv[0] + sizeof(tds_return_status) + 1);
+
+                        if (sv.length() < sizeof(tds_return_status) + 2 + len)
+                            throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected {})."), sv.length(), sizeof(tds_return_status) + 2 + len);
+
+                        msgs.emplace_back(type, sv.substr(0, sizeof(tds_return_status) + 2 + len));
+
+                        sv = sv.substr(sizeof(tds_return_status) + 2 + len);
+                    } else
+                        throw formatted_error(FMT_STRING("Unhandled type {} in RETURNSTATUS message."), h->type);
 
                     break;
                 }
