@@ -529,15 +529,6 @@ public:
         send_prelogin_msg();
 
         send_login_msg(user, password);
-
-        while (!msgs.empty()) {
-            auto& msg = msgs.front();
-
-            if (message_handler && (msg.first == tds_token::INFO || msg.first == tds_token::ERROR))
-                handle_info_msg(msg.second, msg.first == tds_token::ERROR);
-
-            msgs.pop_front();
-        }
     }
 
     ~tds() {
@@ -702,21 +693,62 @@ public:
         if (type != tds_msg::tabular_result)
             throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
 
-        parse_result_message(payload);
+        string_view sv = payload;
+        bool received_loginack = false;
 
-        for (auto it = msgs.begin(); it != msgs.end(); it++) {
-            auto& msg = *it;
+        while (!sv.empty()) {
+            auto type = (tds_token)sv[0];
+            sv = sv.substr(1);
 
-            if (msg.first == tds_token::LOGINACK) {
-                handle_loginack_msg(msg.second);
-                msgs.erase(it);
-                return;
+            switch (type) {
+                case tds_token::DONE:
+                case tds_token::DONEINPROC:
+                case tds_token::DONEPROC:
+                    if (sv.length() < sizeof(tds_done_msg))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+
+                    sv = sv.substr(sizeof(tds_done_msg));
+
+                    break;
+
+                case tds_token::LOGINACK:
+                case tds_token::INFO:
+                case tds_token::ERROR:
+                case tds_token::ENVCHANGE:
+                {
+                    if (sv.length() < sizeof(uint16_t))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+
+                    auto len = *(uint16_t*)&sv[0];
+
+                    sv = sv.substr(sizeof(uint16_t));
+
+                    if (sv.length() < len)
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+
+                    if (type == tds_token::LOGINACK) {
+                        handle_loginack_msg(sv.substr(0, len));
+                        received_loginack = true;
+                    } else if (type == tds_token::INFO) {
+                        if (message_handler)
+                            handle_info_msg(sv.substr(0, len), false);
+                    } else if (type == tds_token::ERROR) {
+                        if (message_handler)
+                            handle_info_msg(sv.substr(0, len), true);
+                    }
+
+                    sv = sv.substr(len);
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("Unhandled token type {} while logging in."), type);
             }
         }
 
-        // FIXME - wait until timeout for LOGINACK message (might not be in first packet?)
-
-        throw formatted_error(FMT_STRING("Did not receive LOGINACK message from server."));
+        if (!received_loginack)
+            throw formatted_error(FMT_STRING("Did not receive LOGINACK message from server."));
     }
 
     void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
