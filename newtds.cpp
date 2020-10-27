@@ -1157,6 +1157,10 @@ public:
 //         init(sv.has_value() ? sv.value() : u"", !sv.has_value());
 //     }
 
+    tds_param(const string_view& sv) {
+        init(sv, false);
+    }
+
     void init(int32_t i, bool null) {
         type = tds_sql_type::INTN;
 
@@ -1175,6 +1179,17 @@ public:
             is_null = true;
         else {
             val.resize(sv.length() * sizeof(char16_t));
+            memcpy(val.data(), sv.data(), val.length());
+        }
+    }
+
+    void init(const string_view& sv, bool null) {
+        type = tds_sql_type::VARCHAR;
+
+        if (null)
+            is_null = true;
+        else {
+            val.resize(sv.length());
             memcpy(val.data(), sv.data(), val.length());
         }
     }
@@ -1363,6 +1378,8 @@ public:
                 bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
             else if (p.type == tds_sql_type::NVARCHAR)
                 bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
+            else if (p.type == tds_sql_type::VARCHAR)
+                bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
             else
                 throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
         }
@@ -1412,7 +1429,7 @@ public:
                     memcpy(ptr, p.val.data(), p.val.length());
                     ptr += p.val.length();
                 }
-            } else if (p.type == tds_sql_type::NVARCHAR) { // FIXME - MAX
+            } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) { // FIXME - MAX
                 auto h2 = (tds_VARCHAR_param*)h;
 
                 h2->max_length = p.is_null ? sizeof(char16_t) : p.val.length();
@@ -1494,6 +1511,8 @@ public:
                     } else if (type == tds_token::ERROR) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), true);
+
+                        throw formatted_error(FMT_STRING("RPC {} failed."), utf16_to_utf8(name));
                     }
 
                     sv = sv.substr(len);
@@ -1759,12 +1778,11 @@ public:
     map<unsigned int, tds_param*> output_params;
 };
 
+// FIXME - can we do static assert if no. of question marks different from no. of parameters?
 class query {
 public:
     query(tds& conn, const string_view& q) {
         tds_output_param<int32_t> handle;
-
-        // FIXME - allow parameters
 
         rpc(conn, u"sp_prepare", handle, u"", utf8_to_utf16(q), 1); // 1 means return metadata
 
@@ -1775,6 +1793,79 @@ public:
         rpc(conn, u"sp_execute", static_cast<tds_param>(handle));
 
         // FIXME - sp_unprepare (is this necessary?)
+    }
+
+    template<typename... Args>
+    query(tds& conn, const string_view& q, Args&&... args) {
+        tds_output_param<int32_t> handle;
+        string q2;
+        bool in_quotes = false;
+        unsigned int param_num = 1;
+
+        // replace ? in q with parameters
+
+        q2.reserve(q.length());
+
+        for (unsigned int i = 0; i < q.length(); i++) {
+            if (q[i] == '\'')
+                in_quotes = !in_quotes;
+
+            if (q[i] == '?' && !in_quotes) {
+                q2 += "@P" + to_string(param_num);
+                param_num++;
+            } else
+                q2 += q[i];
+        }
+
+        auto params_string = create_params_string(1, forward<Args>(args)...);
+
+        rpc(conn, u"sp_prepare", handle, utf8_to_utf16(params_string), utf8_to_utf16(q2), 1); // 1 means return metadata
+
+#ifdef DEBUG_SHOW_MSGS
+        fmt::print("sp_prepare handle is {}.\n", handle);
+#endif
+
+        rpc(conn, u"sp_execute", static_cast<tds_param>(handle), forward<Args>(args)...);
+
+        // FIXME - sp_unprepare (is this necessary?)
+    }
+
+private:
+    template<typename T, typename... Args>
+    string create_params_string(unsigned int num, T&& t, Args&&... args) {
+        string s;
+
+        s += create_params_string(num, t);
+
+        if constexpr (sizeof...(args) != 0)
+            s += ", " + create_params_string(num + 1, args...);
+
+        return s;
+    }
+
+    template<typename T>
+    string create_params_string(unsigned int num, T&& t) {
+        string s = "@P" + to_string(num) + " ";
+
+        if constexpr (is_same_v<decay_t<T>, int32_t>)
+            return s + "INT";
+        else if constexpr (is_same_v<decay_t<T>, int64_t>)
+            return s + "BIGINT";
+        else if constexpr (is_same_v<decay_t<T>, int16_t>)
+            return s + "SMALLINT";
+        else if constexpr (is_same_v<decay_t<T>, uint8_t>)
+            return s + "TINYINT";
+        else if constexpr (is_convertible_v<decay_t<T>, u16string_view>) {
+            auto len = u16string_view(t).length();
+            return s + "NVARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
+        } else if constexpr (is_convertible_v<decay_t<T>, string_view>) {
+            auto len = string_view(t).length();
+            return s + "VARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
+        } else
+            throw runtime_error("Unable to get SQL type from parameter.");
+        // FIXME - other types
+
+        // FIXME - why doesn't static assert work here?
     }
 };
 
@@ -1793,8 +1884,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-//         query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now, ? AS pi", 42, "Hello"s, 3.1415926f);
-        query sq(n, "SELECT SYSTEM_USER AS [user]");
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now", 42, "Hello");
 
         // FIXME
     } catch (const exception& e) {
