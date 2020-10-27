@@ -1145,6 +1145,64 @@ public:
     msg_handler message_handler;
 };
 
+class tds_date {
+public:
+    tds_date(int32_t num) : num(num) {
+        signed long long j, e, f, g, h;
+
+        j = num + 2415021;
+
+        f = (4 * j) + 274277;
+        f /= 146097;
+        f *= 3;
+        f /= 4;
+        f += j;
+        f += 1363;
+
+        e = (4 * f) + 3;
+        g = (e % 1461) / 4;
+        h = (5 * g) + 2;
+
+        day = ((h % 153) / 5) + 1;
+        month = ((h / 153) + 2) % 12 + 1;
+        year = static_cast<uint16_t>((e / 1461) - 4716 + ((14 - month) / 12));
+    }
+
+    tds_date(uint16_t year, uint8_t month, uint8_t day) : year(year), month(month), day(day) {
+        int m2 = ((int)month - 14) / 12;
+        long long n;
+
+        n = (1461 * ((int)year + 4800 + m2)) / 4;
+        n += (367 * ((int)month - 2 - (12 * m2))) / 12;
+        n -= (3 * (((int)year + 4900 + m2)/100)) / 4;
+        n += day;
+        n -= 2447096;
+
+        num = static_cast<int>(n);
+    }
+
+    int32_t num;
+    uint16_t year;
+    uint8_t month, day;
+};
+
+template<>
+struct fmt::formatter<tds_date> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds_date& d, format_context& ctx) {
+        return format_to(ctx.out(), "{:04}-{:02}-{:02}", d.year, d.month, d.day);
+    }
+};
+
 class tds_param {
 public:
     tds_param() {
@@ -1228,6 +1286,28 @@ public:
             auto v = d.value();
 
             memcpy(val.data(), &v, sizeof(double));
+        }
+    }
+
+    tds_param(const tds_date& d) {
+        int32_t n;
+
+        type = tds_sql_type::DATEN;
+        val.resize(3);
+
+        n = d.num + 693595;
+        memcpy(val.data(), &n, 3);
+    }
+
+    tds_param(const optional<tds_date>& d) {
+        type = tds_sql_type::DATEN;
+
+        if (!d.has_value())
+            is_null = true;
+        else {
+            int32_t n = d.value().num + 693595;
+            val.resize(3);
+            memcpy(val.data(), &n, 3);
         }
     }
 
@@ -1349,6 +1429,17 @@ struct fmt::formatter<tds_param> {
                         return format_to(ctx.out(), "{}", *(double*)p.val.data());
                 }
             break;
+
+            case tds_sql_type::DATEN: {
+                uint32_t v;
+
+                memcpy(&v, p.val.data(), 3);
+                v &= 0xffffff;
+
+                tds_date d(v - 693595);
+
+                return format_to(ctx.out(), "{}", d);
+            }
         }
 
         throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
@@ -1481,9 +1572,12 @@ public:
         for (const auto& p : params) {
             if (is_fixed_len_type(p.type))
                 bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
-            else if (is_byte_len_type(p.type))
-                bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
-            else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
+            else if (is_byte_len_type(p.type)) {
+                bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
+
+                if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN)
+                    bufsize += sizeof(uint8_t);
+            } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
                 if (!p.is_null && p.val.length() > 8000) // MAX
                     bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
                 else
@@ -1527,7 +1621,10 @@ public:
 
                 ptr += p.val.length();
             } else if (is_byte_len_type(p.type)) {
-                *ptr = p.val.length(); ptr++;
+                if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN) {
+                    *ptr = p.val.length();
+                    ptr++;
+                }
 
                 if (p.is_null) {
                     *ptr = 0;
@@ -1700,7 +1797,7 @@ public:
 
                         if (is_fixed_len_type(c.type)) {
                             // nop
-                        } else if (is_byte_len_type(c.type)) {
+                        } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN) {
                             if (sv2.length() < sizeof(uint8_t))
                                 throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
@@ -1708,6 +1805,8 @@ public:
 
                             len++;
                             sv2 = sv2.substr(1);
+                        } else if (is_byte_len_type(c.type)) {
+                            // nop
                         } else if (c.type == tds_sql_type::VARCHAR || c.type == tds_sql_type::NVARCHAR) {
                             // FIXME - handle MAX
 
@@ -2078,6 +2177,8 @@ private:
     string create_params_string(unsigned int num, T&& t) {
         string s = "@P" + to_string(num) + " ";
 
+        // FIXME - also add optional<T> versions
+
         if constexpr (is_same_v<decay_t<T>, int32_t>)
             return s + "INT";
         else if constexpr (is_same_v<decay_t<T>, int64_t>)
@@ -2090,6 +2191,8 @@ private:
             return s + "REAL";
         else if constexpr (is_same_v<decay_t<T>, double>)
             return s + "FLOAT";
+        else if constexpr (is_same_v<decay_t<T>, tds_date>)
+            return s + "DATE";
         else if constexpr (is_convertible_v<decay_t<T>, u16string_view>) {
             auto len = u16string_view(t).length();
 
@@ -2130,7 +2233,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now, ? AS pi", 42, "Hello", 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi", 42, "Hello", tds_date{2020, 10, 27}, 3.1415926f);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);
