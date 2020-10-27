@@ -884,43 +884,67 @@ tds_param::tds_param() {
 }
 
 tds_param::tds_param(int32_t i) {
-    init(i, false);
+    type = tds_sql_type::INTN;
+
+    val.resize(sizeof(int32_t));
+    *(int32_t*)val.data() = i;
 }
 
 tds_param::tds_param(const optional<int32_t>& i) {
-    init(i.has_value() ? i.value() : 0, !i.has_value());
+    type = tds_sql_type::INTN;
+
+    val.resize(sizeof(int32_t));
+
+    if (i.has_value())
+        *(int32_t*)val.data() = i.value();
+    else
+        is_null = true;
 }
 
 tds_param::tds_param(const u16string_view& sv) {
-    init(sv, false);
+    type = tds_sql_type::NVARCHAR;
+    val.resize(sv.length() * sizeof(char16_t));
+    memcpy(val.data(), sv.data(), val.length());
 }
 
-tds_param::tds_param(const u16string& sv) {
-    init(sv, false);
+tds_param::tds_param(const u16string& sv) : tds_param(u16string_view(sv)) {
 }
 
-tds_param::tds_param(const char16_t* sv) {
-    init(sv, false);
+tds_param::tds_param(const char16_t* sv) : tds_param(u16string_view(sv)) {
 }
 
 tds_param::tds_param(const optional<u16string_view>& sv) {
-    init(sv.has_value() ? sv.value() : u"", !sv.has_value());
+    type = tds_sql_type::NVARCHAR;
+
+    if (!sv.has_value())
+        is_null = true;
+    else {
+        val.resize(sv.value().length() * sizeof(char16_t));
+        memcpy(val.data(), sv.value().data(), sv.value().length());
+    }
 }
 
 tds_param::tds_param(const string_view& sv) {
-    init(sv, false);
+    type = tds_sql_type::VARCHAR;
+    val.resize(sv.length());
+    memcpy(val.data(), sv.data(), val.length());
 }
 
-tds_param::tds_param(const string& sv) {
-    init(sv, false);
+tds_param::tds_param(const string& sv) : tds_param(string_view(sv)) {
 }
 
-tds_param::tds_param(const char* sv) {
-    init(sv, false);
+tds_param::tds_param(const char* sv) : tds_param(string_view(sv)) {
 }
 
 tds_param::tds_param(const optional<string_view>& sv) {
-    init(sv.has_value() ? sv.value() : "", !sv.has_value());
+    type = tds_sql_type::VARCHAR;
+
+    if (!sv.has_value())
+        is_null = true;
+    else {
+        val.resize(sv.value().length());
+        memcpy(val.data(), sv.value().data(), sv.value().length());
+    }
 }
 
 tds_param::tds_param(float f) {
@@ -982,39 +1006,6 @@ tds_param::tds_param(const optional<tds_date>& d) {
         int32_t n = d.value().num + 693595;
         val.resize(3);
         memcpy(val.data(), &n, 3);
-    }
-}
-
-void tds_param::init(int32_t i, bool null) {
-    type = tds_sql_type::INTN;
-
-    val.resize(sizeof(int32_t));
-
-    if (!null)
-        *(int32_t*)val.data() = i;
-    else
-        is_null = true;
-}
-
-void tds_param::init(const u16string_view& sv, bool null) {
-    type = tds_sql_type::NVARCHAR;
-
-    if (null)
-        is_null = true;
-    else {
-        val.resize(sv.length() * sizeof(char16_t));
-        memcpy(val.data(), sv.data(), val.length());
-    }
-}
-
-void tds_param::init(const string_view& sv, bool null) {
-    type = tds_sql_type::VARCHAR;
-
-    if (null)
-        is_null = true;
-    else {
-        val.resize(sv.length());
-        memcpy(val.data(), sv.data(), val.length());
     }
 }
 

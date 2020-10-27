@@ -375,9 +375,6 @@ public:
     tds_param(const std::optional<double>& d);
     tds_param(const tds_date& d);
     tds_param(const std::optional<tds_date>& d);
-    void init(int32_t i, bool null);
-    void init(const std::u16string_view& sv, bool null);
-    void init(const std::string_view& sv, bool null);
 
     enum tds_sql_type type;
     std::string val;
