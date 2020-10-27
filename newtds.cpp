@@ -1120,6 +1120,20 @@ struct fmt::formatter<tds_param> {
 
                 return format_to(ctx.out(), "{}", d);
             }
+
+            case tds_sql_type::TIMEN: {
+                uint64_t t = 0;
+
+                memcpy(&t, p.val.data(), min(sizeof(uint64_t), p.val.length()));
+
+                for (auto n = p.max_length; n > 0; n--) {
+                    t /= 10;
+                }
+
+                // FIXME - pipe through tds_time
+
+                return format_to(ctx.out(), "{:02}:{:02}:{:02}", t / 3600, (t / 60) % 60, t % 60);
+            }
         }
 
         throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
@@ -1233,7 +1247,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
         else if (is_byte_len_type(p.type)) {
             bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
 
-            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN)
+            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN)
                 bufsize += sizeof(uint8_t);
         } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
             if (!p.is_null && p.val.length() > 8000) // MAX
@@ -1279,7 +1293,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
             ptr += p.val.length();
         } else if (is_byte_len_type(p.type)) {
-            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN) {
+            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN) {
                 *ptr = p.val.length();
                 ptr++;
             }
@@ -1455,7 +1469,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
                     if (is_fixed_len_type(c.type)) {
                         // nop
-                    } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN) {
+                    } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN || c.type == tds_sql_type::TIMEN) {
                         if (sv2.length() < sizeof(uint8_t))
                             throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
@@ -1863,7 +1877,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi", 42, "Hello", tds_date{2020, 10, 27}, 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, CONVERT(TIME, GETDATE()) AS now, ? AS pi", 42, "Hello", 3.1415926f);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);
