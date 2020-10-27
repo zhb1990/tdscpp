@@ -1272,7 +1272,7 @@ public:
 
 class tds_column : public tds_param {
 public:
-    u16string name;
+    string name;
     unsigned int max_length;
 };
 
@@ -1566,7 +1566,6 @@ public:
 
         string_view sv = payload;
         uint16_t num_columns = 0;
-        vector<tds_column> cols;
 
         while (!sv.empty()) {
             auto type = (tds_token)sv[0];
@@ -1641,8 +1640,6 @@ public:
                     cols.clear();
                     cols.reserve(num_columns);
 
-                    // FIXME - actually parse
-
                     size_t len = sizeof(uint16_t);
                     string_view sv2 = sv;
 
@@ -1697,7 +1694,7 @@ public:
                         if (sv2.length() < name_len * sizeof(char16_t))
                             throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), name_len * sizeof(char16_t));
 
-                        col.name = u16string((char16_t*)sv2.data(), name_len);
+                        col.name = utf16_to_utf8(u16string_view((char16_t*)sv2.data(), name_len));
 
                         sv2 = sv2.substr(name_len * sizeof(char16_t));
                         len += name_len * sizeof(char16_t);
@@ -1909,6 +1906,7 @@ public:
     int32_t return_status = 0;
     vector<tds_param> params;
     map<unsigned int, tds_param*> output_params;
+    vector<tds_column> cols;
 };
 
 // FIXME - can we do static assert if no. of question marks different from no. of parameters?
@@ -1917,13 +1915,17 @@ public:
     query(tds& conn, const string_view& q) {
         tds_output_param<int32_t> handle;
 
-        rpc(conn, u"sp_prepare", handle, u"", utf8_to_utf16(q), 1); // 1 means return metadata
+        {
+            rpc r1(conn, u"sp_prepare", handle, u"", utf8_to_utf16(q), 1); // 1 means return metadata
 
 #ifdef DEBUG_SHOW_MSGS
-        fmt::print("sp_prepare handle is {}.\n", handle);
+            fmt::print("sp_prepare handle is {}.\n", handle);
 #endif
 
-        rpc(conn, u"sp_execute", static_cast<tds_param>(handle));
+            cols = r1.cols;
+        }
+
+        rpc r2(conn, u"sp_execute", static_cast<tds_param>(handle));
 
         // FIXME - sp_unprepare (is this necessary?)
     }
@@ -1952,15 +1954,27 @@ public:
 
         auto params_string = create_params_string(1, forward<Args>(args)...);
 
-        rpc(conn, u"sp_prepare", handle, utf8_to_utf16(params_string), utf8_to_utf16(q2), 1); // 1 means return metadata
+        {
+            rpc r1(conn, u"sp_prepare", handle, utf8_to_utf16(params_string), utf8_to_utf16(q2), 1); // 1 means return metadata
 
 #ifdef DEBUG_SHOW_MSGS
-        fmt::print("sp_prepare handle is {}.\n", handle);
+            fmt::print("sp_prepare handle is {}.\n", handle);
 #endif
 
-        rpc(conn, u"sp_execute", static_cast<tds_param>(handle), forward<Args>(args)...);
+            cols = r1.cols;
+        }
+
+        rpc r2(conn, u"sp_execute", static_cast<tds_param>(handle), forward<Args>(args)...);
 
         // FIXME - sp_unprepare (is this necessary?)
+    }
+
+    uint16_t num_columns() const {
+        return cols.size();
+    }
+
+    const tds_column& operator[](unsigned int i) const {
+        return cols[i];
     }
 
 private:
@@ -2012,6 +2026,8 @@ private:
 
         // FIXME - why doesn't static assert work here?
     }
+
+    vector<tds_column> cols;
 };
 
 static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
@@ -2031,7 +2047,17 @@ int main() {
 
         query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now, ? AS pi", 42, "Hello", 3.1415926f);
 
-        // FIXME
+        for (size_t i = 0; i < sq.num_columns(); i++) {
+            fmt::print("{}\t", sq[i].name);
+        }
+        fmt::print("\n");
+
+//         while (sq.fetch_row()) {
+//             for (size_t i = 0; i < sq.num_columns(); i++) {
+//                 fmt::print("{}\t", sq[i]);
+//             }
+//             fmt::print("\n");
+//         }
     } catch (const exception& e) {
         cerr << "Exception: " << e.what() << endl;
         return 1;
