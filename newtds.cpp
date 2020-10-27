@@ -294,6 +294,16 @@ struct tds_VARCHAR_param {
 
 static_assert(sizeof(tds_VARCHAR_param) == 12, "tds_VARCHAR_param has wrong size");
 
+struct tds_VARCHAR_MAX_param {
+    tds_param_header h;
+    uint16_t max_length;
+    tds_collation collation;
+    uint64_t length;
+    uint32_t chunk_length;
+};
+
+static_assert(sizeof(tds_VARCHAR_MAX_param) == 22, "tds_VARCHAR_MAX_param has wrong size");
+
 struct tds_return_value {
     uint16_t param_ordinal;
     uint8_t param_name_len;
@@ -1440,11 +1450,12 @@ public:
                 bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
             else if (is_byte_len_type(p.type))
                 bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
-            else if (p.type == tds_sql_type::NVARCHAR)
-                bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
-            else if (p.type == tds_sql_type::VARCHAR)
-                bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
-            else
+            else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
+                if (!p.is_null && p.val.length() > 8000) // MAX
+                    bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
+                else
+                    bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
+            } else
                 throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
         }
 
@@ -1493,10 +1504,16 @@ public:
                     memcpy(ptr, p.val.data(), p.val.length());
                     ptr += p.val.length();
                 }
-            } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) { // FIXME - MAX
+            } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
                 auto h2 = (tds_VARCHAR_param*)h;
 
-                h2->max_length = p.is_null ? sizeof(char16_t) : p.val.length();
+                if (p.is_null || p.val.empty())
+                    h2->max_length = sizeof(char16_t);
+                else if (p.val.length() > 8000) // MAX
+                    h2->max_length = 0xffff;
+                else
+                    h2->max_length = p.val.length();
+
                 h2->collation.lcid = 0x0409; // en-US
                 h2->collation.ignore_case = 1;
                 h2->collation.ignore_accent = 0;
@@ -1508,16 +1525,29 @@ public:
                 h2->collation.reserved = 0;
                 h2->collation.version = 0;
                 h2->collation.sort_id = 52; // nocase.iso
-                h2->length = p.is_null ? 0 : p.val.length();
 
-                if (h2->max_length == 0)
-                    h2->max_length = sizeof(char16_t);
+                if (!p.is_null && p.val.length() > 8000) { // MAX
+                    auto h3 = (tds_VARCHAR_MAX_param*)h2;
 
-                ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
+                    h3->length = p.val.length();
+                    h3->chunk_length = p.val.length();
 
-                if (!p.is_null) {
-                    memcpy(ptr, p.val.data(), h2->length);
-                    ptr += h2->length;
+                    ptr += sizeof(tds_VARCHAR_MAX_param) - sizeof(tds_param_header);
+
+                    memcpy(ptr, p.val.data(), p.val.length());
+                    ptr += p.val.length();
+
+                    *(uint32_t*)ptr = 0; // last chunk
+                    ptr += sizeof(uint32_t);
+                } else {
+                    h2->length = p.is_null ? 0 : p.val.length();
+
+                    ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
+
+                    if (!p.is_null) {
+                        memcpy(ptr, p.val.data(), h2->length);
+                        ptr += h2->length;
+                    }
                 }
             } else
                 throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
@@ -1964,10 +1994,18 @@ private:
             return s + "FLOAT";
         else if constexpr (is_convertible_v<decay_t<T>, u16string_view>) {
             auto len = u16string_view(t).length();
-            return s + "NVARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
+
+            if (len > 4000)
+                return s + "NVARCHAR(MAX)";
+            else
+                return s + "NVARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
         } else if constexpr (is_convertible_v<decay_t<T>, string_view>) {
             auto len = string_view(t).length();
-            return s + "VARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
+
+            if (len > 8000)
+                return s + "VARCHAR(MAX)";
+            else
+                return s + "VARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
         } else
             throw runtime_error("Unable to get SQL type from parameter.");
         // FIXME - other types
