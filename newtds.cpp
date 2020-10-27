@@ -1333,6 +1333,22 @@ struct fmt::formatter<tds_param> {
 
                 return format_to(ctx.out(), "{}", sv);
             }
+
+            case tds_sql_type::REAL:
+                return format_to(ctx.out(), "{}", *(float*)p.val.data());
+
+            case tds_sql_type::FLOAT:
+                return format_to(ctx.out(), "{}", *(double*)p.val.data());
+
+            case tds_sql_type::FLTN:
+                switch (p.val.length()) {
+                    case sizeof(float):
+                        return format_to(ctx.out(), "{}", *(float*)p.val.data());
+
+                    case sizeof(double):
+                        return format_to(ctx.out(), "{}", *(double*)p.val.data());
+                }
+            break;
         }
 
         throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
