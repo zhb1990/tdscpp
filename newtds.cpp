@@ -1181,6 +1181,46 @@ public:
         init(sv.has_value() ? sv.value() : "", !sv.has_value());
     }
 
+    tds_param(float f) {
+        type = tds_sql_type::FLTN;
+
+        val.resize(sizeof(float));
+        memcpy(val.data(), &f, sizeof(float));
+    }
+
+    tds_param(const optional<float>& f) {
+        type = tds_sql_type::FLTN;
+        val.resize(sizeof(float));
+
+        if (!f.has_value())
+            is_null = true;
+        else {
+            auto v = f.value();
+
+            memcpy(val.data(), &v, sizeof(float));
+        }
+    }
+
+    tds_param(double d) {
+        type = tds_sql_type::FLTN;
+
+        val.resize(sizeof(double));
+        memcpy(val.data(), &d, sizeof(double));
+    }
+
+    tds_param(const optional<double>& d) {
+        type = tds_sql_type::FLTN;
+        val.resize(sizeof(double));
+
+        if (!d.has_value())
+            is_null = true;
+        else {
+            auto v = d.value();
+
+            memcpy(val.data(), &v, sizeof(double));
+        }
+    }
+
     void init(int32_t i, bool null) {
         type = tds_sql_type::INTN;
 
@@ -1360,10 +1400,14 @@ static size_t fixed_len_size(enum tds_sql_type type) {
         case tds_sql_type::MONEY:
             return 8;
 
+        case tds_sql_type::REAL:
+            return 4;
+
+        case tds_sql_type::FLOAT:
+            return 8;
+
         case tds_sql_type::SQL_NULL:
         case tds_sql_type::BIT:
-        case tds_sql_type::REAL:
-        case tds_sql_type::FLOAT:
             throw formatted_error(FMT_STRING("FIXME - fixed_len_size for {}"), type); // FIXME
 
         default:
@@ -1875,6 +1919,10 @@ private:
             return s + "SMALLINT";
         else if constexpr (is_same_v<decay_t<T>, uint8_t>)
             return s + "TINYINT";
+        else if constexpr (is_same_v<decay_t<T>, float>)
+            return s + "REAL";
+        else if constexpr (is_same_v<decay_t<T>, double>)
+            return s + "FLOAT";
         else if constexpr (is_convertible_v<decay_t<T>, u16string_view>) {
             auto len = u16string_view(t).length();
             return s + "NVARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
@@ -1904,7 +1952,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now", 42, "Hello");
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now, ? AS pi", 42, "Hello", 3.1415926f);
 
         // FIXME
     } catch (const exception& e) {
