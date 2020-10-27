@@ -1153,12 +1153,32 @@ public:
         init(sv, false);
     }
 
-//     tds_param(const optional<u16string_view>& sv) {
-//         init(sv.has_value() ? sv.value() : u"", !sv.has_value());
-//     }
+    tds_param(const u16string& sv) {
+        init(sv, false);
+    }
+
+    tds_param(const char16_t* sv) {
+        init(sv, false);
+    }
+
+    tds_param(const optional<u16string_view>& sv) {
+        init(sv.has_value() ? sv.value() : u"", !sv.has_value());
+    }
 
     tds_param(const string_view& sv) {
         init(sv, false);
+    }
+
+    tds_param(const string& sv) {
+        init(sv, false);
+    }
+
+    tds_param(const char* sv) {
+        init(sv, false);
+    }
+
+    tds_param(const optional<string_view>& sv) {
+        init(sv.has_value() ? sv.value() : "", !sv.has_value());
     }
 
     void init(int32_t i, bool null) {
