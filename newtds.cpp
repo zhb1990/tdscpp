@@ -1649,6 +1649,8 @@ public:
                             if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
                                 throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
 
+                            col.max_length = *(uint16_t*)sv2.data();
+
                             len += sizeof(uint16_t) + sizeof(tds_collation);
                             sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
                         } else
@@ -1797,23 +1799,60 @@ public:
             memcpy(col.val.data(), sv.data(), len);
             sv = sv.substr(len);
         } else if (col.type == tds_sql_type::VARCHAR || col.type == tds_sql_type::NVARCHAR) {
-            // FIXME - handle MAX
+            if (col.max_length == 0xffff) {
+                if (sv.length() < sizeof(uint64_t))
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
 
-            if (sv.length() < sizeof(uint16_t))
-                throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 2)."), sv.length());
+                auto len = *(uint64_t*)sv.data();
 
-            auto len = *(uint16_t*)sv.data();
+                sv = sv.substr(sizeof(uint64_t));
 
-            sv = sv.substr(sizeof(uint16_t));
+                col.val.clear();
 
-            col.val.resize(len);
-            col.is_null = false;
+                if (len == 0xffffffffffffffff) {
+                    col.is_null = true;
+                    return;
+                }
 
-            if (sv.length() < len)
-                throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+                col.is_null = false;
 
-            memcpy(col.val.data(), sv.data(), len);
-            sv = sv.substr(len);
+                if (len != 0xfffffffffffffffe) // unknown length
+                    col.val.reserve(len);
+
+                do {
+                    if (sv.length() < sizeof(uint32_t))
+                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
+
+                    auto chunk_len = *(uint32_t*)sv.data();
+
+                    sv = sv.substr(sizeof(uint32_t));
+
+                    if (chunk_len == 0)
+                        break;
+
+                    if (sv.length() < chunk_len)
+                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), chunk_len);
+
+                    col.val += sv.substr(0, chunk_len);
+                    sv = sv.substr(chunk_len);
+                } while (true);
+            } else {
+                if (sv.length() < sizeof(uint16_t))
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 2)."), sv.length());
+
+                auto len = *(uint16_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint16_t));
+
+                col.val.resize(len);
+                col.is_null = false;
+
+                if (sv.length() < len)
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+
+                memcpy(col.val.data(), sv.data(), len);
+                sv = sv.substr(len);
+            }
         } else
             throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), col.type);
     }
