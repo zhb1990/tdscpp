@@ -369,6 +369,10 @@ public:
     tds_param(const std::string& sv);
     tds_param(const char* sv);
     tds_param(const std::optional<std::string_view>& sv);
+    tds_param(const std::u8string_view& sv);
+    tds_param(const std::u8string& sv);
+    tds_param(const char8_t* sv);
+    tds_param(const std::optional<std::u8string_view>& sv);
     tds_param(float f);
     tds_param(const std::optional<float>& f);
     tds_param(double d);

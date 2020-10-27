@@ -947,6 +947,33 @@ tds_param::tds_param(const optional<string_view>& sv) {
     }
 }
 
+tds_param::tds_param(const u8string_view& sv) {
+    auto s = utf8_to_utf16(string_view((char*)sv.data(), sv.length()));
+
+    type = tds_sql_type::NVARCHAR;
+    val.resize(s.length() * sizeof(char16_t));
+    memcpy(val.data(), s.data(), val.length());
+}
+
+tds_param::tds_param(const u8string& sv) : tds_param(u8string_view(sv)) {
+}
+
+tds_param::tds_param(const char8_t* sv) : tds_param(u8string_view(sv)) {
+}
+
+tds_param::tds_param(const std::optional<std::u8string_view>& sv) {
+    type = tds_sql_type::NVARCHAR;
+
+    if (!sv.has_value())
+        is_null = true;
+    else {
+        auto s = utf8_to_utf16(string_view((char*)sv.value().data(), sv.value().length()));
+
+        val.resize(s.length() * sizeof(char16_t));
+        memcpy(val.data(), s.data(), s.length());
+    }
+}
+
 tds_param::tds_param(float f) {
     type = tds_sql_type::FLTN;
 
@@ -1806,6 +1833,14 @@ string query::create_params_string(unsigned int num, T&& t) {
             return s + "VARCHAR(MAX)";
         else
             return s + "VARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
+    } else if constexpr (is_convertible_v<decay_t<T>, u8string_view>) {
+        auto sv = u8string_view(t);
+        auto len = utf8_to_utf16(string_view((char*)sv.data(), sv.length())).length();
+
+        if (len > 4000)
+            return s + "NVARCHAR(MAX)";
+        else
+            return s + "NVARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
     } else
         throw runtime_error("Unable to get SQL type from parameter.");
     // FIXME - other types
