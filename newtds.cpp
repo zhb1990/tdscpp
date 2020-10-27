@@ -1268,12 +1268,12 @@ public:
     string val;
     bool is_null = false;
     bool is_output = false;
+    unsigned int max_length = 0;
 };
 
 class tds_column : public tds_param {
 public:
     string name;
-    unsigned int max_length;
 };
 
 template<>
@@ -1360,6 +1360,23 @@ struct fmt::formatter<tds_output_param<T>> {
     template<typename format_context>
     auto format(const tds_output_param<T>& p, format_context& ctx) {
         return format_to(ctx.out(), "{}", static_cast<tds_param>(p));
+    }
+};
+
+template<>
+struct fmt::formatter<tds_column> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds_column& c, format_context& ctx) {
+        return format_to(ctx.out(), "{}", static_cast<tds_param>(c));
     }
 };
 
@@ -1582,6 +1599,11 @@ public:
 
                     sv = sv.substr(sizeof(tds_done_msg));
 
+                    // FIXME - handle RPCs that return multiple row sets?
+
+                    if (type == tds_token::DONEINPROC)
+                        finished = true;
+
                     break;
 
                 case tds_token::INFO:
@@ -1749,9 +1771,17 @@ public:
 
                 case tds_token::ROW:
                 {
-                    for (auto& col : cols) {
-                        handle_row_col(col, sv);
+                    vector<tds_param> row;
+
+                    row.resize(cols.size());
+
+                    for (unsigned int i = 0; i < row.size(); i++) {
+                        auto& col = row[i];
+
+                        handle_row_col(col, cols[i].type, sv);
                     }
+
+                    rows.push_back(row);
 
                     break;
                 }
@@ -1760,6 +1790,10 @@ public:
                 {
                     if (cols.empty())
                         break;
+
+                    vector<tds_param> row;
+
+                    row.resize(cols.size());
 
                     unsigned int bitset_length = (cols.size() + 7) / 8;
 
@@ -1771,8 +1805,8 @@ public:
 
                     sv = sv.substr(bitset_length);
 
-                    for (unsigned int i = 0; i < cols.size(); i++) {
-                        auto& col = cols[i];
+                    for (unsigned int i = 0; i < row.size(); i++) {
+                        auto& col = row[i];
 
                         if (i != 0) {
                             if (i & 7 == 0) {
@@ -1785,8 +1819,10 @@ public:
                         if (bsv & 1) // NULL
                             col.is_null = true;
                         else
-                            handle_row_col(col, sv);
+                            handle_row_col(col, cols[i].type, sv);
                     }
+
+                    rows.push_back(row);
 
                     break;
                 }
@@ -1797,9 +1833,56 @@ public:
         }
     }
 
-    void handle_row_col(tds_column& col, string_view& sv) {
-        if (is_fixed_len_type(col.type)) {
-            auto len = fixed_len_size(col.type);
+    template<typename T, typename... Args>
+    void add_param(T&& t, Args&&... args) {
+        add_param(t);
+        add_param(args...);
+    }
+
+    template<typename T>
+    void add_param(T&& t) {
+        params.emplace_back(t);
+    }
+
+    template<typename T>
+    void add_param(tds_output_param<T>& t) {
+        params.emplace_back(static_cast<tds_param>(t));
+        params.back().is_output = true;
+
+        output_params[params.size() - 1] = static_cast<tds_param*>(&t);
+    }
+
+    bool fetch_row() {
+        if (!rows.empty()) {
+            auto r = move(rows.front());
+
+            rows.pop_front();
+
+            for (unsigned int i = 0; i < r.size(); i++) {
+                cols[i].is_null = r[i].is_null;
+
+                if (!cols[i].is_null)
+                    cols[i].val = move(r[i].val);
+            }
+
+            return true;
+        }
+
+        if (finished)
+            return false;
+
+        // FIXME - wait for another packet
+
+        return false;
+    }
+
+    int32_t return_status = 0;
+    vector<tds_column> cols;
+
+private:
+    void handle_row_col(tds_param& col, enum tds_sql_type type, string_view& sv) {
+        if (is_fixed_len_type(type)) {
+            auto len = fixed_len_size(type);
 
             col.val.resize(len);
 
@@ -1809,7 +1892,7 @@ public:
             memcpy(col.val.data(), sv.data(), len);
 
             sv = sv.substr(len);
-        } else if (is_byte_len_type(col.type)) {
+        } else if (is_byte_len_type(type)) {
             if (sv.length() < sizeof(uint8_t))
                 throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
 
@@ -1825,7 +1908,7 @@ public:
 
             memcpy(col.val.data(), sv.data(), len);
             sv = sv.substr(len);
-        } else if (col.type == tds_sql_type::VARCHAR || col.type == tds_sql_type::NVARCHAR) {
+        } else if (type == tds_sql_type::VARCHAR || type == tds_sql_type::NVARCHAR) {
             if (col.max_length == 0xffff) {
                 if (sv.length() < sizeof(uint64_t))
                     throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
@@ -1881,32 +1964,13 @@ public:
                 sv = sv.substr(len);
             }
         } else
-            throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), col.type);
+            throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), type);
     }
 
-    template<typename T, typename... Args>
-    void add_param(T&& t, Args&&... args) {
-        add_param(t);
-        add_param(args...);
-    }
-
-    template<typename T>
-    void add_param(T&& t) {
-        params.emplace_back(t);
-    }
-
-    template<typename T>
-    void add_param(tds_output_param<T>& t) {
-        params.emplace_back(static_cast<tds_param>(t));
-        params.back().is_output = true;
-
-        output_params[params.size() - 1] = static_cast<tds_param*>(&t);
-    }
-
-    int32_t return_status = 0;
     vector<tds_param> params;
     map<unsigned int, tds_param*> output_params;
-    vector<tds_column> cols;
+    bool finished = false;
+    list<vector<tds_param>> rows;
 };
 
 // FIXME - can we do static assert if no. of question marks different from no. of parameters?
@@ -1925,7 +1989,7 @@ public:
             cols = r1.cols;
         }
 
-        rpc r2(conn, u"sp_execute", static_cast<tds_param>(handle));
+        r2.reset(new rpc(conn, u"sp_execute", static_cast<tds_param>(handle)));
 
         // FIXME - sp_unprepare (is this necessary?)
     }
@@ -1964,17 +2028,21 @@ public:
             cols = r1.cols;
         }
 
-        rpc r2(conn, u"sp_execute", static_cast<tds_param>(handle), forward<Args>(args)...);
+        r2.reset(new rpc(conn, u"sp_execute", static_cast<tds_param>(handle), forward<Args>(args)...));
 
         // FIXME - sp_unprepare (is this necessary?)
     }
 
     uint16_t num_columns() const {
-        return cols.size();
+        return r2->cols.size();
     }
 
     const tds_column& operator[](unsigned int i) const {
-        return cols[i];
+        return r2->cols[i];
+    }
+
+    bool fetch_row() {
+        return r2->fetch_row();
     }
 
 private:
@@ -2028,6 +2096,7 @@ private:
     }
 
     vector<tds_column> cols;
+    unique_ptr<rpc> r2;
 };
 
 static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
@@ -2052,12 +2121,12 @@ int main() {
         }
         fmt::print("\n");
 
-//         while (sq.fetch_row()) {
-//             for (size_t i = 0; i < sq.num_columns(); i++) {
-//                 fmt::print("{}\t", sq[i]);
-//             }
-//             fmt::print("\n");
-//         }
+        while (sq.fetch_row()) {
+            for (size_t i = 0; i < sq.num_columns(); i++) {
+                fmt::print("{}\t", sq[i]);
+            }
+            fmt::print("\n");
+        }
     } catch (const exception& e) {
         cerr << "Exception: " << e.what() << endl;
         return 1;
