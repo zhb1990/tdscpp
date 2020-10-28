@@ -1855,37 +1855,70 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
                     col.type = c.type;
 
-                    if (is_fixed_len_type(c.type)) {
-                        // nop
-                    } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN || c.type == tds_sql_type::TIMEN ||
-                               c.type == tds_sql_type::DATETIME2N || c.type == tds_sql_type::DATETIMN || c.type == tds_sql_type::DATETIMEOFFSETN) {
-                        if (sv2.length() < sizeof(uint8_t))
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+                    switch (c.type) {
+                        case tds_sql_type::SQL_NULL:
+                        case tds_sql_type::TINYINT:
+                        case tds_sql_type::BIT:
+                        case tds_sql_type::SMALLINT:
+                        case tds_sql_type::INT:
+                        case tds_sql_type::DATETIM4:
+                        case tds_sql_type::REAL:
+                        case tds_sql_type::MONEY:
+                        case tds_sql_type::DATETIME:
+                        case tds_sql_type::FLOAT:
+                        case tds_sql_type::SMALLMONEY:
+                        case tds_sql_type::BIGINT:
+                        case tds_sql_type::UNIQUEIDENTIFIER:
+                        case tds_sql_type::DECIMAL:
+                        case tds_sql_type::NUMERIC:
+                        case tds_sql_type::BITN:
+                        case tds_sql_type::MONEYN:
+                        case tds_sql_type::DATEN:
+                            // nop
+                            break;
 
-                        col.max_length = *(uint8_t*)sv2.data();
+                        case tds_sql_type::INTN:
+                        case tds_sql_type::FLTN:
+                        case tds_sql_type::TIMEN:
+                        case tds_sql_type::DATETIME2N:
+                        case tds_sql_type::DATETIMN:
+                        case tds_sql_type::DATETIMEOFFSETN:
+                            if (sv2.length() < sizeof(uint8_t))
+                                throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
-                        len++;
-                        sv2 = sv2.substr(1);
-                    } else if (is_byte_len_type(c.type)) {
-                        // nop
-                    } else if (c.type == tds_sql_type::VARCHAR || c.type == tds_sql_type::NVARCHAR || c.type == tds_sql_type::CHAR || c.type == tds_sql_type::NCHAR) {
-                        if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
+                            col.max_length = *(uint8_t*)sv2.data();
 
-                        col.max_length = *(uint16_t*)sv2.data();
+                            len++;
+                            sv2 = sv2.substr(1);
+                            break;
 
-                        len += sizeof(uint16_t) + sizeof(tds_collation);
-                        sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
-                    } else if (c.type == tds_sql_type::VARBINARY || c.type == tds_sql_type::BINARY) {
-                        if (sv2.length() < sizeof(uint16_t))
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t));
+                        case tds_sql_type::VARCHAR:
+                        case tds_sql_type::NVARCHAR:
+                        case tds_sql_type::CHAR:
+                        case tds_sql_type::NCHAR:
+                            if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
+                                throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
 
-                        col.max_length = *(uint16_t*)sv2.data();
+                            col.max_length = *(uint16_t*)sv2.data();
 
-                        len += sizeof(uint16_t);
-                        sv2 = sv2.substr(sizeof(uint16_t));
-                    } else
-                        throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
+                            len += sizeof(uint16_t) + sizeof(tds_collation);
+                            sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                            break;
+
+                        case tds_sql_type::VARBINARY:
+                        case tds_sql_type::BINARY:
+                            if (sv2.length() < sizeof(uint16_t))
+                                throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t));
+
+                            col.max_length = *(uint16_t*)sv2.data();
+
+                            len += sizeof(uint16_t);
+                            sv2 = sv2.substr(sizeof(uint16_t));
+                            break;
+
+                        default:
+                            throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
+                    }
 
                     if (sv2.length() < 1)
                         throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
