@@ -329,7 +329,7 @@ void tds::connect(const string& server, uint16_t port) {
         }
 
         break;
-    } while (res = res->ai_next);
+    } while ((res = res->ai_next));
 
     freeaddrinfo(orig_res);
 
@@ -388,8 +388,8 @@ void tds::send_prelogin_msg() {
 
     for (const auto& opt : opts) {
         tlo->type = opt.type;
-        tlo->offset = htons(off);
-        tlo->length = htons(opt.payload.size());
+        tlo->offset = htons((uint16_t)off);
+        tlo->length = htons((uint16_t)opt.payload.size());
 
         memcpy(msg.data() + off, opt.payload.data(), opt.payload.size());
         off += opt.payload.size();
@@ -507,19 +507,20 @@ void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t c
                           const u16string_view& server_name, const u16string_view& interface_library,
                           const u16string_view& locale, const u16string_view& database, const u16string_view& attach_db,
                           const u16string_view& new_password) {
-    uint32_t length, off;
+    uint32_t length;
+    uint16_t off;
 
     // FIXME - send features list (UTF-8 support etc.)
 
     length = sizeof(tds_login_msg);
-    length += client_name.length() * sizeof(char16_t);
-    length += username.length() * sizeof(char16_t);
-    length += password.length() * sizeof(char16_t);
-    length += app_name.length() * sizeof(char16_t);
-    length += server_name.length() * sizeof(char16_t);
-    length += interface_library.length() * sizeof(char16_t);
-    length += locale.length() * sizeof(char16_t);
-    length += database.length() * sizeof(char16_t);
+    length += (uint32_t)(client_name.length() * sizeof(char16_t));
+    length += (uint32_t)(username.length() * sizeof(char16_t));
+    length += (uint32_t)(password.length() * sizeof(char16_t));
+    length += (uint32_t)(app_name.length() * sizeof(char16_t));
+    length += (uint32_t)(server_name.length() * sizeof(char16_t));
+    length += (uint32_t)(interface_library.length() * sizeof(char16_t));
+    length += (uint32_t)(locale.length() * sizeof(char16_t));
+    length += (uint32_t)(database.length() * sizeof(char16_t));
 
     string payload;
 
@@ -545,29 +546,29 @@ void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t c
     msg->client_name_offset = off;
 
     if (!client_name.empty()) {
-        msg->client_name_length = client_name.length();
+        msg->client_name_length = (uint16_t)client_name.length();
         memcpy((uint8_t*)msg + msg->client_name_offset, client_name.data(),
                 client_name.length() * sizeof(char16_t));
 
-        off += client_name.length() * sizeof(char16_t);
+        off += (uint16_t)(client_name.length() * sizeof(char16_t));
     } else
         msg->client_name_length = 0;
 
     msg->username_offset = off;
 
     if (!username.empty()) {
-        msg->username_length = username.length();
+        msg->username_length = (uint16_t)username.length();
         memcpy((uint8_t*)msg + msg->username_offset, username.data(),
                 username.length() * sizeof(char16_t));
 
-        off += username.length() * sizeof(char16_t);
+        off += (uint16_t)(username.length() * sizeof(char16_t));
     } else
         msg->username_length = 0;
 
     msg->password_offset = off;
 
     if (!password.empty()) {
-        msg->password_length = password.length();
+        msg->password_length = (uint16_t)password.length();
 
         auto pw_dest = (uint8_t*)msg + msg->password_offset;
         auto pw_src = (uint8_t*)password.data();
@@ -575,7 +576,7 @@ void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t c
         for (unsigned int i = 0; i < password.length() * sizeof(char16_t); i++) {
             uint8_t c = *pw_src;
 
-            c = ((c & 0xf) << 4) | (c >> 4);
+            c = (uint8_t)(((c & 0xf) << 4) | (c >> 4));
             c ^= 0xa5;
 
             *pw_dest = c;
@@ -584,29 +585,29 @@ void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t c
             pw_dest++;
         }
 
-        off += password.length() * sizeof(char16_t);
+        off += (uint16_t)(password.length() * sizeof(char16_t));
     } else
         msg->password_length = 0;
 
     msg->app_name_offset = off;
 
     if (!app_name.empty()) {
-        msg->app_name_length = app_name.length();
+        msg->app_name_length = (uint16_t)app_name.length();
         memcpy((uint8_t*)msg + msg->app_name_offset, app_name.data(),
                 app_name.length() * sizeof(char16_t));
 
-        off += app_name.length() * sizeof(char16_t);
+        off += (uint16_t)(app_name.length() * sizeof(char16_t));
     } else
         msg->app_name_length = 0;
 
     msg->server_name_offset = off;
 
     if (!server_name.empty()) {
-        msg->server_name_length = server_name.length();
+        msg->server_name_length = (uint16_t)server_name.length();
         memcpy((uint8_t*)msg + msg->server_name_offset, server_name.data(),
                 server_name.length() * sizeof(char16_t));
 
-        off += server_name.length() * sizeof(char16_t);
+        off += (uint16_t)(server_name.length() * sizeof(char16_t));
     } else
         msg->server_name_length = 0;
 
@@ -616,33 +617,33 @@ void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t c
     msg->interface_library_offset = off;
 
     if (!interface_library.empty()) {
-        msg->interface_library_length = interface_library.length();
+        msg->interface_library_length = (uint16_t)interface_library.length();
         memcpy((uint8_t*)msg + msg->interface_library_offset, interface_library.data(),
                 interface_library.length() * sizeof(char16_t));
 
-        off += interface_library.length() * sizeof(char16_t);
+        off += (uint16_t)(interface_library.length() * sizeof(char16_t));
     } else
         msg->interface_library_length = 0;
 
     msg->locale_offset = off;
 
     if (!locale.empty()) {
-        msg->locale_length = locale.length();
+        msg->locale_length = (uint16_t)locale.length();
         memcpy((uint8_t*)msg + msg->locale_offset, locale.data(),
                 locale.length() * sizeof(char16_t));
 
-        off += locale.length() * sizeof(char16_t);
+        off += (uint16_t)(locale.length() * sizeof(char16_t));
     } else
         msg->locale_length = 0;
 
     msg->database_offset = off;
 
     if (!database.empty()) {
-        msg->database_length = database.length();
+        msg->database_length = (uint16_t)database.length();
         memcpy((uint8_t*)msg + msg->database_offset, database.data(),
                 database.length() * sizeof(char16_t));
 
-        off += database.length() * sizeof(char16_t);
+        off += (uint16_t)(database.length() * sizeof(char16_t));
     } else
         msg->database_length = 0;
 
@@ -657,22 +658,22 @@ void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t c
     msg->attach_db_offset = off;
 
     if (!attach_db.empty()) {
-        msg->attach_db_length = attach_db.length();
+        msg->attach_db_length = (uint16_t)attach_db.length();
         memcpy((uint8_t*)msg + msg->attach_db_offset, attach_db.data(),
                 attach_db.length() * sizeof(char16_t));
 
-        off += attach_db.length() * sizeof(char16_t);
+        off += (uint16_t)(attach_db.length() * sizeof(char16_t));
     } else
         msg->attach_db_length = 0;
 
     msg->new_password_offset = off;
 
     if (!new_password.empty()) {
-        msg->new_password_length = new_password.length();
+        msg->new_password_length = (uint16_t)new_password.length();
         memcpy((uint8_t*)msg + msg->new_password_offset, new_password.data(),
                 new_password.length() * sizeof(char16_t));
 
-        off += new_password.length() * sizeof(char16_t);
+        off += (uint16_t)(new_password.length() * sizeof(char16_t));
     } else
         msg->new_password_length = 0;
 
@@ -691,7 +692,7 @@ void tds::send_msg(enum tds_msg type, const string_view& msg) {
 
     h->type = type;
     h->status = 1; // last message
-    h->length = htons(msg.length() + sizeof(tds_header));
+    h->length = htons((uint16_t)(msg.length() + sizeof(tds_header)));
     h->spid = 0;
     h->packet_id = 0; // FIXME?
     h->window = 0;
@@ -701,10 +702,10 @@ void tds::send_msg(enum tds_msg type, const string_view& msg) {
 
     auto ret = send(sock, payload.data(), payload.length(), 0);
 
-    if (ret == -1)
+    if (ret < 0)
         throw formatted_error(FMT_STRING("send failed (error {})"), errno);
 
-    if (ret < payload.length())
+    if ((size_t)ret < payload.length())
         throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
 }
 
@@ -717,13 +718,13 @@ void tds::wait_for_msg(enum tds_msg& type, string& payload) {
 
     auto ret = recv(sock, &h, sizeof(tds_header), MSG_WAITALL);
 
-    if (ret == -1)
+    if (ret < 0)
         throw formatted_error(FMT_STRING("recv failed (error {})"), errno);
 
     if (ret == 0)
         throw formatted_error(FMT_STRING("Disconnected."));
 
-    if (ret < sizeof(h))
+    if ((size_t)ret < sizeof(h))
         throw formatted_error(FMT_STRING("recv received {} bytes, expected {}"), ret, sizeof(h));
 
     if (htons(h.length) < sizeof(tds_header)) {
@@ -740,13 +741,13 @@ void tds::wait_for_msg(enum tds_msg& type, string& payload) {
 
         ret = recv(sock, payload.data(), len, MSG_WAITALL);
 
-        if (ret == -1)
+        if (ret < 0)
             throw formatted_error(FMT_STRING("recv failed (error {})"), errno);
 
         if (ret == 0)
             throw formatted_error(FMT_STRING("Disconnected."));
 
-        if (ret < len)
+        if ((unsigned int)ret < len)
             throw formatted_error(FMT_STRING("recv received {} bytes, expected {}"), ret, len);
     } else
         payload.clear();
@@ -844,8 +845,8 @@ tds_date::tds_date(int32_t num) : num(num) {
     g = (e % 1461) / 4;
     h = (5 * g) + 2;
 
-    day = ((h % 153) / 5) + 1;
-    month = ((h / 153) + 2) % 12 + 1;
+    day = (uint8_t)(((h % 153) / 5) + 1);
+    month = (uint8_t)(((h / 153) + 2) % 12 + 1);
     year = static_cast<uint16_t>((e / 1461) - 4716 + ((14 - month) / 12));
 }
 
@@ -1257,6 +1258,9 @@ struct fmt::formatter<tds_param> {
 
                     case 8:
                         return format_to(ctx.out(), "{}", *(int64_t*)p.val.data());
+
+                    default:
+                        throw formatted_error(FMT_STRING("INTN has unexpected length {}."), p.val.length());
                 }
             break;
 
@@ -1290,6 +1294,9 @@ struct fmt::formatter<tds_param> {
 
                     case sizeof(double):
                         return format_to(ctx.out(), "{}", *(double*)p.val.data());
+
+                    default:
+                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), p.val.length());
                 }
             break;
 
@@ -1313,7 +1320,7 @@ struct fmt::formatter<tds_param> {
                     secs /= 10;
                 }
 
-                tds_time t(secs);
+                tds_time t((uint32_t)secs);
 
                 return format_to(ctx.out(), "{}", t);
             }
@@ -1331,7 +1338,7 @@ struct fmt::formatter<tds_param> {
                 memcpy(&v, p.val.data() + p.val.length() - 3, 3);
                 v &= 0xffffff;
 
-                tds_datetime dt(v - 693595, secs);
+                tds_datetime dt(v - 693595, (uint32_t)secs);
 
                 return format_to(ctx.out(), "{}", dt);
             }
@@ -1369,7 +1376,7 @@ struct fmt::formatter<tds_param> {
                 memcpy(&v, p.val.data() + p.val.length() - 5, 3);
                 v &= 0xffffff;
 
-                tds_datetimeoffset dto(v - 693595, secs, *(int16_t*)(p.val.data() + p.val.length() - sizeof(int16_t)));
+                tds_datetimeoffset dto(v - 693595, (uint32_t)secs, *(int16_t*)(p.val.data() + p.val.length() - sizeof(int16_t)));
 
                 return format_to(ctx.out(), "{}", dto);
             }
@@ -1385,9 +1392,10 @@ struct fmt::formatter<tds_param> {
 
                 return format_to(ctx.out(), "{}", s);
             }
-        }
 
-        throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
+            default:
+                throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
+        }
     }
 };
 
@@ -1543,7 +1551,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
     auto ptr = (uint8_t*)&all_headers[1];
 
-    *(uint16_t*)ptr = name.length();
+    *(uint16_t*)ptr = (uint16_t)name.length();
     ptr += sizeof(uint16_t);
 
     memcpy(ptr, name.data(), name.length() * sizeof(char16_t));
@@ -1582,14 +1590,15 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
             case tds_sql_type::INTN:
             case tds_sql_type::FLTN:
-                *ptr = p.val.length();
+                *ptr = (uint8_t)p.val.length();
                 ptr++;
 
                 if (p.is_null) {
                     *ptr = 0;
                     ptr++;
                 } else {
-                    *ptr = p.val.length(); ptr++;
+                    *ptr = (uint8_t)p.val.length();
+                    ptr++;
                     memcpy(ptr, p.val.data(), p.val.length());
                     ptr += p.val.length();
                 }
@@ -1599,14 +1608,15 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
             case tds_sql_type::TIMEN:
             case tds_sql_type::DATETIME2N:
             case tds_sql_type::DATETIMEOFFSETN:
-                *ptr = p.max_length;
+                *ptr = (uint8_t)p.max_length;
                 ptr++;
 
                 if (p.is_null) {
                     *ptr = 0;
                     ptr++;
                 } else {
-                    *ptr = p.val.length(); ptr++;
+                    *ptr = (uint8_t)p.val.length();
+                    ptr++;
                     memcpy(ptr, p.val.data(), p.val.length());
                     ptr += p.val.length();
                 }
@@ -1624,7 +1634,8 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                     *ptr = 0;
                     ptr++;
                 } else {
-                    *ptr = p.val.length(); ptr++;
+                    *ptr = (uint8_t)p.val.length();
+                    ptr++;
                     memcpy(ptr, p.val.data(), p.val.length());
                     ptr += p.val.length();
                 }
@@ -1641,7 +1652,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 else if (p.val.length() > 8000) // MAX
                     h2->max_length = 0xffff;
                 else
-                    h2->max_length = p.val.length();
+                    h2->max_length = (uint16_t)p.val.length();
 
                 h2->collation.lcid = 0x0409; // en-US
                 h2->collation.ignore_case = 1;
@@ -1658,8 +1669,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 if (!p.is_null && p.val.length() > 8000) { // MAX
                     auto h3 = (tds_VARCHAR_MAX_param*)h2;
 
-                    h3->length = p.val.length();
-                    h3->chunk_length = p.val.length();
+                    h3->length = h3->chunk_length = (uint16_t)p.val.length();
 
                     ptr += sizeof(tds_VARCHAR_MAX_param) - sizeof(tds_param_header);
 
@@ -1669,7 +1679,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                     *(uint32_t*)ptr = 0; // last chunk
                     ptr += sizeof(uint32_t);
                 } else {
-                    h2->length = p.is_null ? 0 : p.val.length();
+                    h2->length = (uint16_t)(p.is_null ? 0 : p.val.length());
 
                     ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
 
@@ -1690,13 +1700,12 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 else if (p.val.length() > 8000) // MAX
                     h2->max_length = 0xffff;
                 else
-                    h2->max_length = p.val.length();
+                    h2->max_length = (uint16_t)p.val.length();
 
                 if (!p.is_null && p.val.length() > 8000) { // MAX
                     auto h3 = (tds_VARBINARY_MAX_param*)h2;
 
-                    h3->length = p.val.length();
-                    h3->chunk_length = p.val.length();
+                    h3->length = h3->chunk_length = (uint16_t)p.val.length();
 
                     ptr += sizeof(tds_VARBINARY_MAX_param) - sizeof(tds_param_header);
 
@@ -1706,7 +1715,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                     *(uint32_t*)ptr = 0; // last chunk
                     ptr += sizeof(uint32_t);
                 } else {
-                    h2->length = p.is_null ? 0 : p.val.length();
+                    h2->length = (uint16_t)(p.is_null ? 0 : p.val.length());
 
                     ptr += sizeof(tds_VARBINARY_param) - sizeof(tds_param_header);
 
@@ -1715,6 +1724,8 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                         ptr += h2->length;
                     }
                 }
+
+                break;
             }
 
             default:
@@ -1989,7 +2000,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
                 row.resize(cols.size());
 
-                unsigned int bitset_length = (cols.size() + 7) / 8;
+                auto bitset_length = (cols.size() + 7) / 8;
 
                 if (sv.length() < bitset_length)
                     throw formatted_error(FMT_STRING("Short NBCROW message ({} bytes, expected at least {})."), sv.length(), bitset_length);
@@ -2003,7 +2014,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                     auto& col = row[i];
 
                     if (i != 0) {
-                        if (i & 7 == 0) {
+                        if ((i & 7) == 0) {
                             bitset = bitset.substr(1);
                             bsv = bitset[0];
                         } else
@@ -2239,10 +2250,10 @@ query::query(tds& conn, const string_view& q, Args&&... args) {
 }
 
 uint16_t query::num_columns() const {
-    return r2->cols.size();
+    return (uint16_t)r2->cols.size();
 }
 
-const tds_column& query::operator[](unsigned int i) const {
+const tds_column& query::operator[](uint16_t i) const {
     return r2->cols[i];
 }
 
@@ -2324,9 +2335,8 @@ string query::create_params_string(unsigned int num, T&& t) {
     }
 }
 
-static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
-                     const string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
-                     uint8_t severity, int oserr, bool error) {
+static void show_msg(const string_view&, const string_view& message, const string_view&, const string_view&,
+                     int32_t msgno, int32_t, int16_t, uint8_t, uint8_t severity, int, bool) {
     if (severity > 10)
         fmt::print("\x1b[31;1mError {}: {}\x1b[0m\n", msgno, message);
     else if (msgno == 50000) // match SSMS by not displaying message no. if 50000 (RAISERROR etc.)
@@ -2344,13 +2354,13 @@ int main() {
 
         query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, CONVERT(BINARY(3),0x070809) AS test", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f);
 
-        for (size_t i = 0; i < sq.num_columns(); i++) {
+        for (uint16_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);
         }
         fmt::print("\n");
 
         while (sq.fetch_row()) {
-            for (size_t i = 0; i < sq.num_columns(); i++) {
+            for (uint16_t i = 0; i < sq.num_columns(); i++) {
                 fmt::print("{}\t", sq[i]);
             }
             fmt::print("\n");

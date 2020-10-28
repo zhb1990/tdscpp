@@ -376,7 +376,7 @@ public:
 class tds_time {
 public:
     tds_time(uint8_t hour, uint8_t minute, uint8_t second) : hour(hour), minute(minute), second(second) { }
-    tds_time(uint32_t secs) : hour(secs / 3600), minute((secs / 60) % 60), second(secs % 60) { }
+    tds_time(uint32_t secs) : hour((uint8_t)(secs / 3600)), minute((uint8_t)((secs / 60) % 60)), second((uint8_t)(secs % 60)) { }
 
     uint8_t hour, minute, second;
 };
@@ -482,7 +482,7 @@ public:
         params.emplace_back(static_cast<tds_param>(t));
         params.back().is_output = true;
 
-        output_params[params.size() - 1] = static_cast<tds_param*>(&t);
+        output_params[(unsigned int)(params.size() - 1)] = static_cast<tds_param*>(&t);
     }
 
     bool fetch_row();
@@ -509,7 +509,7 @@ public:
 
     uint16_t num_columns() const;
 
-    const tds_column& operator[](unsigned int i) const;
+    const tds_column& operator[](uint16_t i) const;
 
     bool fetch_row();
 
