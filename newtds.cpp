@@ -934,18 +934,18 @@ struct fmt::formatter<tds_datetimeoffset> {
     }
 };
 
-tds_param::tds_param() {
+tds_value::tds_value() {
     type = tds_sql_type::SQL_NULL;
 }
 
-tds_param::tds_param(int32_t i) {
+tds_value::tds_value(int32_t i) {
     type = tds_sql_type::INTN;
 
     val.resize(sizeof(int32_t));
     *(int32_t*)val.data() = i;
 }
 
-tds_param::tds_param(const optional<int32_t>& i) {
+tds_value::tds_value(const optional<int32_t>& i) {
     type = tds_sql_type::INTN;
 
     val.resize(sizeof(int32_t));
@@ -956,19 +956,19 @@ tds_param::tds_param(const optional<int32_t>& i) {
         is_null = true;
 }
 
-tds_param::tds_param(const u16string_view& sv) {
+tds_value::tds_value(const u16string_view& sv) {
     type = tds_sql_type::NVARCHAR;
     val.resize(sv.length() * sizeof(char16_t));
     memcpy(val.data(), sv.data(), val.length());
 }
 
-tds_param::tds_param(const u16string& sv) : tds_param(u16string_view(sv)) {
+tds_value::tds_value(const u16string& sv) : tds_value(u16string_view(sv)) {
 }
 
-tds_param::tds_param(const char16_t* sv) : tds_param(u16string_view(sv)) {
+tds_value::tds_value(const char16_t* sv) : tds_value(u16string_view(sv)) {
 }
 
-tds_param::tds_param(const optional<u16string_view>& sv) {
+tds_value::tds_value(const optional<u16string_view>& sv) {
     type = tds_sql_type::NVARCHAR;
 
     if (!sv.has_value())
@@ -979,19 +979,19 @@ tds_param::tds_param(const optional<u16string_view>& sv) {
     }
 }
 
-tds_param::tds_param(const string_view& sv) {
+tds_value::tds_value(const string_view& sv) {
     type = tds_sql_type::VARCHAR;
     val.resize(sv.length());
     memcpy(val.data(), sv.data(), val.length());
 }
 
-tds_param::tds_param(const string& sv) : tds_param(string_view(sv)) {
+tds_value::tds_value(const string& sv) : tds_value(string_view(sv)) {
 }
 
-tds_param::tds_param(const char* sv) : tds_param(string_view(sv)) {
+tds_value::tds_value(const char* sv) : tds_value(string_view(sv)) {
 }
 
-tds_param::tds_param(const optional<string_view>& sv) {
+tds_value::tds_value(const optional<string_view>& sv) {
     type = tds_sql_type::VARCHAR;
 
     if (!sv.has_value())
@@ -1002,7 +1002,7 @@ tds_param::tds_param(const optional<string_view>& sv) {
     }
 }
 
-tds_param::tds_param(const u8string_view& sv) {
+tds_value::tds_value(const u8string_view& sv) {
     auto s = utf8_to_utf16(string_view((char*)sv.data(), sv.length()));
 
     type = tds_sql_type::NVARCHAR;
@@ -1010,13 +1010,13 @@ tds_param::tds_param(const u8string_view& sv) {
     memcpy(val.data(), s.data(), val.length());
 }
 
-tds_param::tds_param(const u8string& sv) : tds_param(u8string_view(sv)) {
+tds_value::tds_value(const u8string& sv) : tds_value(u8string_view(sv)) {
 }
 
-tds_param::tds_param(const char8_t* sv) : tds_param(u8string_view(sv)) {
+tds_value::tds_value(const char8_t* sv) : tds_value(u8string_view(sv)) {
 }
 
-tds_param::tds_param(const optional<u8string_view>& sv) {
+tds_value::tds_value(const optional<u8string_view>& sv) {
     type = tds_sql_type::NVARCHAR;
 
     if (!sv.has_value())
@@ -1029,14 +1029,14 @@ tds_param::tds_param(const optional<u8string_view>& sv) {
     }
 }
 
-tds_param::tds_param(float f) {
+tds_value::tds_value(float f) {
     type = tds_sql_type::FLTN;
 
     val.resize(sizeof(float));
     memcpy(val.data(), &f, sizeof(float));
 }
 
-tds_param::tds_param(const optional<float>& f) {
+tds_value::tds_value(const optional<float>& f) {
     type = tds_sql_type::FLTN;
     val.resize(sizeof(float));
 
@@ -1049,14 +1049,14 @@ tds_param::tds_param(const optional<float>& f) {
     }
 }
 
-tds_param::tds_param(double d) {
+tds_value::tds_value(double d) {
     type = tds_sql_type::FLTN;
 
     val.resize(sizeof(double));
     memcpy(val.data(), &d, sizeof(double));
 }
 
-tds_param::tds_param(const optional<double>& d) {
+tds_value::tds_value(const optional<double>& d) {
     type = tds_sql_type::FLTN;
     val.resize(sizeof(double));
 
@@ -1069,7 +1069,7 @@ tds_param::tds_param(const optional<double>& d) {
     }
 }
 
-tds_param::tds_param(const tds_date& d) {
+tds_value::tds_value(const tds_date& d) {
     int32_t n;
 
     type = tds_sql_type::DATEN;
@@ -1079,7 +1079,7 @@ tds_param::tds_param(const tds_date& d) {
     memcpy(val.data(), &n, 3);
 }
 
-tds_param::tds_param(const optional<tds_date>& d) {
+tds_value::tds_value(const optional<tds_date>& d) {
     type = tds_sql_type::DATEN;
 
     if (!d.has_value())
@@ -1091,7 +1091,7 @@ tds_param::tds_param(const optional<tds_date>& d) {
     }
 }
 
-tds_param::tds_param(const tds_time& t) {
+tds_value::tds_value(const tds_time& t) {
     uint32_t secs;
 
     secs = (unsigned int)t.hour * 3600;
@@ -1105,7 +1105,7 @@ tds_param::tds_param(const tds_time& t) {
     memcpy(val.data(), &secs, val.length());
 }
 
-tds_param::tds_param(const optional<tds_time>& t) {
+tds_value::tds_value(const optional<tds_time>& t) {
     type = tds_sql_type::TIMEN;
     max_length = 0; // TIME(0)
 
@@ -1123,7 +1123,7 @@ tds_param::tds_param(const optional<tds_time>& t) {
     }
 }
 
-tds_param::tds_param(const tds_datetime& dt) {
+tds_value::tds_value(const tds_datetime& dt) {
     int32_t n;
     uint32_t secs;
 
@@ -1141,7 +1141,7 @@ tds_param::tds_param(const tds_datetime& dt) {
     memcpy(val.data() + 3, &n, 3);
 }
 
-tds_param::tds_param(const optional<tds_datetime>& dt) {
+tds_value::tds_value(const optional<tds_datetime>& dt) {
     type = tds_sql_type::DATETIME2N;
     val.resize(6);
     max_length = 0; // DATETIME2(0)
@@ -1163,7 +1163,7 @@ tds_param::tds_param(const optional<tds_datetime>& dt) {
     }
 }
 
-tds_param::tds_param(const tds_datetimeoffset& dto) {
+tds_value::tds_value(const tds_datetimeoffset& dto) {
     int32_t n;
     uint32_t secs;
 
@@ -1183,7 +1183,7 @@ tds_param::tds_param(const tds_datetimeoffset& dto) {
     *(int16_t*)(val.data() + 6) = dto.offset;
 }
 
-tds_param::tds_param(const optional<tds_datetimeoffset>& dto) {
+tds_value::tds_value(const optional<tds_datetimeoffset>& dto) {
     type = tds_sql_type::DATETIMEOFFSETN;
     val.resize(8);
     max_length = 0; // DATETIMEOFFSET(0)
@@ -1207,7 +1207,7 @@ tds_param::tds_param(const optional<tds_datetimeoffset>& dto) {
     }
 }
 
-tds_param::tds_param(const span<byte>& bin) {
+tds_value::tds_value(const span<byte>& bin) {
     // FIXME - std::optional version of this too
 
     type = tds_sql_type::VARBINARY;
@@ -1215,13 +1215,13 @@ tds_param::tds_param(const span<byte>& bin) {
     memcpy(val.data(), bin.data(), bin.size());
 }
 
-tds_param::tds_param(bool b) {
+tds_value::tds_value(bool b) {
     type = tds_sql_type::BITN;
     val.resize(sizeof(uint8_t));
     *(uint8_t*)val.data() = b ? 1 : 0;
 }
 
-tds_param::tds_param(const optional<bool>& b) {
+tds_value::tds_value(const optional<bool>& b) {
     type = tds_sql_type::BITN;
     val.resize(sizeof(uint8_t));
 
@@ -1231,18 +1231,18 @@ tds_param::tds_param(const optional<bool>& b) {
         is_null = true;
 }
 
-tds_param::operator string() const {
+tds_value::operator string() const {
     return fmt::format(FMT_STRING("{}"), *this);
 }
 
-tds_param::operator u16string() const {
+tds_value::operator u16string() const {
     if (type == tds_sql_type::NVARCHAR || type == tds_sql_type::NCHAR)
         return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
     else
         return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
 }
 
-tds_param::operator int64_t() const {
+tds_value::operator int64_t() const {
     if (is_null)
         return 0;
 
@@ -1380,7 +1380,7 @@ tds_param::operator int64_t() const {
 }
 
 template<>
-struct fmt::formatter<tds_param> {
+struct fmt::formatter<tds_value> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin();
 
@@ -1391,7 +1391,7 @@ struct fmt::formatter<tds_param> {
     }
 
     template<typename format_context>
-    auto format(const tds_param& p, format_context& ctx) {
+    auto format(const tds_value& p, format_context& ctx) {
         if (p.is_null)
             return format_to(ctx.out(), "NULL");
 
@@ -1578,7 +1578,7 @@ struct fmt::formatter<tds_output_param<T>> {
 
     template<typename format_context>
     auto format(const tds_output_param<T>& p, format_context& ctx) {
-        return format_to(ctx.out(), "{}", static_cast<tds_param>(p));
+        return format_to(ctx.out(), "{}", static_cast<tds_value>(p));
     }
 };
 
@@ -1595,7 +1595,7 @@ struct fmt::formatter<tds_column> {
 
     template<typename format_context>
     auto format(const tds_column& c, format_context& ctx) {
-        return format_to(ctx.out(), "{}", static_cast<tds_param>(c));
+        return format_to(ctx.out(), "{}", static_cast<tds_value>(c));
     }
 };
 
@@ -2116,7 +2116,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                         throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected {})."), sv.length(), sizeof(tds_return_value) + 2 + len);
 
                     if (output_params.count(h->param_ordinal) != 0) {
-                        tds_param& out = *output_params.at(h->param_ordinal);
+                        tds_value& out = *output_params.at(h->param_ordinal);
 
                         if (len == 0)
                             out.is_null = true;
@@ -2139,7 +2139,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
             case tds_token::ROW:
             {
-                vector<tds_param> row;
+                vector<tds_value> row;
 
                 row.resize(cols.size());
 
@@ -2159,7 +2159,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 if (cols.empty())
                     break;
 
-                vector<tds_param> row;
+                vector<tds_value> row;
 
                 row.resize(cols.size());
 
@@ -2225,7 +2225,7 @@ bool rpc::fetch_row() {
     return false;
 }
 
-void rpc::handle_row_col(tds_param& col, enum tds_sql_type type, unsigned int max_length, string_view& sv) {
+void rpc::handle_row_col(tds_value& col, enum tds_sql_type type, unsigned int max_length, string_view& sv) {
     switch (type) {
         case tds_sql_type::SQL_NULL:
         case tds_sql_type::TINYINT:
@@ -2368,7 +2368,7 @@ query::query(tds& conn, const string_view& q) {
         cols = r1.cols;
     }
 
-    r2.reset(new rpc(conn, u"sp_execute", static_cast<tds_param>(handle)));
+    r2.reset(new rpc(conn, u"sp_execute", static_cast<tds_value>(handle)));
 
     // FIXME - sp_unprepare (is this necessary?)
 }
@@ -2407,7 +2407,7 @@ query::query(tds& conn, const string_view& q, Args&&... args) {
         cols = r1.cols;
     }
 
-    r2.reset(new rpc(conn, u"sp_execute", static_cast<tds_param>(handle), forward<Args>(args)...));
+    r2.reset(new rpc(conn, u"sp_execute", static_cast<tds_value>(handle), forward<Args>(args)...));
 
     // FIXME - sp_unprepare (is this necessary?)
 }

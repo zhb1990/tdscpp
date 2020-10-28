@@ -399,41 +399,41 @@ public:
     int16_t offset;
 };
 
-class tds_param {
+class tds_value {
 public:
     template<typename T>
-    tds_param(T*) = delete;
+    tds_value(T*) = delete;
 
-    tds_param();
-    tds_param(int32_t i);
-    tds_param(const std::optional<int32_t>& i);
-    tds_param(const std::u16string_view& sv);
-    tds_param(const std::u16string& sv);
-    tds_param(const char16_t* sv);
-    tds_param(const std::optional<std::u16string_view>& sv);
-    tds_param(const std::string_view& sv);
-    tds_param(const std::string& sv);
-    tds_param(const char* sv);
-    tds_param(const std::optional<std::string_view>& sv);
-    tds_param(const std::u8string_view& sv);
-    tds_param(const std::u8string& sv);
-    tds_param(const char8_t* sv);
-    tds_param(const std::optional<std::u8string_view>& sv);
-    tds_param(float f);
-    tds_param(const std::optional<float>& f);
-    tds_param(double d);
-    tds_param(const std::optional<double>& d);
-    tds_param(const tds_date& d);
-    tds_param(const std::optional<tds_date>& d);
-    tds_param(const tds_time& t);
-    tds_param(const std::optional<tds_time>& t);
-    tds_param(const tds_datetime& dt);
-    tds_param(const std::optional<tds_datetime>& t);
-    tds_param(const tds_datetimeoffset& dt);
-    tds_param(const std::optional<tds_datetimeoffset>& t);
-    tds_param(const std::span<std::byte>& bin);
-    tds_param(bool b);
-    tds_param(const std::optional<bool>& b);
+    tds_value();
+    tds_value(int32_t i);
+    tds_value(const std::optional<int32_t>& i);
+    tds_value(const std::u16string_view& sv);
+    tds_value(const std::u16string& sv);
+    tds_value(const char16_t* sv);
+    tds_value(const std::optional<std::u16string_view>& sv);
+    tds_value(const std::string_view& sv);
+    tds_value(const std::string& sv);
+    tds_value(const char* sv);
+    tds_value(const std::optional<std::string_view>& sv);
+    tds_value(const std::u8string_view& sv);
+    tds_value(const std::u8string& sv);
+    tds_value(const char8_t* sv);
+    tds_value(const std::optional<std::u8string_view>& sv);
+    tds_value(float f);
+    tds_value(const std::optional<float>& f);
+    tds_value(double d);
+    tds_value(const std::optional<double>& d);
+    tds_value(const tds_date& d);
+    tds_value(const std::optional<tds_date>& d);
+    tds_value(const tds_time& t);
+    tds_value(const std::optional<tds_time>& t);
+    tds_value(const tds_datetime& dt);
+    tds_value(const std::optional<tds_datetime>& t);
+    tds_value(const tds_datetimeoffset& dt);
+    tds_value(const std::optional<tds_datetimeoffset>& t);
+    tds_value(const std::span<std::byte>& bin);
+    tds_value(bool b);
+    tds_value(const std::optional<bool>& b);
 
     operator std::string() const;
     operator std::u16string() const;
@@ -446,28 +446,28 @@ public:
     unsigned int max_length = 0;
 };
 
-class tds_column : public tds_param {
+class tds_column : public tds_value {
 public:
     std::string name;
 
     operator std::string() const {
-        return (std::string)static_cast<tds_param>(*this);
+        return (std::string)static_cast<tds_value>(*this);
     }
 
     operator std::u16string() const {
-        return (std::u16string)static_cast<tds_param>(*this);
+        return (std::u16string)static_cast<tds_value>(*this);
     }
 
     operator int64_t() const {
-        return (int64_t)static_cast<tds_param>(*this);
+        return (int64_t)static_cast<tds_value>(*this);
     }
 };
 
 
 template<typename T>
-class tds_output_param : public tds_param {
+class tds_output_param : public tds_value {
 public:
-    tds_output_param() : tds_param(std::optional<T>(std::nullopt)) {
+    tds_output_param() : tds_value(std::optional<T>(std::nullopt)) {
     }
 };
 
@@ -499,10 +499,10 @@ public:
 
     template<typename T>
     void add_param(tds_output_param<T>& t) {
-        params.emplace_back(static_cast<tds_param>(t));
+        params.emplace_back(static_cast<tds_value>(t));
         params.back().is_output = true;
 
-        output_params[(unsigned int)(params.size() - 1)] = static_cast<tds_param*>(&t);
+        output_params[(unsigned int)(params.size() - 1)] = static_cast<tds_value*>(&t);
     }
 
     bool fetch_row();
@@ -512,12 +512,12 @@ public:
 
 private:
     void do_rpc(tds& conn, const std::u16string_view& name);
-    void handle_row_col(tds_param& col, enum tds_sql_type type, unsigned int max_length, std::string_view& sv);
+    void handle_row_col(tds_value& col, enum tds_sql_type type, unsigned int max_length, std::string_view& sv);
 
-    std::vector<tds_param> params;
-    std::map<unsigned int, tds_param*> output_params;
+    std::vector<tds_value> params;
+    std::map<unsigned int, tds_value*> output_params;
     bool finished = false;
-    std::list<std::vector<tds_param>> rows;
+    std::list<std::vector<tds_value>> rows;
 };
 
 class query {
