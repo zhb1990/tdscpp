@@ -1017,7 +1017,7 @@ tds_param::tds_param(const u8string& sv) : tds_param(u8string_view(sv)) {
 tds_param::tds_param(const char8_t* sv) : tds_param(u8string_view(sv)) {
 }
 
-tds_param::tds_param(const std::optional<std::u8string_view>& sv) {
+tds_param::tds_param(const optional<u8string_view>& sv) {
     type = tds_sql_type::NVARCHAR;
 
     if (!sv.has_value())
@@ -1106,7 +1106,7 @@ tds_param::tds_param(const tds_time& t) {
     memcpy(val.data(), &secs, val.length());
 }
 
-tds_param::tds_param(const std::optional<tds_time>& t) {
+tds_param::tds_param(const optional<tds_time>& t) {
     type = tds_sql_type::TIMEN;
     max_length = 0; // TIME(0)
 
@@ -1142,7 +1142,7 @@ tds_param::tds_param(const tds_datetime& dt) {
     memcpy(val.data() + 3, &n, 3);
 }
 
-tds_param::tds_param(const std::optional<tds_datetime>& dt) {
+tds_param::tds_param(const optional<tds_datetime>& dt) {
     type = tds_sql_type::DATETIME2N;
     val.resize(6);
     max_length = 0; // DATETIME2(0)
@@ -1184,7 +1184,7 @@ tds_param::tds_param(const tds_datetimeoffset& dto) {
     *(int16_t*)(val.data() + 6) = dto.offset;
 }
 
-tds_param::tds_param(const std::optional<tds_datetimeoffset>& dto) {
+tds_param::tds_param(const optional<tds_datetimeoffset>& dto) {
     type = tds_sql_type::DATETIMEOFFSETN;
     val.resize(8);
     max_length = 0; // DATETIMEOFFSET(0)
@@ -1208,12 +1208,28 @@ tds_param::tds_param(const std::optional<tds_datetimeoffset>& dto) {
     }
 }
 
-tds_param::tds_param(const std::span<std::byte>& bin) {
+tds_param::tds_param(const span<byte>& bin) {
     // FIXME - std::optional version of this too
 
     type = tds_sql_type::VARBINARY;
     val.resize(bin.size());
     memcpy(val.data(), bin.data(), bin.size());
+}
+
+tds_param::tds_param(bool b) {
+    type = tds_sql_type::BITN;
+    val.resize(sizeof(uint8_t));
+    *(uint8_t*)val.data() = b ? 1 : 0;
+}
+
+tds_param::tds_param(const optional<bool>& b) {
+    type = tds_sql_type::BITN;
+    val.resize(sizeof(uint8_t));
+
+    if (b.has_value())
+        *(uint8_t*)val.data() = b ? 1 : 0;
+    else
+        is_null = true;
 }
 
 template<>
@@ -1393,6 +1409,9 @@ struct fmt::formatter<tds_param> {
                 return format_to(ctx.out(), "{}", s);
             }
 
+            case tds_sql_type::BITN:
+                return format_to(ctx.out(), "{}", p.val[0] != 0);
+
             default:
                 throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
         }
@@ -1497,24 +1516,21 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 break;
 
             case tds_sql_type::UNIQUEIDENTIFIER:
-            case tds_sql_type::INTN:
             case tds_sql_type::DECIMAL:
             case tds_sql_type::NUMERIC:
-            case tds_sql_type::BITN:
-            case tds_sql_type::FLTN:
             case tds_sql_type::MONEYN:
             case tds_sql_type::DATETIMN:
             case tds_sql_type::DATEN:
+                bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
+                break;
+
+            case tds_sql_type::INTN:
+            case tds_sql_type::FLTN:
             case tds_sql_type::TIMEN:
             case tds_sql_type::DATETIME2N:
             case tds_sql_type::DATETIMEOFFSETN:
-                bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
-
-                if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN ||
-                    p.type == tds_sql_type::DATETIME2N || p.type == tds_sql_type::DATETIMEOFFSETN) {
-                    bufsize += sizeof(uint8_t);
-                }
-
+            case tds_sql_type::BITN:
+                bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length()) + sizeof(uint8_t);
                 break;
 
             case tds_sql_type::NVARCHAR:
@@ -1590,6 +1606,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
             case tds_sql_type::INTN:
             case tds_sql_type::FLTN:
+            case tds_sql_type::BITN:
                 *ptr = (uint8_t)p.val.length();
                 ptr++;
 
@@ -1626,7 +1643,6 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
             case tds_sql_type::UNIQUEIDENTIFIER:
             case tds_sql_type::DECIMAL:
             case tds_sql_type::NUMERIC:
-            case tds_sql_type::BITN:
             case tds_sql_type::MONEYN:
             case tds_sql_type::DATETIMN:
             case tds_sql_type::DATEN:
@@ -1861,7 +1877,6 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                         case tds_sql_type::UNIQUEIDENTIFIER:
                         case tds_sql_type::DECIMAL:
                         case tds_sql_type::NUMERIC:
-                        case tds_sql_type::BITN:
                         case tds_sql_type::MONEYN:
                         case tds_sql_type::DATEN:
                             // nop
@@ -1873,6 +1888,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                         case tds_sql_type::DATETIME2N:
                         case tds_sql_type::DATETIMN:
                         case tds_sql_type::DATETIMEOFFSETN:
+                        case tds_sql_type::BITN:
                             if (sv2.length() < sizeof(uint8_t))
                                 throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
@@ -2299,6 +2315,8 @@ string query::create_params_string(unsigned int num, T&& t) {
         return s + "DATETIME2";
     else if constexpr (is_same_v<decay_t<T>, tds_datetimeoffset>)
         return s + "DATETIMEOFFSET";
+    else if constexpr (is_same_v<decay_t<T>, bool>)
+        return s + "BIT";
     else if constexpr (is_convertible_v<decay_t<T>, u16string_view>) {
         auto len = u16string_view(t).length();
 
@@ -2352,7 +2370,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, CONVERT(BINARY(3),0x070809) AS test", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, ? AS test", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f, true);
 
         for (uint16_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);

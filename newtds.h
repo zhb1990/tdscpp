@@ -402,6 +402,9 @@ public:
 
 class tds_param {
 public:
+    template<typename T>
+    tds_param(T*) = delete;
+
     tds_param();
     tds_param(int32_t i);
     tds_param(const std::optional<int32_t>& i);
@@ -430,6 +433,8 @@ public:
     tds_param(const tds_datetimeoffset& dt);
     tds_param(const std::optional<tds_datetimeoffset>& t);
     tds_param(const std::span<std::byte>& bin);
+    tds_param(bool b);
+    tds_param(const std::optional<bool>& b);
 
     enum tds_sql_type type;
     std::string val;
