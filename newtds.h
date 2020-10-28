@@ -219,7 +219,7 @@ enum class tds_sql_type : uint8_t {
     BIT = 0x32,
     SMALLINT = 0x34,
     INT = 0x38,
-    SMALLDATETIME = 0x3A,
+    DATETIM4 = 0x3A,
     REAL = 0x3B,
     MONEY = 0x3C,
     DATETIME = 0x3D,

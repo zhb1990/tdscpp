@@ -211,8 +211,8 @@ struct fmt::formatter<enum tds_sql_type> {
             case tds_sql_type::INT:
                 return format_to(ctx.out(), "INT");
 
-            case tds_sql_type::SMALLDATETIME:
-                return format_to(ctx.out(), "SMALLDATETIME");
+            case tds_sql_type::DATETIM4:
+                return format_to(ctx.out(), "DATETIM4");
 
             case tds_sql_type::REAL:
                 return format_to(ctx.out(), "REAL");
@@ -1273,6 +1273,15 @@ struct fmt::formatter<tds_param> {
 
                 return format_to(ctx.out(), "{}", dt);
             }
+
+            case tds_sql_type::DATETIMN: { // SMALLDATETIME
+                auto v = *(uint16_t*)p.val.data();
+                auto mins = *(uint16_t*)(p.val.data() + sizeof(uint16_t));
+
+                tds_datetime dt(v, mins * 60);
+
+                return format_to(ctx.out(), "{}", dt);
+            }
         }
 
         throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
@@ -1320,7 +1329,7 @@ static bool is_fixed_len_type(enum tds_sql_type type) {
         case tds_sql_type::BIT:
         case tds_sql_type::SMALLINT:
         case tds_sql_type::INT:
-        case tds_sql_type::SMALLDATETIME:
+        case tds_sql_type::DATETIM4:
         case tds_sql_type::REAL:
         case tds_sql_type::MONEY:
         case tds_sql_type::DATETIME:
@@ -1351,7 +1360,7 @@ static size_t fixed_len_size(enum tds_sql_type type) {
         case tds_sql_type::DATETIME:
             return 8;
 
-        case tds_sql_type::SMALLDATETIME:
+        case tds_sql_type::DATETIM4:
             return 4;
 
         case tds_sql_type::SMALLMONEY:
@@ -1611,7 +1620,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
                     if (is_fixed_len_type(c.type)) {
                         // nop
-                    } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN || c.type == tds_sql_type::TIMEN || c.type == tds_sql_type::DATETIME2N) {
+                    } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN || c.type == tds_sql_type::TIMEN || c.type == tds_sql_type::DATETIME2N || c.type == tds_sql_type::DATETIMN) {
                         if (sv2.length() < sizeof(uint8_t))
                             throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
@@ -2025,7 +2034,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now, ? AS pi", 42, "Hello", 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, CONVERT(SMALLDATETIME, GETDATE()) AS now, ? AS pi", 42, "Hello", 3.1415926f);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);
