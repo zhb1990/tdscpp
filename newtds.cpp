@@ -879,6 +879,23 @@ struct fmt::formatter<tds_date> {
     }
 };
 
+template<>
+struct fmt::formatter<tds_time> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds_time& t, format_context& ctx) {
+        return format_to(ctx.out(), "{:02}:{:02}:{:02}", t.hour, t.minute, t.second);
+    }
+};
+
 tds_param::tds_param() {
     type = tds_sql_type::SQL_NULL;
 }
@@ -1036,6 +1053,38 @@ tds_param::tds_param(const optional<tds_date>& d) {
     }
 }
 
+tds_param::tds_param(const tds_time& t) {
+    uint32_t secs;
+
+    secs = (unsigned int)t.hour * 3600;
+    secs += (unsigned int)t.minute * 60;
+    secs += t.second;
+
+    type = tds_sql_type::TIMEN;
+    max_length = 0; // TIME(0)
+
+    val.resize(3);
+    memcpy(val.data(), &secs, val.length());
+}
+
+tds_param::tds_param(const std::optional<tds_time>& t) {
+    type = tds_sql_type::TIMEN;
+    max_length = 0; // TIME(0)
+
+    if (!t.has_value())
+        is_null = true;
+    else {
+        uint32_t secs;
+
+        secs = (unsigned int)t.value().hour * 3600;
+        secs += (unsigned int)t.value().minute * 60;
+        secs += t.value().second;
+
+        val.resize(3);
+        memcpy(val.data(), &secs, val.length());
+    }
+}
+
 template<>
 struct fmt::formatter<tds_param> {
     constexpr auto parse(format_parse_context& ctx) {
@@ -1122,17 +1171,17 @@ struct fmt::formatter<tds_param> {
             }
 
             case tds_sql_type::TIMEN: {
-                uint64_t t = 0;
+                uint64_t secs = 0;
 
-                memcpy(&t, p.val.data(), min(sizeof(uint64_t), p.val.length()));
+                memcpy(&secs, p.val.data(), min(sizeof(uint64_t), p.val.length()));
 
                 for (auto n = p.max_length; n > 0; n--) {
-                    t /= 10;
+                    secs /= 10;
                 }
 
-                // FIXME - pipe through tds_time
+                tds_time t(secs);
 
-                return format_to(ctx.out(), "{:02}:{:02}:{:02}", t / 3600, (t / 60) % 60, t % 60);
+                return format_to(ctx.out(), "{}", t);
             }
         }
 
@@ -1293,8 +1342,11 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
             ptr += p.val.length();
         } else if (is_byte_len_type(p.type)) {
-            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN) {
+            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN) {
                 *ptr = p.val.length();
+                ptr++;
+            } else if (p.type == tds_sql_type::TIMEN) {
+                *ptr = p.max_length;
                 ptr++;
             }
 
@@ -1833,6 +1885,8 @@ string query::create_params_string(unsigned int num, T&& t) {
         return s + "FLOAT";
     else if constexpr (is_same_v<decay_t<T>, tds_date>)
         return s + "DATE";
+    else if constexpr (is_same_v<decay_t<T>, tds_time>)
+        return s + "TIME";
     else if constexpr (is_convertible_v<decay_t<T>, u16string_view>) {
         auto len = u16string_view(t).length();
 
@@ -1879,7 +1933,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, CONVERT(TIME, GETDATE()) AS now, ? AS pi", 42, "Hello", 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi", 42, "Hello", tds_time{9, 35, 2}, 3.1415926f);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);

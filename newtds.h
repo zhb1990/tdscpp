@@ -356,6 +356,14 @@ public:
     uint8_t month, day;
 };
 
+class tds_time {
+public:
+    tds_time(uint8_t hour, uint8_t minute, uint8_t second) : hour(hour), minute(minute), second(second) { }
+    tds_time(uint32_t secs) : hour(secs / 3600), minute((secs / 60) % 6), second(secs % 60) { }
+
+    uint8_t hour, minute, second;
+};
+
 class tds_param {
 public:
     tds_param();
@@ -379,6 +387,8 @@ public:
     tds_param(const std::optional<double>& d);
     tds_param(const tds_date& d);
     tds_param(const std::optional<tds_date>& d);
+    tds_param(const tds_time& t);
+    tds_param(const std::optional<tds_time>& t);
 
     enum tds_sql_type type;
     std::string val;
