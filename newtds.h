@@ -333,8 +333,7 @@ static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong s
 #pragma pack(pop)
 
 using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
-                                       const std::string_view& sql_state, int32_t msgno, int32_t line_number, int16_t state, uint8_t priv_msg_type,
-                                       uint8_t severity, int oserr, bool error)>;
+                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
 
 // FIXME - use pimpl
 class tds {

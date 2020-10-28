@@ -823,10 +823,8 @@ void tds::handle_info_msg(const string_view& sv, bool error) {
     proc_name = u16string_view((char16_t*)&sv[10 + ((msg_len + server_name_len) * sizeof(char16_t))], proc_name_len);
     line_number = *(int32_t*)&sv[10 + ((msg_len + server_name_len + proc_name_len) * sizeof(char16_t))];
 
-    // FIXME - get rid of unused params
-
-    message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), "", msgno, line_number, state, 0,
-                    severity, 0, error);
+    message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), msgno, line_number, state,
+                    severity, error);
 }
 
 tds_date::tds_date(int32_t num) : num(num) {
@@ -2364,8 +2362,8 @@ string query::create_params_string(unsigned int num, T&& t) {
     }
 }
 
-static void show_msg(const string_view&, const string_view& message, const string_view&, const string_view&,
-                     int32_t msgno, int32_t, int16_t, uint8_t, uint8_t severity, int, bool) {
+static void show_msg(const string_view&, const string_view& message, const string_view&, int32_t msgno, int32_t, int16_t,
+                     uint8_t severity, bool) {
     if (severity > 10)
         fmt::print("\x1b[31;1mError {}: {}\x1b[0m\n", msgno, message);
     else if (msgno == 50000) // match SSMS by not displaying message no. if 50000 (RAISERROR etc.)
