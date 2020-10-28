@@ -1425,27 +1425,6 @@ struct fmt::formatter<tds_column> {
     }
 };
 
-static bool is_fixed_len_type(enum tds_sql_type type) {
-    switch (type) {
-        case tds_sql_type::SQL_NULL:
-        case tds_sql_type::TINYINT:
-        case tds_sql_type::BIT:
-        case tds_sql_type::SMALLINT:
-        case tds_sql_type::INT:
-        case tds_sql_type::DATETIM4:
-        case tds_sql_type::REAL:
-        case tds_sql_type::MONEY:
-        case tds_sql_type::DATETIME:
-        case tds_sql_type::FLOAT:
-        case tds_sql_type::SMALLMONEY:
-        case tds_sql_type::BIGINT:
-            return true;
-
-        default:
-            return false;
-    }
-}
-
 static size_t fixed_len_size(enum tds_sql_type type) {
     switch (type) {
         case tds_sql_type::TINYINT:
@@ -2073,91 +2052,132 @@ bool rpc::fetch_row() {
 }
 
 void rpc::handle_row_col(tds_param& col, enum tds_sql_type type, unsigned int max_length, string_view& sv) {
-    if (is_fixed_len_type(type)) {
-        auto len = fixed_len_size(type);
-
-        col.val.resize(len);
-
-        if (sv.length() < len)
-            throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
-
-        memcpy(col.val.data(), sv.data(), len);
-
-        sv = sv.substr(len);
-    } else if (is_byte_len_type(type)) {
-        if (sv.length() < sizeof(uint8_t))
-            throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
-
-        auto len = *(uint8_t*)sv.data();
-
-        sv = sv.substr(1);
-
-        col.val.resize(len);
-        col.is_null = len == 0;
-
-        if (sv.length() < len)
-            throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
-
-        memcpy(col.val.data(), sv.data(), len);
-        sv = sv.substr(len);
-    } else if (type == tds_sql_type::VARCHAR || type == tds_sql_type::NVARCHAR || type == tds_sql_type::VARBINARY ||
-               type == tds_sql_type::CHAR || type == tds_sql_type::NCHAR || type == tds_sql_type::BINARY) {
-        if (max_length == 0xffff) {
-            if (sv.length() < sizeof(uint64_t))
-                throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
-
-            auto len = *(uint64_t*)sv.data();
-
-            sv = sv.substr(sizeof(uint64_t));
-
-            col.val.clear();
-
-            if (len == 0xffffffffffffffff) {
-                col.is_null = true;
-                return;
-            }
-
-            col.is_null = false;
-
-            if (len != 0xfffffffffffffffe) // unknown length
-                col.val.reserve(len);
-
-            do {
-                if (sv.length() < sizeof(uint32_t))
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
-
-                auto chunk_len = *(uint32_t*)sv.data();
-
-                sv = sv.substr(sizeof(uint32_t));
-
-                if (chunk_len == 0)
-                    break;
-
-                if (sv.length() < chunk_len)
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), chunk_len);
-
-                col.val += sv.substr(0, chunk_len);
-                sv = sv.substr(chunk_len);
-            } while (true);
-        } else {
-            if (sv.length() < sizeof(uint16_t))
-                throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 2)."), sv.length());
-
-            auto len = *(uint16_t*)sv.data();
-
-            sv = sv.substr(sizeof(uint16_t));
+    switch (type) {
+        case tds_sql_type::SQL_NULL:
+        case tds_sql_type::TINYINT:
+        case tds_sql_type::BIT:
+        case tds_sql_type::SMALLINT:
+        case tds_sql_type::INT:
+        case tds_sql_type::DATETIM4:
+        case tds_sql_type::REAL:
+        case tds_sql_type::MONEY:
+        case tds_sql_type::DATETIME:
+        case tds_sql_type::FLOAT:
+        case tds_sql_type::SMALLMONEY:
+        case tds_sql_type::BIGINT:
+        {
+            auto len = fixed_len_size(type);
 
             col.val.resize(len);
-            col.is_null = false;
+
+            if (sv.length() < len)
+                throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+
+            memcpy(col.val.data(), sv.data(), len);
+
+            sv = sv.substr(len);
+
+            break;
+        }
+
+        case tds_sql_type::UNIQUEIDENTIFIER:
+        case tds_sql_type::INTN:
+        case tds_sql_type::DECIMAL:
+        case tds_sql_type::NUMERIC:
+        case tds_sql_type::BITN:
+        case tds_sql_type::FLTN:
+        case tds_sql_type::MONEYN:
+        case tds_sql_type::DATETIMN:
+        case tds_sql_type::DATEN:
+        case tds_sql_type::TIMEN:
+        case tds_sql_type::DATETIME2N:
+        case tds_sql_type::DATETIMEOFFSETN:
+        {
+            if (sv.length() < sizeof(uint8_t))
+                throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
+
+            auto len = *(uint8_t*)sv.data();
+
+            sv = sv.substr(1);
+
+            col.val.resize(len);
+            col.is_null = len == 0;
 
             if (sv.length() < len)
                 throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
 
             memcpy(col.val.data(), sv.data(), len);
             sv = sv.substr(len);
+
+            break;
         }
-    } else
-        throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), type);
+
+        case tds_sql_type::VARCHAR:
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::VARBINARY:
+        case tds_sql_type::CHAR:
+        case tds_sql_type::NCHAR:
+        case tds_sql_type::BINARY:
+            if (max_length == 0xffff) {
+                if (sv.length() < sizeof(uint64_t))
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
+
+                auto len = *(uint64_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint64_t));
+
+                col.val.clear();
+
+                if (len == 0xffffffffffffffff) {
+                    col.is_null = true;
+                    return;
+                }
+
+                col.is_null = false;
+
+                if (len != 0xfffffffffffffffe) // unknown length
+                    col.val.reserve(len);
+
+                do {
+                    if (sv.length() < sizeof(uint32_t))
+                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
+
+                    auto chunk_len = *(uint32_t*)sv.data();
+
+                    sv = sv.substr(sizeof(uint32_t));
+
+                    if (chunk_len == 0)
+                        break;
+
+                    if (sv.length() < chunk_len)
+                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), chunk_len);
+
+                    col.val += sv.substr(0, chunk_len);
+                    sv = sv.substr(chunk_len);
+                } while (true);
+            } else {
+                if (sv.length() < sizeof(uint16_t))
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 2)."), sv.length());
+
+                auto len = *(uint16_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint16_t));
+
+                col.val.resize(len);
+                col.is_null = false;
+
+                if (sv.length() < len)
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+
+                memcpy(col.val.data(), sv.data(), len);
+                sv = sv.substr(len);
+            }
+
+            break;
+
+        default:
+            throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), type);
+    }
 }
 
 // FIXME - can we do static assert if no. of question marks different from no. of parameters?
