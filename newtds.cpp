@@ -913,6 +913,27 @@ struct fmt::formatter<tds_datetime> {
     }
 };
 
+template<>
+struct fmt::formatter<tds_datetimeoffset> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds_datetimeoffset& dto, format_context& ctx) {
+        auto absoff = abs(dto.offset);
+
+        return format_to(ctx.out(), "{} {} {}{:02}:{:02}", dto.date, dto.time,
+                         dto.offset < 0 ? '-' : '+',
+                         absoff / 60, absoff % 60);
+    }
+};
+
 tds_param::tds_param() {
     type = tds_sql_type::SQL_NULL;
 }
@@ -1131,10 +1152,6 @@ tds_param::tds_param(const std::optional<tds_datetime>& dt) {
         int32_t n;
         uint32_t secs;
 
-        type = tds_sql_type::DATETIME2N;
-        val.resize(6);
-        max_length = 0; // DATETIME2(0)
-
         secs = (unsigned int)dt.value().time.hour * 3600;
         secs += (unsigned int)dt.value().time.minute * 60;
         secs += dt.value().time.second;
@@ -1143,6 +1160,50 @@ tds_param::tds_param(const std::optional<tds_datetime>& dt) {
 
         n = dt.value().date.num + 693595;
         memcpy(val.data() + 3, &n, 3);
+    }
+}
+
+tds_param::tds_param(const tds_datetimeoffset& dto) {
+    int32_t n;
+    uint32_t secs;
+
+    type = tds_sql_type::DATETIMEOFFSETN;
+    val.resize(8);
+    max_length = 0; // DATETIMEOFFSET(0)
+
+    secs = (unsigned int)dto.time.hour * 3600;
+    secs += (unsigned int)dto.time.minute * 60;
+    secs += dto.time.second;
+
+    memcpy(val.data(), &secs, 3);
+
+    n = dto.date.num + 693595;
+    memcpy(val.data() + 3, &n, 3);
+
+    *(int16_t*)(val.data() + 6) = dto.offset;
+}
+
+tds_param::tds_param(const std::optional<tds_datetimeoffset>& dto) {
+    type = tds_sql_type::DATETIMEOFFSETN;
+    val.resize(8);
+    max_length = 0; // DATETIMEOFFSET(0)
+
+    if (!dto.has_value())
+        is_null = true;
+    else {
+        int32_t n;
+        uint32_t secs;
+
+        secs = (unsigned int)dto.value().time.hour * 3600;
+        secs += (unsigned int)dto.value().time.minute * 60;
+        secs += dto.value().time.second;
+
+        memcpy(val.data(), &secs, 3);
+
+        n = dto.value().date.num + 693595;
+        memcpy(val.data() + 3, &n, 3);
+
+        *(int16_t*)(val.data() + 6) = dto.value().offset;
     }
 }
 
@@ -1282,6 +1343,24 @@ struct fmt::formatter<tds_param> {
 
                 return format_to(ctx.out(), "{}", dt);
             }
+
+            case tds_sql_type::DATETIMEOFFSETN: {
+                uint64_t secs = 0;
+                uint32_t v;
+
+                memcpy(&secs, p.val.data(), min(sizeof(uint64_t), p.val.length() - 5));
+
+                for (auto n = p.max_length; n > 0; n--) {
+                    secs /= 10;
+                }
+
+                memcpy(&v, p.val.data() + p.val.length() - 5, 3);
+                v &= 0xffffff;
+
+                tds_datetimeoffset dto(v - 693595, secs, *(int16_t*)(p.val.data() + p.val.length() - sizeof(int16_t)));
+
+                return format_to(ctx.out(), "{}", dto);
+            }
         }
 
         throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
@@ -1395,8 +1474,10 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
         else if (is_byte_len_type(p.type)) {
             bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
 
-            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN || p.type == tds_sql_type::DATETIME2N)
+            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN ||
+                p.type == tds_sql_type::DATETIME2N || p.type == tds_sql_type::DATETIMEOFFSETN) {
                 bufsize += sizeof(uint8_t);
+            }
         } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
             if (!p.is_null && p.val.length() > 8000) // MAX
                 bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
@@ -1444,7 +1525,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
             if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN) {
                 *ptr = p.val.length();
                 ptr++;
-            } else if (p.type == tds_sql_type::TIMEN || p.type == tds_sql_type::DATETIME2N) {
+            } else if (p.type == tds_sql_type::TIMEN || p.type == tds_sql_type::DATETIME2N || p.type == tds_sql_type::DATETIMEOFFSETN) {
                 *ptr = p.max_length;
                 ptr++;
             }
@@ -1620,7 +1701,8 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
                     if (is_fixed_len_type(c.type)) {
                         // nop
-                    } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN || c.type == tds_sql_type::TIMEN || c.type == tds_sql_type::DATETIME2N || c.type == tds_sql_type::DATETIMN) {
+                    } else if (c.type == tds_sql_type::INTN || c.type == tds_sql_type::FLTN || c.type == tds_sql_type::TIMEN ||
+                               c.type == tds_sql_type::DATETIME2N || c.type == tds_sql_type::DATETIMN || c.type == tds_sql_type::DATETIMEOFFSETN) {
                         if (sv2.length() < sizeof(uint8_t))
                             throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
@@ -1988,6 +2070,8 @@ string query::create_params_string(unsigned int num, T&& t) {
         return s + "TIME";
     else if constexpr (is_same_v<decay_t<T>, tds_datetime>)
         return s + "DATETIME2";
+    else if constexpr (is_same_v<decay_t<T>, tds_datetimeoffset>)
+        return s + "DATETIMEOFFSET";
     else if constexpr (is_convertible_v<decay_t<T>, u16string_view>) {
         auto len = u16string_view(t).length();
 
@@ -2034,7 +2118,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, CONVERT(SMALLDATETIME, GETDATE()) AS now, ? AS pi", 42, "Hello", 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);

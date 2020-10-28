@@ -374,6 +374,15 @@ public:
     tds_time time;
 };
 
+class tds_datetimeoffset : public tds_datetime {
+public:
+    tds_datetimeoffset(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
+        tds_datetime(year, month, day, hour, minute, second), offset(offset) { }
+    tds_datetimeoffset(int32_t num, uint32_t secs, int16_t offset) : tds_datetime(num, secs), offset(offset) { }
+
+    int16_t offset;
+};
+
 class tds_param {
 public:
     tds_param();
@@ -401,6 +410,8 @@ public:
     tds_param(const std::optional<tds_time>& t);
     tds_param(const tds_datetime& dt);
     tds_param(const std::optional<tds_datetime>& t);
+    tds_param(const tds_datetimeoffset& dt);
+    tds_param(const std::optional<tds_datetimeoffset>& t);
 
     enum tds_sql_type type;
     std::string val;
