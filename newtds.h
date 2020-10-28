@@ -293,6 +293,23 @@ struct tds_VARCHAR_MAX_param {
 
 static_assert(sizeof(tds_VARCHAR_MAX_param) == 22, "tds_VARCHAR_MAX_param has wrong size");
 
+struct tds_VARBINARY_param {
+    tds_param_header h;
+    uint16_t max_length;
+    uint16_t length;
+};
+
+static_assert(sizeof(tds_VARBINARY_param) == 7, "tds_VARBINARY_param has wrong size");
+
+struct tds_VARBINARY_MAX_param {
+    tds_param_header h;
+    uint16_t max_length;
+    uint64_t length;
+    uint32_t chunk_length;
+};
+
+static_assert(sizeof(tds_VARBINARY_MAX_param) == 17, "tds_VARBINARY_MAX_param has wrong size");
+
 struct tds_return_value {
     uint16_t param_ordinal;
     uint8_t param_name_len;
@@ -412,6 +429,7 @@ public:
     tds_param(const std::optional<tds_datetime>& t);
     tds_param(const tds_datetimeoffset& dt);
     tds_param(const std::optional<tds_datetimeoffset>& t);
+    tds_param(const std::span<std::byte>& bin);
 
     enum tds_sql_type type;
     std::string val;

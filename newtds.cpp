@@ -1207,6 +1207,14 @@ tds_param::tds_param(const std::optional<tds_datetimeoffset>& dto) {
     }
 }
 
+tds_param::tds_param(const std::span<std::byte>& bin) {
+    // FIXME - std::optional version of this too
+
+    type = tds_sql_type::VARBINARY;
+    val.resize(bin.size());
+    memcpy(val.data(), bin.data(), bin.size());
+}
+
 template<>
 struct fmt::formatter<tds_param> {
     constexpr auto parse(format_parse_context& ctx) {
@@ -1493,6 +1501,11 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
             else
                 bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
+        } else if (p.type == tds_sql_type::VARBINARY) {
+            if (!p.is_null && p.val.length() > 8000) // MAX
+                bufsize += sizeof(tds_VARBINARY_MAX_param) + p.val.length() + sizeof(uint32_t);
+            else
+                bufsize += sizeof(tds_VARBINARY_param) + (p.is_null ? 0 : p.val.length());
         } else
             throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
     }
@@ -1587,6 +1600,39 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 h2->length = p.is_null ? 0 : p.val.length();
 
                 ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
+
+                if (!p.is_null) {
+                    memcpy(ptr, p.val.data(), h2->length);
+                    ptr += h2->length;
+                }
+            }
+        } else if (p.type == tds_sql_type::VARBINARY) {
+            auto h2 = (tds_VARBINARY_param*)h;
+
+            if (p.is_null || p.val.empty())
+                h2->max_length = 1;
+            else if (p.val.length() > 8000) // MAX
+                h2->max_length = 0xffff;
+            else
+                h2->max_length = p.val.length();
+
+            if (!p.is_null && p.val.length() > 8000) { // MAX
+                auto h3 = (tds_VARBINARY_MAX_param*)h2;
+
+                h3->length = p.val.length();
+                h3->chunk_length = p.val.length();
+
+                ptr += sizeof(tds_VARBINARY_MAX_param) - sizeof(tds_param_header);
+
+                memcpy(ptr, p.val.data(), p.val.length());
+                ptr += p.val.length();
+
+                *(uint32_t*)ptr = 0; // last chunk
+                ptr += sizeof(uint32_t);
+            } else {
+                h2->length = p.is_null ? 0 : p.val.length();
+
+                ptr += sizeof(tds_VARBINARY_param) - sizeof(tds_param_header);
 
                 if (!p.is_null) {
                     memcpy(ptr, p.val.data(), h2->length);
@@ -2110,13 +2156,18 @@ string query::create_params_string(unsigned int num, T&& t) {
             return s + "NVARCHAR(MAX)";
         else
             return s + "NVARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
+    } else if constexpr (is_constructible_v<span<byte>, add_lvalue_reference_t<decay_t<T>>>) {
+        auto len = span<byte>(t).size();
+
+        if (len > 8000)
+            return s + "VARBINARY(MAX)";
+        else
+            return s + "VARBINARY(" + to_string(len == 0 ? 1 : len) + ")";
     } else {
         []<bool flag = false>() {
             static_assert(flag, "Unable to get SQL type from parameter.");
         }();
     }
-
-    // FIXME - other types
 }
 
 static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
@@ -2130,11 +2181,16 @@ static void show_msg(const string_view& server, const string_view& message, cons
         fmt::print("{}: {}\n", msgno, message);
 }
 
+template<typename T>
+void test(T) = delete;
+
 int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, 0x010203 AS binary", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f);
+        vector<byte> bin{ byte{4}, byte{5}, byte{6} };
+
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, ? AS binary", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f, bin);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);
