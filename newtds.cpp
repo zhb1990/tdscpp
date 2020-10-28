@@ -1493,27 +1493,63 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
     bufsize = sizeof(tds_all_headers) + sizeof(uint16_t) + (name.length() * sizeof(uint16_t)) + sizeof(uint16_t);
 
     for (const auto& p : params) {
-        if (is_fixed_len_type(p.type))
-            bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
-        else if (is_byte_len_type(p.type)) {
-            bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
+        switch (p.type) {
+            case tds_sql_type::SQL_NULL:
+            case tds_sql_type::TINYINT:
+            case tds_sql_type::BIT:
+            case tds_sql_type::SMALLINT:
+            case tds_sql_type::INT:
+            case tds_sql_type::DATETIM4:
+            case tds_sql_type::REAL:
+            case tds_sql_type::MONEY:
+            case tds_sql_type::DATETIME:
+            case tds_sql_type::FLOAT:
+            case tds_sql_type::SMALLMONEY:
+            case tds_sql_type::BIGINT:
+                bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
+                break;
 
-            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN ||
-                p.type == tds_sql_type::DATETIME2N || p.type == tds_sql_type::DATETIMEOFFSETN) {
-                bufsize += sizeof(uint8_t);
-            }
-        } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
-            if (!p.is_null && p.val.length() > 8000) // MAX
-                bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
-            else
-                bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
-        } else if (p.type == tds_sql_type::VARBINARY) {
-            if (!p.is_null && p.val.length() > 8000) // MAX
-                bufsize += sizeof(tds_VARBINARY_MAX_param) + p.val.length() + sizeof(uint32_t);
-            else
-                bufsize += sizeof(tds_VARBINARY_param) + (p.is_null ? 0 : p.val.length());
-        } else
-            throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+            case tds_sql_type::UNIQUEIDENTIFIER:
+            case tds_sql_type::INTN:
+            case tds_sql_type::DECIMAL:
+            case tds_sql_type::NUMERIC:
+            case tds_sql_type::BITN:
+            case tds_sql_type::FLTN:
+            case tds_sql_type::MONEYN:
+            case tds_sql_type::DATETIMN:
+            case tds_sql_type::DATEN:
+            case tds_sql_type::TIMEN:
+            case tds_sql_type::DATETIME2N:
+            case tds_sql_type::DATETIMEOFFSETN:
+                bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
+
+                if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN || p.type == tds_sql_type::TIMEN ||
+                    p.type == tds_sql_type::DATETIME2N || p.type == tds_sql_type::DATETIMEOFFSETN) {
+                    bufsize += sizeof(uint8_t);
+                }
+
+                break;
+
+            case tds_sql_type::NVARCHAR:
+            case tds_sql_type::VARCHAR:
+                if (!p.is_null && p.val.length() > 8000) // MAX
+                    bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
+                else
+                    bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
+
+                break;
+
+            case tds_sql_type::VARBINARY:
+                if (!p.is_null && p.val.length() > 8000) // MAX
+                    bufsize += sizeof(tds_VARBINARY_MAX_param) + p.val.length() + sizeof(uint32_t);
+                else
+                    bufsize += sizeof(tds_VARBINARY_param) + (p.is_null ? 0 : p.val.length());
+
+                break;
+
+            default:
+                throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+        }
     }
 
     vector<uint8_t> buf(bufsize);
