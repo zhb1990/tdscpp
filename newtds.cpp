@@ -1855,11 +1855,13 @@ string query::create_params_string(unsigned int num, T&& t) {
             return s + "NVARCHAR(MAX)";
         else
             return s + "NVARCHAR(" + to_string(len == 0 ? 1 : len) + ")";
-    } else
-        throw runtime_error("Unable to get SQL type from parameter.");
-    // FIXME - other types
+    } else {
+        []<bool flag = false>() {
+            static_assert(flag, "Unable to get SQL type from parameter.");
+        }();
+    }
 
-    // FIXME - why doesn't static assert work here?
+    // FIXME - other types
 }
 
 static void show_msg(const string_view& server, const string_view& message, const string_view& proc_name,
