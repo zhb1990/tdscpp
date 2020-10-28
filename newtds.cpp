@@ -1582,107 +1582,165 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
         ptr += sizeof(tds_param_header);
 
-        if (is_fixed_len_type(p.type)) {
-            memcpy(ptr, p.val.data(), p.val.length());
+        switch (p.type) {
+            case tds_sql_type::SQL_NULL:
+            case tds_sql_type::TINYINT:
+            case tds_sql_type::BIT:
+            case tds_sql_type::SMALLINT:
+            case tds_sql_type::INT:
+            case tds_sql_type::DATETIM4:
+            case tds_sql_type::REAL:
+            case tds_sql_type::MONEY:
+            case tds_sql_type::DATETIME:
+            case tds_sql_type::FLOAT:
+            case tds_sql_type::SMALLMONEY:
+            case tds_sql_type::BIGINT:
+                memcpy(ptr, p.val.data(), p.val.length());
 
-            ptr += p.val.length();
-        } else if (is_byte_len_type(p.type)) {
-            if (p.type == tds_sql_type::INTN || p.type == tds_sql_type::FLTN) {
+                ptr += p.val.length();
+
+                break;
+
+            case tds_sql_type::INTN:
+            case tds_sql_type::FLTN:
                 *ptr = p.val.length();
                 ptr++;
-            } else if (p.type == tds_sql_type::TIMEN || p.type == tds_sql_type::DATETIME2N || p.type == tds_sql_type::DATETIMEOFFSETN) {
+
+                if (p.is_null) {
+                    *ptr = 0;
+                    ptr++;
+                } else {
+                    *ptr = p.val.length(); ptr++;
+                    memcpy(ptr, p.val.data(), p.val.length());
+                    ptr += p.val.length();
+                }
+
+                break;
+
+            case tds_sql_type::TIMEN:
+            case tds_sql_type::DATETIME2N:
+            case tds_sql_type::DATETIMEOFFSETN:
                 *ptr = p.max_length;
                 ptr++;
+
+                if (p.is_null) {
+                    *ptr = 0;
+                    ptr++;
+                } else {
+                    *ptr = p.val.length(); ptr++;
+                    memcpy(ptr, p.val.data(), p.val.length());
+                    ptr += p.val.length();
+                }
+
+                break;
+
+            case tds_sql_type::UNIQUEIDENTIFIER:
+            case tds_sql_type::DECIMAL:
+            case tds_sql_type::NUMERIC:
+            case tds_sql_type::BITN:
+            case tds_sql_type::MONEYN:
+            case tds_sql_type::DATETIMN:
+            case tds_sql_type::DATEN:
+                if (p.is_null) {
+                    *ptr = 0;
+                    ptr++;
+                } else {
+                    *ptr = p.val.length(); ptr++;
+                    memcpy(ptr, p.val.data(), p.val.length());
+                    ptr += p.val.length();
+                }
+
+                break;
+
+            case tds_sql_type::NVARCHAR:
+            case tds_sql_type::VARCHAR:
+            {
+                auto h2 = (tds_VARCHAR_param*)h;
+
+                if (p.is_null || p.val.empty())
+                    h2->max_length = sizeof(char16_t);
+                else if (p.val.length() > 8000) // MAX
+                    h2->max_length = 0xffff;
+                else
+                    h2->max_length = p.val.length();
+
+                h2->collation.lcid = 0x0409; // en-US
+                h2->collation.ignore_case = 1;
+                h2->collation.ignore_accent = 0;
+                h2->collation.ignore_width = 1;
+                h2->collation.ignore_kana = 1;
+                h2->collation.binary = 0;
+                h2->collation.binary2 = 0;
+                h2->collation.utf8 = 0;
+                h2->collation.reserved = 0;
+                h2->collation.version = 0;
+                h2->collation.sort_id = 52; // nocase.iso
+
+                if (!p.is_null && p.val.length() > 8000) { // MAX
+                    auto h3 = (tds_VARCHAR_MAX_param*)h2;
+
+                    h3->length = p.val.length();
+                    h3->chunk_length = p.val.length();
+
+                    ptr += sizeof(tds_VARCHAR_MAX_param) - sizeof(tds_param_header);
+
+                    memcpy(ptr, p.val.data(), p.val.length());
+                    ptr += p.val.length();
+
+                    *(uint32_t*)ptr = 0; // last chunk
+                    ptr += sizeof(uint32_t);
+                } else {
+                    h2->length = p.is_null ? 0 : p.val.length();
+
+                    ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
+
+                    if (!p.is_null) {
+                        memcpy(ptr, p.val.data(), h2->length);
+                        ptr += h2->length;
+                    }
+                }
+
+                break;
             }
 
-            if (p.is_null) {
-                *ptr = 0;
-                ptr++;
-            } else {
-                *ptr = p.val.length(); ptr++;
-                memcpy(ptr, p.val.data(), p.val.length());
-                ptr += p.val.length();
-            }
-        } else if (p.type == tds_sql_type::NVARCHAR || p.type == tds_sql_type::VARCHAR) {
-            auto h2 = (tds_VARCHAR_param*)h;
+            case tds_sql_type::VARBINARY: {
+                auto h2 = (tds_VARBINARY_param*)h;
 
-            if (p.is_null || p.val.empty())
-                h2->max_length = sizeof(char16_t);
-            else if (p.val.length() > 8000) // MAX
-                h2->max_length = 0xffff;
-            else
-                h2->max_length = p.val.length();
+                if (p.is_null || p.val.empty())
+                    h2->max_length = 1;
+                else if (p.val.length() > 8000) // MAX
+                    h2->max_length = 0xffff;
+                else
+                    h2->max_length = p.val.length();
 
-            h2->collation.lcid = 0x0409; // en-US
-            h2->collation.ignore_case = 1;
-            h2->collation.ignore_accent = 0;
-            h2->collation.ignore_width = 1;
-            h2->collation.ignore_kana = 1;
-            h2->collation.binary = 0;
-            h2->collation.binary2 = 0;
-            h2->collation.utf8 = 0;
-            h2->collation.reserved = 0;
-            h2->collation.version = 0;
-            h2->collation.sort_id = 52; // nocase.iso
+                if (!p.is_null && p.val.length() > 8000) { // MAX
+                    auto h3 = (tds_VARBINARY_MAX_param*)h2;
 
-            if (!p.is_null && p.val.length() > 8000) { // MAX
-                auto h3 = (tds_VARCHAR_MAX_param*)h2;
+                    h3->length = p.val.length();
+                    h3->chunk_length = p.val.length();
 
-                h3->length = p.val.length();
-                h3->chunk_length = p.val.length();
+                    ptr += sizeof(tds_VARBINARY_MAX_param) - sizeof(tds_param_header);
 
-                ptr += sizeof(tds_VARCHAR_MAX_param) - sizeof(tds_param_header);
+                    memcpy(ptr, p.val.data(), p.val.length());
+                    ptr += p.val.length();
 
-                memcpy(ptr, p.val.data(), p.val.length());
-                ptr += p.val.length();
+                    *(uint32_t*)ptr = 0; // last chunk
+                    ptr += sizeof(uint32_t);
+                } else {
+                    h2->length = p.is_null ? 0 : p.val.length();
 
-                *(uint32_t*)ptr = 0; // last chunk
-                ptr += sizeof(uint32_t);
-            } else {
-                h2->length = p.is_null ? 0 : p.val.length();
+                    ptr += sizeof(tds_VARBINARY_param) - sizeof(tds_param_header);
 
-                ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
-
-                if (!p.is_null) {
-                    memcpy(ptr, p.val.data(), h2->length);
-                    ptr += h2->length;
+                    if (!p.is_null) {
+                        memcpy(ptr, p.val.data(), h2->length);
+                        ptr += h2->length;
+                    }
                 }
             }
-        } else if (p.type == tds_sql_type::VARBINARY) {
-            auto h2 = (tds_VARBINARY_param*)h;
 
-            if (p.is_null || p.val.empty())
-                h2->max_length = 1;
-            else if (p.val.length() > 8000) // MAX
-                h2->max_length = 0xffff;
-            else
-                h2->max_length = p.val.length();
-
-            if (!p.is_null && p.val.length() > 8000) { // MAX
-                auto h3 = (tds_VARBINARY_MAX_param*)h2;
-
-                h3->length = p.val.length();
-                h3->chunk_length = p.val.length();
-
-                ptr += sizeof(tds_VARBINARY_MAX_param) - sizeof(tds_param_header);
-
-                memcpy(ptr, p.val.data(), p.val.length());
-                ptr += p.val.length();
-
-                *(uint32_t*)ptr = 0; // last chunk
-                ptr += sizeof(uint32_t);
-            } else {
-                h2->length = p.is_null ? 0 : p.val.length();
-
-                ptr += sizeof(tds_VARBINARY_param) - sizeof(tds_param_header);
-
-                if (!p.is_null) {
-                    memcpy(ptr, p.val.data(), h2->length);
-                    ptr += h2->length;
-                }
-            }
-        } else
-            throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+            default:
+                throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+        }
     }
 
     conn.send_msg(tds_msg::rpc, buf);
