@@ -1262,6 +1262,17 @@ struct fmt::formatter<tds_param> {
 
                 return format_to(ctx.out(), "{}", dt);
             }
+
+            case tds_sql_type::DATETIME: {
+                auto v = *(int32_t*)p.val.data();
+                auto secs = *(uint32_t*)(p.val.data() + sizeof(int32_t));
+
+                secs /= 300;
+
+                tds_datetime dt(v, secs);
+
+                return format_to(ctx.out(), "{}", dt);
+            }
         }
 
         throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
@@ -2014,7 +2025,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi", 42, "Hello", tds_datetime{2020, 10, 28, 10, 6, 53}, 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, GETDATE() AS now, ? AS pi", 42, "Hello", 3.1415926f);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);
