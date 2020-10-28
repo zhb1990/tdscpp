@@ -5,6 +5,7 @@
 #include <list>
 #include <span>
 #include <map>
+#include <charconv>
 #include <fmt/format.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -1241,6 +1242,143 @@ tds_param::operator u16string() const {
         return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
 }
 
+tds_param::operator int64_t() const {
+    if (is_null)
+        return 0;
+
+    switch (type) {
+        case tds_sql_type::TINYINT:
+            return *(uint8_t*)val.data();
+
+        case tds_sql_type::SMALLINT:
+            return *(int16_t*)val.data();
+
+        case tds_sql_type::INT:
+            return *(int32_t*)val.data();
+
+        case tds_sql_type::BIGINT:
+            return *(int64_t*)val.data();
+
+        case tds_sql_type::INTN:
+            switch (val.length()) {
+                case 1:
+                    return *(uint8_t*)val.data();
+
+                case 2:
+                    return *(int16_t*)val.data();
+
+                case 4:
+                    return *(int32_t*)val.data();
+
+                case 8:
+                    return *(int64_t*)val.data();
+
+                default:
+                    throw formatted_error(FMT_STRING("INTN has unexpected length {}."), val.length());
+            }
+
+        case tds_sql_type::REAL:
+            return (int64_t)*(float*)val.data();
+
+        case tds_sql_type::FLOAT:
+            return (int64_t)*(double*)val.data();
+
+        case tds_sql_type::FLTN:
+            switch (val.length()) {
+                case sizeof(float):
+                    return (int64_t)*(float*)val.data();
+
+                case sizeof(double):
+                    return (int64_t)*(double*)val.data();
+
+                default:
+                    throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), val.length());
+            }
+
+        case tds_sql_type::BITN:
+            return val[0] != 0 ? 1 : 0;
+
+        case tds_sql_type::VARCHAR:
+        case tds_sql_type::CHAR:
+        {
+            if (val.empty())
+                return 0;
+
+            bool first = true;
+
+            for (auto c : val) {
+                if (c == '-') {
+                    if (!first)
+                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), val);
+                } else if (c < '0' || c > '9')
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), val);
+
+                first = false;
+            }
+
+            int64_t res;
+
+            auto [p, ec] = from_chars(val.data(), val.data() + val.length(), res);
+
+            if (ec == errc::invalid_argument)
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), val);
+            else if (ec == errc::result_out_of_range)
+                throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT."), val);
+
+            return res;
+        }
+
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::NCHAR:
+        {
+            if (val.empty())
+                return 0;
+
+            u16string_view v((char16_t*)val.data(), val.length() / sizeof(char16_t));
+            string s;
+
+            s.reserve(v.length());
+
+            bool first = true;
+
+            for (auto c : v) {
+                if (c == u'-') {
+                    if (!first)
+                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), utf16_to_utf8(v));
+                } else if (c < u'0' || c > u'9')
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), utf16_to_utf8(v));
+
+                s += (char)c;
+                first = false;
+            }
+
+            int64_t res;
+
+            auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
+
+            if (ec == errc::invalid_argument)
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), s);
+            else if (ec == errc::result_out_of_range)
+                throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT."), s);
+
+            return res;
+        }
+
+        case tds_sql_type::DATETIME:
+            return *(int32_t*)val.data(); // MSSQL adds 1 if after midday
+
+        case tds_sql_type::DATETIMN:
+            return *(uint16_t*)val.data(); // MSSQL adds 1 if after midday
+
+        // MSSQL doesn't allow conversion to INT for DATE, TIME, DATETIME2, or DATETIMEOFFSET
+
+        // Not allowing VARBINARY even though MSSQL does
+
+        default:
+            throw formatted_error(FMT_STRING("Cannot convert {} to integer."), type);
+    }
+}
+
 template<>
 struct fmt::formatter<tds_param> {
     constexpr auto parse(format_parse_context& ctx) {
@@ -2371,9 +2509,6 @@ static void show_msg(const string_view&, const string_view& message, const strin
     else
         fmt::print("{}: {}\n", msgno, message);
 }
-
-template<typename T>
-void test(T) = delete;
 
 int main() {
     try {
