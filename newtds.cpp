@@ -1361,6 +1361,16 @@ struct fmt::formatter<tds_param> {
 
                 return format_to(ctx.out(), "{}", dto);
             }
+
+            case tds_sql_type::VARBINARY: {
+                string s = "0x";
+
+                for (auto c : p.val) {
+                    s += fmt::format(FMT_STRING("{:02x}"), (uint8_t)c);
+                }
+
+                return format_to(ctx.out(), "{}", s);
+            }
         }
 
         throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
@@ -1713,8 +1723,6 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                     } else if (is_byte_len_type(c.type)) {
                         // nop
                     } else if (c.type == tds_sql_type::VARCHAR || c.type == tds_sql_type::NVARCHAR) {
-                        // FIXME - handle MAX
-
                         if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
                             throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
 
@@ -1722,6 +1730,14 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
                         len += sizeof(uint16_t) + sizeof(tds_collation);
                         sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                    } else if (c.type == tds_sql_type::VARBINARY) {
+                        if (sv2.length() < sizeof(uint16_t))
+                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t));
+
+                        col.max_length = *(uint16_t*)sv2.data();
+
+                        len += sizeof(uint16_t);
+                        sv2 = sv2.substr(sizeof(uint16_t));
                     } else
                         throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
 
@@ -1905,7 +1921,7 @@ void rpc::handle_row_col(tds_param& col, enum tds_sql_type type, string_view& sv
 
         memcpy(col.val.data(), sv.data(), len);
         sv = sv.substr(len);
-    } else if (type == tds_sql_type::VARCHAR || type == tds_sql_type::NVARCHAR) {
+    } else if (type == tds_sql_type::VARCHAR || type == tds_sql_type::NVARCHAR || type == tds_sql_type::VARBINARY) {
         if (col.max_length == 0xffff) {
             if (sv.length() < sizeof(uint64_t))
                 throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
@@ -2118,7 +2134,7 @@ int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
 
-        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f);
+        query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, 0x010203 AS binary", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f);
 
         for (size_t i = 0; i < sq.num_columns(); i++) {
             fmt::print("{}\t", sq[i].name);
