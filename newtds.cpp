@@ -1236,6 +1236,13 @@ tds_param::operator string() const {
     return fmt::format(FMT_STRING("{}"), *this);
 }
 
+tds_param::operator u16string() const {
+    if (type == tds_sql_type::NVARCHAR || type == tds_sql_type::NCHAR)
+        return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
+    else
+        return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
+}
+
 template<>
 struct fmt::formatter<tds_param> {
     constexpr auto parse(format_parse_context& ctx) {
