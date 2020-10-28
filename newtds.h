@@ -474,7 +474,7 @@ public:
 
 private:
     void do_rpc(tds& conn, const std::u16string_view& name);
-    void handle_row_col(tds_param& col, enum tds_sql_type type, std::string_view& sv);
+    void handle_row_col(tds_param& col, enum tds_sql_type type, unsigned int max_length, std::string_view& sv);
 
     std::vector<tds_param> params;
     std::map<unsigned int, tds_param*> output_params;

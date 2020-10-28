@@ -1814,7 +1814,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                 for (unsigned int i = 0; i < row.size(); i++) {
                     auto& col = row[i];
 
-                    handle_row_col(col, cols[i].type, sv);
+                    handle_row_col(col, cols[i].type, cols[i].max_length, sv);
                 }
 
                 rows.push_back(row);
@@ -1855,7 +1855,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                     if (bsv & 1) // NULL
                         col.is_null = true;
                     else
-                        handle_row_col(col, cols[i].type, sv);
+                        handle_row_col(col, cols[i].type, cols[i].max_length, sv);
                 }
 
                 rows.push_back(row);
@@ -1893,7 +1893,7 @@ bool rpc::fetch_row() {
     return false;
 }
 
-void rpc::handle_row_col(tds_param& col, enum tds_sql_type type, string_view& sv) {
+void rpc::handle_row_col(tds_param& col, enum tds_sql_type type, unsigned int max_length, string_view& sv) {
     if (is_fixed_len_type(type)) {
         auto len = fixed_len_size(type);
 
@@ -1922,7 +1922,7 @@ void rpc::handle_row_col(tds_param& col, enum tds_sql_type type, string_view& sv
         memcpy(col.val.data(), sv.data(), len);
         sv = sv.substr(len);
     } else if (type == tds_sql_type::VARCHAR || type == tds_sql_type::NVARCHAR || type == tds_sql_type::VARBINARY) {
-        if (col.max_length == 0xffff) {
+        if (max_length == 0xffff) {
             if (sv.length() < sizeof(uint64_t))
                 throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
 
