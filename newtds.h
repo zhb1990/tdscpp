@@ -436,6 +436,8 @@ public:
     tds_param(bool b);
     tds_param(const std::optional<bool>& b);
 
+    operator std::string() const;
+
     enum tds_sql_type type;
     std::string val;
     bool is_null = false;
@@ -446,6 +448,10 @@ public:
 class tds_column : public tds_param {
 public:
     std::string name;
+
+    operator std::string() const {
+        return (std::string)static_cast<tds_param>(*this);
+    }
 };
 
 

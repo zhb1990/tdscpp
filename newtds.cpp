@@ -1232,6 +1232,10 @@ tds_param::tds_param(const optional<bool>& b) {
         is_null = true;
 }
 
+tds_param::operator string() const {
+    return fmt::format(FMT_STRING("{}"), *this);
+}
+
 template<>
 struct fmt::formatter<tds_param> {
     constexpr auto parse(format_parse_context& ctx) {
