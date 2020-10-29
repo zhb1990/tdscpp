@@ -1671,7 +1671,79 @@ tds_value::operator tds_time() const {
         return tds_time{0, 0, 0};
 
     switch (type) {
-        // FIXME - VARCHAR
+        case tds_sql_type::VARCHAR:
+        case tds_sql_type::CHAR:
+        {
+            uint8_t h, m, s;
+
+            auto t = string_view(val);
+
+            // remove leading whitespace
+
+            while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
+                t = t.substr(1, t.length() - 1);
+            }
+
+            // remove trailing whitespace
+
+            while (!t.empty() && (t.back() == ' ' || t.back() == '\t')) {
+                t = t.substr(0, t.length() - 1);
+            }
+
+            if (t.empty())
+                return tds_time{0, 0, 0};
+
+            cmatch rm;
+            static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?$");
+            static const regex r2("^([0-9]{1,2}):([0-9]{1,2})$");
+            static const regex r3("^([0-9]{1,2})( *)([AaPp])[Mm]$");
+            static const regex r4("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]$");
+            static const regex r5("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]$");
+
+            if (regex_match(t.begin(), t.end(), rm, r1)) { // hh:mm:ss.s
+                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
+            } else if (regex_match(t.begin(), t.end(), rm, r2)) { // hh:mm
+                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+                s = 0;
+            } else if (regex_match(t.begin(), t.end(), rm, r3)) { // hh am
+                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+                m = 0;
+                s = 0;
+
+                auto ap = rm[3].str().front();
+
+                if (ap == 'P' || ap == 'p')
+                    h += 12;
+            } else if (regex_match(t.begin(), t.end(), rm, r4)) { // hh:mm:ss.s am
+                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
+
+                auto ap = rm[7].str().front();
+
+                if (ap == 'P' || ap == 'p')
+                    h += 12;
+            } else if (regex_match(t.begin(), t.end(), rm, r5)) { // hh:mm am
+                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+                s = 0;
+
+                auto ap = rm[4].str().front();
+
+                if (ap == 'P' || ap == 'p')
+                    h += 12;
+            } else
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), val);
+
+            if (h >= 60 || m >= 60 || s >= 60)
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), val);
+
+            return tds_time{h, m, s};
+        }
+
         // FIXME - NVARCHAR
 
         case tds_sql_type::TIMEN: {
@@ -3011,6 +3083,26 @@ static void show_msg(const string_view&, const string_view& message, const strin
 int main() {
     try {
         tds n(db_server, db_port, db_user, db_password, show_msg);
+
+#if 0
+        fmt::print("{}\n", (tds_date)tds_value("2020-10-29"));
+        fmt::print("{}\n", (tds_date)tds_value("29/10/2020"));
+        fmt::print("{}\n", (tds_date)tds_value("29/10/20"));
+        fmt::print("{}\n", (tds_date)tds_value("29/Oct/2020"));
+        fmt::print("{}\n", (tds_date)tds_value("29/Oct/20"));
+        fmt::print("{}\n", (tds_date)tds_value("Oct 29, 2020"));
+        fmt::print("{}\n", (tds_date)tds_value("Oct 2020"));
+        fmt::print("{}\n", (tds_date)tds_value("2000-02-29"));
+
+        fmt::print("{}\n", (tds_time)tds_value("01:23:45.0"));
+        fmt::print("{}\n", (tds_time)tds_value("01:23:45"));
+        fmt::print("{}\n", (tds_time)tds_value("01:23"));
+        fmt::print("{}\n", (tds_time)tds_value("1AM"));
+        fmt::print("{}\n", (tds_time)tds_value("2 pm"));
+        fmt::print("{}\n", (tds_time)tds_value("2:56:34.0 pm"));
+        fmt::print("{}\n", (tds_time)tds_value("2:56:34 pm"));
+        fmt::print("{}\n", (tds_time)tds_value("2:56 pm"));
+#endif
 
         query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, ? AS test", 42, "Hello", tds_datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f, true);
 
