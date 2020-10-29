@@ -1648,6 +1648,63 @@ tds_value::operator tds_date() const {
     }
 }
 
+tds_value::operator tds_time() const {
+    if (is_null)
+        return tds_time{0, 0, 0};
+
+    switch (type) {
+        // FIXME - VARCHAR
+        // FIXME - NVARCHAR
+
+        case tds_sql_type::TIMEN: {
+            uint64_t secs = 0;
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            return tds_time{(uint32_t)secs};
+        }
+
+        case tds_sql_type::DATETIME:
+            return tds_time{*(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
+
+        case tds_sql_type::DATETIMN:
+            return tds_time{(uint32_t)(*(uint16_t*)(val.data() + sizeof(uint16_t)) * 60)};
+
+        case tds_sql_type::DATETIME2N: {
+            uint64_t secs = 0;
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 3));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            return tds_time{(uint32_t)secs};
+        }
+
+        case tds_sql_type::DATETIMEOFFSETN: {
+            uint64_t secs = 0;
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 5));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            return tds_time{(uint32_t)secs};
+        }
+
+        // MSSQL doesn't allow conversion to TIME for integers, floats, BITs, or DATE
+
+        default:
+            throw formatted_error(FMT_STRING("Cannot convert {} to time."), type);
+    }
+}
+
 tds_value::operator double() const {
     if (is_null)
         return 0;
