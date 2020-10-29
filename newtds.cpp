@@ -1379,6 +1379,121 @@ tds_value::operator int64_t() const {
     }
 }
 
+tds_value::operator double() const {
+    if (is_null)
+        return 0;
+
+    switch (type) {
+        case tds_sql_type::TINYINT:
+        case tds_sql_type::SMALLINT:
+        case tds_sql_type::INT:
+        case tds_sql_type::BIGINT:
+        case tds_sql_type::INTN:
+        case tds_sql_type::BITN:
+            return (double)operator int64_t();
+
+        case tds_sql_type::REAL:
+            return *(float*)val.data();
+
+        case tds_sql_type::FLOAT:
+            return *(double*)val.data();
+
+        case tds_sql_type::FLTN:
+            switch (val.length()) {
+                case sizeof(float):
+                    return *(float*)val.data();
+
+                case sizeof(double):
+                    return *(double*)val.data();
+
+                default:
+                    throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), val.length());
+            }
+
+        case tds_sql_type::VARCHAR:
+        case tds_sql_type::CHAR:
+        {
+            if (val.empty())
+                return 0.0;
+
+            // from_chars not implemented for double yet on gcc
+#if 0
+            double res;
+
+            auto [p, ec] = from_chars(val.data(), val.data() + val.length(), res);
+
+            if (ec == errc::invalid_argument)
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), val);
+            else if (ec == errc::result_out_of_range)
+                throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), val);
+
+            return res;
+#else
+            try {
+                return stod(val);
+            } catch (...) {
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), val);
+            }
+#endif
+        }
+
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::NCHAR:
+        {
+            if (val.empty())
+                return 0.0;
+
+            u16string_view v((char16_t*)val.data(), val.length() / sizeof(char16_t));
+            string s;
+
+            s.reserve(v.length());
+
+            for (auto c : v) {
+                s += (char)c;
+            }
+
+            // from_chars not implemente for double yet on gcc
+#if 0
+            double res;
+
+            auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
+
+            if (ec == errc::invalid_argument)
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), s);
+            else if (ec == errc::result_out_of_range)
+                throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), s);
+
+            return res;
+#else
+            try {
+                return stod(s);
+            } catch (...) {
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), s);
+            }
+#endif
+        }
+
+        case tds_sql_type::DATETIME: {
+            auto d = *(int32_t*)val.data();
+            auto t = *(uint32_t*)(val.data() + sizeof(int32_t));
+
+            return (double)d + ((double)t / 25920000.0);
+        }
+
+        case tds_sql_type::DATETIMN: {
+            auto d = *(uint16_t*)val.data();
+            auto t = *(uint16_t*)(val.data() + sizeof(uint16_t));
+
+            return (double)d + ((double)t / 1440.0);
+        }
+
+        // MSSQL doesn't allow conversion to FLOAT for DATE, TIME, DATETIME2, DATETIMEOFFSET, or VARBINARY
+
+        default:
+            throw formatted_error(FMT_STRING("Cannot convert {} to float."), type);
+    }
+}
+
 template<>
 struct fmt::formatter<tds_value> {
     constexpr auto parse(format_parse_context& ctx) {

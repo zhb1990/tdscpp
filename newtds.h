@@ -438,6 +438,7 @@ public:
     operator std::string() const;
     operator std::u16string() const;
     operator int64_t() const;
+    operator double() const;
 
     enum tds_sql_type type;
     std::string val;
@@ -460,6 +461,10 @@ public:
 
     operator int64_t() const {
         return (int64_t)static_cast<tds_value>(*this);
+    }
+
+    operator double() const {
+        return (double)static_cast<tds_value>(*this);
     }
 };
 
