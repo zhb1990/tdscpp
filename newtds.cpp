@@ -1666,6 +1666,55 @@ tds_value::operator tds_date() const {
     }
 }
 
+static bool parse_time(const string_view& t, uint8_t& h, uint8_t& m, uint8_t& s) {
+    cmatch rm;
+    static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?$");
+    static const regex r2("^([0-9]{1,2}):([0-9]{1,2})$");
+    static const regex r3("^([0-9]{1,2})( *)([AaPp])[Mm]$");
+    static const regex r4("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]$");
+    static const regex r5("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]$");
+
+    if (regex_match(t.begin(), t.end(), rm, r1)) { // hh:mm:ss.s
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+        from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
+    } else if (regex_match(t.begin(), t.end(), rm, r2)) { // hh:mm
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+        from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+        s = 0;
+    } else if (regex_match(t.begin(), t.end(), rm, r3)) { // hh am
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+        m = 0;
+        s = 0;
+
+        auto ap = rm[3].str().front();
+
+        if (ap == 'P' || ap == 'p')
+            h += 12;
+    } else if (regex_match(t.begin(), t.end(), rm, r4)) { // hh:mm:ss.s am
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+        from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
+
+        auto ap = rm[7].str().front();
+
+        if (ap == 'P' || ap == 'p')
+            h += 12;
+    } else if (regex_match(t.begin(), t.end(), rm, r5)) { // hh:mm am
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
+        from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
+        s = 0;
+
+        auto ap = rm[4].str().front();
+
+        if (ap == 'P' || ap == 'p')
+            h += 12;
+    } else
+        return false;
+
+    return true;
+}
+
 tds_value::operator tds_time() const {
     if (is_null)
         return tds_time{0, 0, 0};
@@ -1693,58 +1742,47 @@ tds_value::operator tds_time() const {
             if (t.empty())
                 return tds_time{0, 0, 0};
 
-            cmatch rm;
-            static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?$");
-            static const regex r2("^([0-9]{1,2}):([0-9]{1,2})$");
-            static const regex r3("^([0-9]{1,2})( *)([AaPp])[Mm]$");
-            static const regex r4("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]$");
-            static const regex r5("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]$");
-
-            if (regex_match(t.begin(), t.end(), rm, r1)) { // hh:mm:ss.s
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
-                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
-            } else if (regex_match(t.begin(), t.end(), rm, r2)) { // hh:mm
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
-                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
-                s = 0;
-            } else if (regex_match(t.begin(), t.end(), rm, r3)) { // hh am
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
-                m = 0;
-                s = 0;
-
-                auto ap = rm[3].str().front();
-
-                if (ap == 'P' || ap == 'p')
-                    h += 12;
-            } else if (regex_match(t.begin(), t.end(), rm, r4)) { // hh:mm:ss.s am
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
-                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
-
-                auto ap = rm[7].str().front();
-
-                if (ap == 'P' || ap == 'p')
-                    h += 12;
-            } else if (regex_match(t.begin(), t.end(), rm, r5)) { // hh:mm am
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
-                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
-                s = 0;
-
-                auto ap = rm[4].str().front();
-
-                if (ap == 'P' || ap == 'p')
-                    h += 12;
-            } else
-                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), val);
-
-            if (h >= 60 || m >= 60 || s >= 60)
+            if (!parse_time(t, h, m, s) || h >= 60 || m >= 60 || s >= 60)
                 throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), val);
 
             return tds_time{h, m, s};
         }
 
-        // FIXME - NVARCHAR
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::NCHAR:
+        {
+            uint8_t h, m, s;
+
+            auto t = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
+
+            // remove leading whitespace
+
+            while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
+                t = t.substr(1, t.length() - 1);
+            }
+
+            // remove trailing whitespace
+
+            while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
+                t = t.substr(0, t.length() - 1);
+            }
+
+            if (t.empty())
+                return tds_time{0, 0, 0};
+
+            string t2;
+
+            t2.reserve(t.length());
+
+            for (auto c : t) {
+                t2 += (char)c;
+            }
+
+            if (!parse_time(t2, h, m, s) || h >= 60 || m >= 60 || s >= 60)
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), utf16_to_utf8(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t))));
+
+            return tds_time{h, m, s};
+        }
 
         case tds_sql_type::TIMEN: {
             uint64_t secs = 0;
