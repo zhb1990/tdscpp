@@ -1369,7 +1369,16 @@ tds_value::operator int64_t() const {
             return *(int32_t*)val.data(); // MSSQL adds 1 if after midday
 
         case tds_sql_type::DATETIMN:
-            return *(uint16_t*)val.data(); // MSSQL adds 1 if after midday
+            switch (val.length()) {
+                case 4:
+                    return *(uint16_t*)val.data(); // MSSQL adds 1 if after midday
+
+                case 8:
+                    return *(int32_t*)val.data(); // MSSQL adds 1 if after midday
+
+                default:
+                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+            }
 
         // MSSQL doesn't allow conversion to INT for DATE, TIME, DATETIME2, or DATETIMEOFFSET
 
@@ -1623,7 +1632,16 @@ tds_value::operator tds_date() const {
             return tds_date{*(int32_t*)val.data()};
 
         case tds_sql_type::DATETIMN:
-            return tds_date{*(uint16_t*)val.data()};
+            switch (val.length()) {
+                case 4:
+                    return tds_date{*(uint16_t*)val.data()};
+
+                case 8:
+                    return tds_date{*(int32_t*)val.data()};
+
+                default:
+                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+            }
 
         case tds_sql_type::DATETIME2N: {
             uint32_t n = 0;
@@ -1672,7 +1690,16 @@ tds_value::operator tds_time() const {
             return tds_time{*(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
 
         case tds_sql_type::DATETIMN:
-            return tds_time{(uint32_t)(*(uint16_t*)(val.data() + sizeof(uint16_t)) * 60)};
+            switch (val.length()) {
+                case 4:
+                    return tds_time{(uint32_t)(*(uint16_t*)(val.data() + sizeof(uint16_t)) * 60)};
+
+                case 8:
+                    return tds_time{*(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
+
+                default:
+                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+            }
 
         case tds_sql_type::DATETIME2N: {
             uint64_t secs = 0;
@@ -1806,12 +1833,25 @@ tds_value::operator double() const {
             return (double)d + ((double)t / 25920000.0);
         }
 
-        case tds_sql_type::DATETIMN: {
-            auto d = *(uint16_t*)val.data();
-            auto t = *(uint16_t*)(val.data() + sizeof(uint16_t));
+        case tds_sql_type::DATETIMN:
+            switch (val.length()) {
+                case 4: {
+                    auto d = *(uint16_t*)val.data();
+                    auto t = *(uint16_t*)(val.data() + sizeof(uint16_t));
 
-            return (double)d + ((double)t / 1440.0);
-        }
+                    return (double)d + ((double)t / 1440.0);
+                }
+
+                case 8: {
+                    auto d = *(int32_t*)val.data();
+                    auto t = *(uint32_t*)(val.data() + sizeof(int32_t));
+
+                    return (double)d + ((double)t / 25920000.0);
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+            }
 
         // MSSQL doesn't allow conversion to FLOAT for DATE, TIME, DATETIME2, DATETIMEOFFSET, or VARBINARY
 
@@ -1958,14 +1998,31 @@ struct fmt::formatter<tds_value> {
                 return format_to(ctx.out(), "{}", dt);
             }
 
-            case tds_sql_type::DATETIMN: { // SMALLDATETIME
-                auto v = *(uint16_t*)p.val.data();
-                auto mins = *(uint16_t*)(p.val.data() + sizeof(uint16_t));
+            case tds_sql_type::DATETIMN:
+                switch (p.val.length()) {
+                    case 4: {
+                        auto v = *(uint16_t*)p.val.data();
+                        auto mins = *(uint16_t*)(p.val.data() + sizeof(uint16_t));
 
-                tds_datetime dt(v, mins * 60);
+                        tds_datetime dt(v, mins * 60);
 
-                return format_to(ctx.out(), "{}", dt);
-            }
+                        return format_to(ctx.out(), "{}", dt);
+                    }
+
+                    case 8: {
+                        auto v = *(int32_t*)p.val.data();
+                        auto secs = *(uint32_t*)(p.val.data() + sizeof(int32_t));
+
+                        secs /= 300;
+
+                        tds_datetime dt(v, secs);
+
+                        return format_to(ctx.out(), "{}", dt);
+                    }
+
+                    default:
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), p.val.length());
+                }
 
             case tds_sql_type::DATETIMEOFFSETN: {
                 uint64_t secs = 0;
