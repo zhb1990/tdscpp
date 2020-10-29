@@ -1472,6 +1472,74 @@ static bool is_valid_date(uint16_t y, uint8_t m, uint8_t d) {
     return true;
 }
 
+static bool parse_date(const string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
+    cmatch rm;
+    static const regex r1("^([0-9]{4})([\\-/]?)([0-9]{2})([\\-/]?)([0-9]{2})$");
+    static const regex r2("^([0-9]{1,2})([\\-/]?)([0-9]{1,2})([\\-/]?)([0-9]{1,2})$");
+    static const regex r3("^([0-9]{1,2})([\\-/])([0-9]{1,2})([\\-/])([0-9]{4})$");
+    static const regex r4("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{4})$");
+    static const regex r5("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{2})$");
+    static const regex r6("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{4})$");
+    static const regex r7("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{2})$");
+    static const regex r8("^([A-Za-z]*)( ?)([0-9]{4})$");
+
+    // FIXME - allow option for American-style dates?
+
+    if (regex_match(s.begin(), s.end(), rm, r1)) { // ISO style
+        string s;
+
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
+        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), d);
+    } else if (regex_match(s.begin(), s.end(), rm, r2)) { // dd/mm/yy
+        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+
+        if (y >= 50)
+            y += 1900;
+        else
+            y += 2000;
+    } else if (regex_match(s.begin(), s.end(), rm, r3)) { // dd/mm/yyyy
+        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+    } else if (regex_match(s.begin(), s.end(), rm, r4)) { // dd/mon/yyyy
+        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+        m = parse_month_name(rm[3].str());
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+    } else if (regex_match(s.begin(), s.end(), rm, r5)) { // dd/mon/yy
+        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+        m = parse_month_name(rm[3].str());
+        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+
+        if (y >= 50)
+            y += 1900;
+        else
+            y += 2000;
+    } else if (regex_match(s.begin(), s.end(), rm, r6)) { // mon dd, yyyy
+        from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
+        m = parse_month_name(rm[1].str());
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+    } else if (regex_match(s.begin(), s.end(), rm, r7)) { // mon dd, yy
+        from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
+        m = parse_month_name(rm[1].str());
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+
+        if (y >= 50)
+            y += 1900;
+        else
+            y += 2000;
+    } else if (regex_match(s.begin(), s.end(), rm, r8)) { // mon yyyy
+        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
+        m = parse_month_name(rm[1].str());
+        d = 1;
+    } else
+        return false;
+
+    return true;
+}
+
 tds_value::operator tds_date() const {
     if (is_null)
         return tds_date{1900, 1, 1};
@@ -1482,8 +1550,6 @@ tds_value::operator tds_date() const {
         {
             uint16_t y;
             uint8_t m, d;
-
-            // FIXME - allow option for American-style dates?
 
             auto s = string_view(val);
 
@@ -1502,75 +1568,48 @@ tds_value::operator tds_date() const {
             if (s.empty())
                 return tds_date{1900, 1, 1};
 
-            cmatch rm;
-            static const regex r1("^([0-9]{4})([\\-/]?)([0-9]{2})([\\-/]?)([0-9]{2})$");
-            static const regex r2("^([0-9]{1,2})([\\-/]?)([0-9]{1,2})([\\-/]?)([0-9]{1,2})$");
-            static const regex r3("^([0-9]{1,2})([\\-/])([0-9]{1,2})([\\-/])([0-9]{4})$");
-            static const regex r4("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{4})$");
-            static const regex r5("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{2})$");
-            static const regex r6("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{4})$");
-            static const regex r7("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{2})$");
-            static const regex r8("^([A-Za-z]*)( ?)([0-9]{4})$");
-
-            if (regex_match(s.begin(), s.end(), rm, r1)) { // ISO style
-                string s;
-
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
-                from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), d);
-            } else if (regex_match(s.begin(), s.end(), rm, r2)) { // dd/mm/yy
-                from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-
-                if (y >= 50)
-                    y += 1900;
-                else
-                    y += 2000;
-            } else if (regex_match(s.begin(), s.end(), rm, r3)) { // dd/mm/yyyy
-                from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-            } else if (regex_match(s.begin(), s.end(), rm, r4)) { // dd/mon/yyyy
-                from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-                m = parse_month_name(rm[3].str());
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-            } else if (regex_match(s.begin(), s.end(), rm, r5)) { // dd/mon/yy
-                from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-                m = parse_month_name(rm[3].str());
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-
-                if (y >= 50)
-                    y += 1900;
-                else
-                    y += 2000;
-            } else if (regex_match(s.begin(), s.end(), rm, r6)) { // mon dd, yyyy
-                from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
-                m = parse_month_name(rm[1].str());
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-            } else if (regex_match(s.begin(), s.end(), rm, r7)) { // mon dd, yy
-                from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
-                m = parse_month_name(rm[1].str());
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-
-                if (y >= 50)
-                    y += 1900;
-                else
-                    y += 2000;
-            } else if (regex_match(s.begin(), s.end(), rm, r8)) { // mon yyyy
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
-                m = parse_month_name(rm[1].str());
-                d = 1;
-            } else
-                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date."), val);
-
-            if (!is_valid_date(y, m, d))
+            if (!parse_date(s, y, m, d) || !is_valid_date(y, m, d))
                 throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date."), val);
 
             return tds_date{y, m, d};
         }
 
-        // FIXME - NVARCHAR / NCHAR
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::NCHAR:
+        {
+            uint16_t y;
+            uint8_t m, d;
+
+            auto s = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
+
+            // remove leading whitespace
+
+            while (!s.empty() && (s.front() == u' ' || s.front() == u'\t')) {
+                s = s.substr(1, s.length() - 1);
+            }
+
+            // remove trailing whitespace
+
+            while (!s.empty() && (s.back() == u' ' || s.back() == u'\t')) {
+                s = s.substr(0, s.length() - 1);
+            }
+
+            if (s.empty())
+                return tds_date{1900, 1, 1};
+
+            string s2;
+
+            s2.reserve(s.length());
+
+            for (auto c : s) {
+                s2 += (char)c;
+            }
+
+            if (!parse_date(s2, y, m, d) || !is_valid_date(y, m, d))
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date."), utf16_to_utf8(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t))));
+
+            return tds_date{y, m, d};
+        }
 
         case tds_sql_type::DATEN: {
             uint32_t n = 0;
