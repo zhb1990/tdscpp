@@ -1379,6 +1379,51 @@ tds_value::operator int64_t() const {
     }
 }
 
+tds_value::operator tds_date() const {
+    if (is_null)
+        return tds_date{1, 1, 1};
+
+    switch (type) {
+        // FIXME - VARCHAR / CHAR
+        // FIXME - NVARCHAR / NCHAR
+
+        case tds_sql_type::DATEN: {
+            uint32_t n = 0;
+
+            memcpy(&n, val.data(), 3);
+
+            return tds_date{(int32_t)n - 693595};
+        }
+
+        case tds_sql_type::DATETIME:
+            return tds_date{*(int32_t*)val.data()};
+
+        case tds_sql_type::DATETIMN:
+            return tds_date{*(uint16_t*)val.data()};
+
+        case tds_sql_type::DATETIME2N: {
+            uint32_t n = 0;
+
+            memcpy(&n, val.data() + val.length() - 3, 3);
+
+            return tds_date{(int32_t)n - 693595};
+        }
+
+        case tds_sql_type::DATETIMEOFFSETN: {
+            uint32_t n = 0;
+
+            memcpy(&n, val.data() + val.length() - 5, 3);
+
+            return tds_date{(int32_t)n - 693595};
+        }
+
+        // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
+
+        default:
+            throw formatted_error(FMT_STRING("Cannot convert {} to date."), type);
+    }
+}
+
 tds_value::operator double() const {
     if (is_null)
         return 0;
