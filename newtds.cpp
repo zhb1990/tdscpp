@@ -138,17 +138,17 @@ struct fmt::formatter<enum tds_sql_type> {
             case tds_sql_type::INTN:
                 return format_to(ctx.out(), "INTN");
 
-            case tds_sql_type::DATEN:
-                return format_to(ctx.out(), "DATEN");
+            case tds_sql_type::DATE:
+                return format_to(ctx.out(), "DATE");
 
-            case tds_sql_type::TIMEN:
-                return format_to(ctx.out(), "TIMEN");
+            case tds_sql_type::TIME:
+                return format_to(ctx.out(), "TIME");
 
-            case tds_sql_type::DATETIME2N:
-                return format_to(ctx.out(), "DATETIME2N");
+            case tds_sql_type::DATETIME2:
+                return format_to(ctx.out(), "DATETIME2");
 
-            case tds_sql_type::DATETIMEOFFSETN:
-                return format_to(ctx.out(), "DATETIMEOFFSETN");
+            case tds_sql_type::DATETIMEOFFSET:
+                return format_to(ctx.out(), "DATETIMEOFFSET");
 
             case tds_sql_type::SQL_VARIANT:
                 return format_to(ctx.out(), "SQL_VARIANT");
@@ -262,10 +262,10 @@ static bool is_byte_len_type(enum tds_sql_type type) {
         case tds_sql_type::FLTN:
         case tds_sql_type::MONEYN:
         case tds_sql_type::DATETIMN:
-        case tds_sql_type::DATEN:
-        case tds_sql_type::TIMEN:
-        case tds_sql_type::DATETIME2N:
-        case tds_sql_type::DATETIMEOFFSETN:
+        case tds_sql_type::DATE:
+        case tds_sql_type::TIME:
+        case tds_sql_type::DATETIME2:
+        case tds_sql_type::DATETIMEOFFSET:
             return true;
 
         default:
@@ -1073,7 +1073,7 @@ tds_value::tds_value(const optional<double>& d) {
 tds_value::tds_value(const tds_date& d) {
     int32_t n;
 
-    type = tds_sql_type::DATEN;
+    type = tds_sql_type::DATE;
     val.resize(3);
 
     n = d.num + 693595;
@@ -1081,7 +1081,7 @@ tds_value::tds_value(const tds_date& d) {
 }
 
 tds_value::tds_value(const optional<tds_date>& d) {
-    type = tds_sql_type::DATEN;
+    type = tds_sql_type::DATE;
 
     if (!d.has_value())
         is_null = true;
@@ -1099,7 +1099,7 @@ tds_value::tds_value(const tds_time& t) {
     secs += (unsigned int)t.minute * 60;
     secs += t.second;
 
-    type = tds_sql_type::TIMEN;
+    type = tds_sql_type::TIME;
     max_length = 0; // TIME(0)
 
     val.resize(3);
@@ -1107,7 +1107,7 @@ tds_value::tds_value(const tds_time& t) {
 }
 
 tds_value::tds_value(const optional<tds_time>& t) {
-    type = tds_sql_type::TIMEN;
+    type = tds_sql_type::TIME;
     max_length = 0; // TIME(0)
 
     if (!t.has_value())
@@ -1128,7 +1128,7 @@ tds_value::tds_value(const tds_datetime& dt) {
     int32_t n;
     uint32_t secs;
 
-    type = tds_sql_type::DATETIME2N;
+    type = tds_sql_type::DATETIME2;
     val.resize(6);
     max_length = 0; // DATETIME2(0)
 
@@ -1143,7 +1143,7 @@ tds_value::tds_value(const tds_datetime& dt) {
 }
 
 tds_value::tds_value(const optional<tds_datetime>& dt) {
-    type = tds_sql_type::DATETIME2N;
+    type = tds_sql_type::DATETIME2;
     val.resize(6);
     max_length = 0; // DATETIME2(0)
 
@@ -1168,7 +1168,7 @@ tds_value::tds_value(const tds_datetimeoffset& dto) {
     int32_t n;
     uint32_t secs;
 
-    type = tds_sql_type::DATETIMEOFFSETN;
+    type = tds_sql_type::DATETIMEOFFSET;
     val.resize(8);
     max_length = 0; // DATETIMEOFFSET(0)
 
@@ -1185,7 +1185,7 @@ tds_value::tds_value(const tds_datetimeoffset& dto) {
 }
 
 tds_value::tds_value(const optional<tds_datetimeoffset>& dto) {
-    type = tds_sql_type::DATETIMEOFFSETN;
+    type = tds_sql_type::DATETIMEOFFSET;
     val.resize(8);
     max_length = 0; // DATETIMEOFFSET(0)
 
@@ -1620,7 +1620,7 @@ tds_value::operator tds_date() const {
             return tds_date{y, m, d};
         }
 
-        case tds_sql_type::DATEN: {
+        case tds_sql_type::DATE: {
             uint32_t n = 0;
 
             memcpy(&n, val.data(), 3);
@@ -1643,7 +1643,7 @@ tds_value::operator tds_date() const {
                     throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
             }
 
-        case tds_sql_type::DATETIME2N: {
+        case tds_sql_type::DATETIME2: {
             uint32_t n = 0;
 
             memcpy(&n, val.data() + val.length() - 3, 3);
@@ -1651,7 +1651,7 @@ tds_value::operator tds_date() const {
             return tds_date{(int32_t)n - 693595};
         }
 
-        case tds_sql_type::DATETIMEOFFSETN: {
+        case tds_sql_type::DATETIMEOFFSET: {
             uint32_t n = 0;
 
             memcpy(&n, val.data() + val.length() - 5, 3);
@@ -1784,7 +1784,7 @@ tds_value::operator tds_time() const {
             return tds_time{h, m, s};
         }
 
-        case tds_sql_type::TIMEN: {
+        case tds_sql_type::TIME: {
             uint64_t secs = 0;
 
             memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
@@ -1811,7 +1811,7 @@ tds_value::operator tds_time() const {
                     throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
             }
 
-        case tds_sql_type::DATETIME2N: {
+        case tds_sql_type::DATETIME2: {
             uint64_t secs = 0;
 
             memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 3));
@@ -1823,7 +1823,7 @@ tds_value::operator tds_time() const {
             return tds_time{(uint32_t)secs};
         }
 
-        case tds_sql_type::DATETIMEOFFSETN: {
+        case tds_sql_type::DATETIMEOFFSET: {
             uint64_t secs = 0;
 
             memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 5));
@@ -2054,7 +2054,7 @@ struct fmt::formatter<tds_value> {
                 }
             break;
 
-            case tds_sql_type::DATEN: {
+            case tds_sql_type::DATE: {
                 uint32_t v;
 
                 memcpy(&v, p.val.data(), 3);
@@ -2065,7 +2065,7 @@ struct fmt::formatter<tds_value> {
                 return format_to(ctx.out(), "{}", d);
             }
 
-            case tds_sql_type::TIMEN: {
+            case tds_sql_type::TIME: {
                 uint64_t secs = 0;
 
                 memcpy(&secs, p.val.data(), min(sizeof(uint64_t), p.val.length()));
@@ -2079,7 +2079,7 @@ struct fmt::formatter<tds_value> {
                 return format_to(ctx.out(), "{}", t);
             }
 
-            case tds_sql_type::DATETIME2N: {
+            case tds_sql_type::DATETIME2: {
                 uint64_t secs = 0;
                 uint32_t v;
 
@@ -2134,7 +2134,7 @@ struct fmt::formatter<tds_value> {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), p.val.length());
                 }
 
-            case tds_sql_type::DATETIMEOFFSETN: {
+            case tds_sql_type::DATETIMEOFFSET: {
                 uint64_t secs = 0;
                 uint32_t v;
 
@@ -2275,15 +2275,15 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
             case tds_sql_type::NUMERIC:
             case tds_sql_type::MONEYN:
             case tds_sql_type::DATETIMN:
-            case tds_sql_type::DATEN:
+            case tds_sql_type::DATE:
                 bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
                 break;
 
             case tds_sql_type::INTN:
             case tds_sql_type::FLTN:
-            case tds_sql_type::TIMEN:
-            case tds_sql_type::DATETIME2N:
-            case tds_sql_type::DATETIMEOFFSETN:
+            case tds_sql_type::TIME:
+            case tds_sql_type::DATETIME2:
+            case tds_sql_type::DATETIMEOFFSET:
             case tds_sql_type::BITN:
                 bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length()) + sizeof(uint8_t);
                 break;
@@ -2377,9 +2377,9 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
 
                 break;
 
-            case tds_sql_type::TIMEN:
-            case tds_sql_type::DATETIME2N:
-            case tds_sql_type::DATETIMEOFFSETN:
+            case tds_sql_type::TIME:
+            case tds_sql_type::DATETIME2:
+            case tds_sql_type::DATETIMEOFFSET:
                 *ptr = (uint8_t)p.max_length;
                 ptr++;
 
@@ -2400,7 +2400,7 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
             case tds_sql_type::NUMERIC:
             case tds_sql_type::MONEYN:
             case tds_sql_type::DATETIMN:
-            case tds_sql_type::DATEN:
+            case tds_sql_type::DATE:
                 if (p.is_null) {
                     *ptr = 0;
                     ptr++;
@@ -2633,16 +2633,16 @@ void rpc::do_rpc(tds& conn, const u16string_view& name) {
                         case tds_sql_type::DECIMAL:
                         case tds_sql_type::NUMERIC:
                         case tds_sql_type::MONEYN:
-                        case tds_sql_type::DATEN:
+                        case tds_sql_type::DATE:
                             // nop
                             break;
 
                         case tds_sql_type::INTN:
                         case tds_sql_type::FLTN:
-                        case tds_sql_type::TIMEN:
-                        case tds_sql_type::DATETIME2N:
+                        case tds_sql_type::TIME:
+                        case tds_sql_type::DATETIME2:
                         case tds_sql_type::DATETIMN:
-                        case tds_sql_type::DATETIMEOFFSETN:
+                        case tds_sql_type::DATETIMEOFFSET:
                         case tds_sql_type::BITN:
                             if (sv2.length() < sizeof(uint8_t))
                                 throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
@@ -2870,10 +2870,10 @@ void rpc::handle_row_col(tds_value& col, enum tds_sql_type type, unsigned int ma
         case tds_sql_type::FLTN:
         case tds_sql_type::MONEYN:
         case tds_sql_type::DATETIMN:
-        case tds_sql_type::DATEN:
-        case tds_sql_type::TIMEN:
-        case tds_sql_type::DATETIME2N:
-        case tds_sql_type::DATETIMEOFFSETN:
+        case tds_sql_type::DATE:
+        case tds_sql_type::TIME:
+        case tds_sql_type::DATETIME2:
+        case tds_sql_type::DATETIMEOFFSET:
         {
             if (sv.length() < sizeof(uint8_t))
                 throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
