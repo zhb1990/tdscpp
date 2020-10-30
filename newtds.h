@@ -57,6 +57,14 @@ namespace tds {
         tds(const std::string& server, uint16_t port, const std::string_view& user, const std::string_view& password,
             const msg_handler& message_handler = nullptr);
         ~tds();
+        void send_msg(enum tds_msg type, const std::string_view& msg);
+        void send_msg(enum tds_msg type, const std::span<uint8_t>& msg);
+        void wait_for_msg(enum tds_msg& type, std::string& payload);
+        void handle_info_msg(const std::string_view& sv, bool error);
+
+        msg_handler message_handler;
+
+    private:
         void connect(const std::string& server, uint16_t port);
         void send_prelogin_msg();
         void send_login_msg(const std::string_view& user, const std::string_view& password);
@@ -67,15 +75,9 @@ namespace tds {
                             const std::u16string_view& server_name, const std::u16string_view& interface_library,
                             const std::u16string_view& locale, const std::u16string_view& database, const std::u16string_view& attach_db,
                             const std::u16string_view& new_password);
-        void send_msg(enum tds_msg type, const std::string_view& msg);
-        void send_msg(enum tds_msg type, const std::span<uint8_t>& msg);
-        void wait_for_msg(enum tds_msg& type, std::string& payload);
         void handle_loginack_msg(std::string_view sv);
-        void handle_info_msg(const std::string_view& sv, bool error);
 
         int sock = 0;
-        std::list<std::pair<tds_token, std::string>> msgs;
-        msg_handler message_handler;
     };
 
     class date {
@@ -223,6 +225,12 @@ namespace tds {
             do_rpc(conn, name);
         }
 
+        bool fetch_row();
+
+        int32_t return_status = 0;
+        std::vector<column> cols;
+
+    private:
         template<typename T, typename... Args>
         void add_param(T&& t, Args&&... args) {
             add_param(t);
@@ -242,12 +250,6 @@ namespace tds {
             output_params[(unsigned int)(params.size() - 1)] = static_cast<value*>(&t);
         }
 
-        bool fetch_row();
-
-        int32_t return_status = 0;
-        std::vector<column> cols;
-
-    private:
         void do_rpc(tds& conn, const std::u16string_view& name);
         void handle_row_col(value& col, enum sql_type type, unsigned int max_length, std::string_view& sv);
 
@@ -281,4 +283,3 @@ namespace tds {
         std::unique_ptr<rpc> r2;
     };
 };
-
