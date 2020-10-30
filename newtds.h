@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fmt/format.h>
 #include <string>
 #include <span>
 #include <list>
@@ -7,6 +8,8 @@
 #include <optional>
 #include <vector>
 #include <map>
+
+enum class tds_msg : uint8_t; // FIXME
 
 namespace tds {
     enum class sql_type : uint8_t {
@@ -49,7 +52,7 @@ namespace tds {
     };
 
     using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
-                                        int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
+                                      int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
 
     // FIXME - use pimpl
     class tds {
@@ -250,6 +253,13 @@ namespace tds {
             output_params[(unsigned int)(params.size() - 1)] = static_cast<value*>(&t);
         }
 
+        template<typename T>
+        void add_param(std::vector<T>& v) {
+            for (const auto& t : v) {
+                params.emplace_back(t);
+            }
+        }
+
         void do_rpc(tds& conn, const std::u16string_view& name);
         void handle_row_col(value& col, enum sql_type type, unsigned int max_length, std::string_view& sv);
 
@@ -261,10 +271,18 @@ namespace tds {
 
     class query {
     public:
-        query(tds& conn, const std::string_view& q);
+        query(tds& conn, const std::string_view& q) {
+            do_query(conn, q);
+        }
 
         template<typename... Args>
-        query(tds& conn, const std::string_view& q, Args&&... args);
+        query(tds& conn, const std::string_view& q, Args&&... args) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_query(conn, q);
+        }
 
         uint16_t num_columns() const;
 
@@ -273,13 +291,277 @@ namespace tds {
         bool fetch_row();
 
     private:
+        void do_query(tds& conn, const std::string_view& q);
+
         template<typename T, typename... Args>
-        std::string create_params_string(unsigned int num, T&& t, Args&&... args);
+        void add_param(T&& t, Args&&... args) {
+            add_param(t);
+            add_param(args...);
+        }
 
         template<typename T>
-        std::string create_params_string(unsigned int num, T&& t);
+        void add_param(T&& t) {
+            params.emplace_back(t);
+        }
 
+        std::string create_params_string();
+
+        std::vector<value> params;
         std::vector<column> cols;
         std::unique_ptr<rpc> r2;
     };
+};
+
+template<>
+struct fmt::formatter<enum tds::sql_type> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(enum tds::sql_type t, format_context& ctx) {
+        switch (t) {
+            case tds::sql_type::IMAGE:
+                return format_to(ctx.out(), "IMAGE");
+
+            case tds::sql_type::TEXT:
+                return format_to(ctx.out(), "TEXT");
+
+            case tds::sql_type::UNIQUEIDENTIFIER:
+                return format_to(ctx.out(), "UNIQUEIDENTIFIER");
+
+            case tds::sql_type::INTN:
+                return format_to(ctx.out(), "INTN");
+
+            case tds::sql_type::DATE:
+                return format_to(ctx.out(), "DATE");
+
+            case tds::sql_type::TIME:
+                return format_to(ctx.out(), "TIME");
+
+            case tds::sql_type::DATETIME2:
+                return format_to(ctx.out(), "DATETIME2");
+
+            case tds::sql_type::DATETIMEOFFSET:
+                return format_to(ctx.out(), "DATETIMEOFFSET");
+
+            case tds::sql_type::SQL_VARIANT:
+                return format_to(ctx.out(), "SQL_VARIANT");
+
+            case tds::sql_type::NTEXT:
+                return format_to(ctx.out(), "NTEXT");
+
+            case tds::sql_type::BITN:
+                return format_to(ctx.out(), "BITN");
+
+            case tds::sql_type::DECIMAL:
+                return format_to(ctx.out(), "DECIMAL");
+
+            case tds::sql_type::NUMERIC:
+                return format_to(ctx.out(), "NUMERIC");
+
+            case tds::sql_type::FLTN:
+                return format_to(ctx.out(), "FLTN");
+
+            case tds::sql_type::MONEYN:
+                return format_to(ctx.out(), "MONEYN");
+
+            case tds::sql_type::DATETIMN:
+                return format_to(ctx.out(), "DATETIMN");
+
+            case tds::sql_type::VARBINARY:
+                return format_to(ctx.out(), "VARBINARY");
+
+            case tds::sql_type::VARCHAR:
+                return format_to(ctx.out(), "VARCHAR");
+
+            case tds::sql_type::BINARY:
+                return format_to(ctx.out(), "BINARY");
+
+            case tds::sql_type::CHAR:
+                return format_to(ctx.out(), "CHAR");
+
+            case tds::sql_type::NVARCHAR:
+                return format_to(ctx.out(), "NVARCHAR");
+
+            case tds::sql_type::NCHAR:
+                return format_to(ctx.out(), "NCHAR");
+
+            case tds::sql_type::UDT:
+                return format_to(ctx.out(), "UDT");
+
+            case tds::sql_type::XML:
+                return format_to(ctx.out(), "XML");
+
+            case tds::sql_type::SQL_NULL:
+                return format_to(ctx.out(), "NULL");
+
+            case tds::sql_type::TINYINT:
+                return format_to(ctx.out(), "TINYINT");
+
+            case tds::sql_type::BIT:
+                return format_to(ctx.out(), "BIT");
+
+            case tds::sql_type::SMALLINT:
+                return format_to(ctx.out(), "SMALLINT");
+
+            case tds::sql_type::INT:
+                return format_to(ctx.out(), "INT");
+
+            case tds::sql_type::DATETIM4:
+                return format_to(ctx.out(), "DATETIM4");
+
+            case tds::sql_type::REAL:
+                return format_to(ctx.out(), "REAL");
+
+            case tds::sql_type::MONEY:
+                return format_to(ctx.out(), "MONEY");
+
+            case tds::sql_type::DATETIME:
+                return format_to(ctx.out(), "DATETIME");
+
+            case tds::sql_type::FLOAT:
+                return format_to(ctx.out(), "FLOAT");
+
+            case tds::sql_type::SMALLMONEY:
+                return format_to(ctx.out(), "SMALLMONEY");
+
+            case tds::sql_type::BIGINT:
+                return format_to(ctx.out(), "BIGINT");
+
+            default:
+                return format_to(ctx.out(), "{:x}", (uint8_t)t);
+        }
+    }
+};
+
+template<>
+struct fmt::formatter<tds::date> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::date& d, format_context& ctx) {
+        return format_to(ctx.out(), "{:04}-{:02}-{:02}", d.year, d.month, d.day);
+    }
+};
+
+template<>
+struct fmt::formatter<tds::time> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::time& t, format_context& ctx) {
+        return format_to(ctx.out(), "{:02}:{:02}:{:02}", t.hour, t.minute, t.second);
+    }
+};
+
+template<>
+struct fmt::formatter<tds::datetime> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::datetime& dt, format_context& ctx) {
+        return format_to(ctx.out(), "{} {}", dt.d, dt.t);
+    }
+};
+
+template<>
+struct fmt::formatter<tds::datetimeoffset> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::datetimeoffset& dto, format_context& ctx) {
+        auto absoff = abs(dto.offset);
+
+        return format_to(ctx.out(), "{} {} {}{:02}:{:02}", dto.d, dto.t,
+                        dto.offset < 0 ? '-' : '+',
+                        absoff / 60, absoff % 60);
+    }
+};
+
+template<>
+struct fmt::formatter<tds::value> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::value& p, format_context& ctx) {
+        if (p.is_null)
+            return format_to(ctx.out(), "NULL");
+        else
+            return format_to(ctx.out(), "{}", (std::string)p);
+    }
+};
+
+template<typename T>
+struct fmt::formatter<tds::output_param<T>> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::output_param<T>& p, format_context& ctx) {
+        return format_to(ctx.out(), "{}", static_cast<tds::value>(p));
+    }
+};
+
+template<>
+struct fmt::formatter<tds::column> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::column& c, format_context& ctx) {
+        return format_to(ctx.out(), "{}", static_cast<tds::value>(c));
+    }
 };
