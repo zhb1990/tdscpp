@@ -1233,7 +1233,193 @@ tds_value::tds_value(const optional<bool>& b) {
 }
 
 tds_value::operator string() const {
-    return fmt::format(FMT_STRING("{}"), *this);
+    if (is_null)
+        return "";
+
+    switch (type) {
+        case tds_sql_type::TINYINT:
+            return fmt::format(FMT_STRING("{}"), *(uint8_t*)val.data());
+
+        case tds_sql_type::SMALLINT:
+            return fmt::format(FMT_STRING("{}"), *(int16_t*)val.data());
+
+        case tds_sql_type::INT:
+            return fmt::format(FMT_STRING("{}"), *(int32_t*)val.data());
+
+        case tds_sql_type::BIGINT:
+            return fmt::format(FMT_STRING("{}"), *(int64_t*)val.data());
+
+        case tds_sql_type::INTN:
+            switch (val.length()) {
+                case 1:
+                    return fmt::format(FMT_STRING("{}"), *(uint8_t*)val.data());
+
+                case 2:
+                    return fmt::format(FMT_STRING("{}"), *(int16_t*)val.data());
+
+                case 4:
+                    return fmt::format(FMT_STRING("{}"), *(int32_t*)val.data());
+
+                case 8:
+                    return fmt::format(FMT_STRING("{}"), *(int64_t*)val.data());
+
+                default:
+                    throw formatted_error(FMT_STRING("INTN has unexpected length {}."), val.length());
+            }
+        break;
+
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::NCHAR:
+        {
+            u16string_view sv((char16_t*)val.data(), val.length() / sizeof(char16_t));
+            auto s = utf16_to_utf8(sv);
+
+            return fmt::format(FMT_STRING("{}"), s);
+        }
+
+        case tds_sql_type::VARCHAR:
+        case tds_sql_type::CHAR:
+        {
+            string_view sv(val.data(), val.length());
+
+            return fmt::format(FMT_STRING("{}"), sv);
+        }
+
+        case tds_sql_type::REAL:
+            return fmt::format(FMT_STRING("{}"), *(float*)val.data());
+
+        case tds_sql_type::FLOAT:
+            return fmt::format(FMT_STRING("{}"), *(double*)val.data());
+
+        case tds_sql_type::FLTN:
+            switch (val.length()) {
+                case sizeof(float):
+                    return fmt::format(FMT_STRING("{}"), *(float*)val.data());
+
+                case sizeof(double):
+                    return fmt::format(FMT_STRING("{}"), *(double*)val.data());
+
+                default:
+                    throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), val.length());
+            }
+        break;
+
+        case tds_sql_type::DATE: {
+            uint32_t v;
+
+            memcpy(&v, val.data(), 3);
+            v &= 0xffffff;
+
+            tds_date d(v - 693595);
+
+            return fmt::format(FMT_STRING("{}"), d);
+        }
+
+        case tds_sql_type::TIME: {
+            uint64_t secs = 0;
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            tds_time t((uint32_t)secs);
+
+            return fmt::format(FMT_STRING("{}"), t);
+        }
+
+        case tds_sql_type::DATETIME2: {
+            uint64_t secs = 0;
+            uint32_t v;
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 3));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            memcpy(&v, val.data() + val.length() - 3, 3);
+            v &= 0xffffff;
+
+            tds_datetime dt(v - 693595, (uint32_t)secs);
+
+            return fmt::format(FMT_STRING("{}"), dt);
+        }
+
+        case tds_sql_type::DATETIME: {
+            auto v = *(int32_t*)val.data();
+            auto secs = *(uint32_t*)(val.data() + sizeof(int32_t));
+
+            secs /= 300;
+
+            tds_datetime dt(v, secs);
+
+            return fmt::format(FMT_STRING("{}"), dt);
+        }
+
+        case tds_sql_type::DATETIMN:
+            switch (val.length()) {
+                case 4: {
+                    auto v = *(uint16_t*)val.data();
+                    auto mins = *(uint16_t*)(val.data() + sizeof(uint16_t));
+
+                    tds_datetime dt(v, mins * 60);
+
+                    return fmt::format(FMT_STRING("{}"), dt);
+                }
+
+                case 8: {
+                    auto v = *(int32_t*)val.data();
+                    auto secs = *(uint32_t*)(val.data() + sizeof(int32_t));
+
+                    secs /= 300;
+
+                    tds_datetime dt(v, secs);
+
+                    return fmt::format(FMT_STRING("{}"), dt);
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+            }
+
+        case tds_sql_type::DATETIMEOFFSET: {
+            uint64_t secs = 0;
+            uint32_t v;
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 5));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            memcpy(&v, val.data() + val.length() - 5, 3);
+            v &= 0xffffff;
+
+            tds_datetimeoffset dto(v - 693595, (uint32_t)secs, *(int16_t*)(val.data() + val.length() - sizeof(int16_t)));
+
+            return fmt::format(FMT_STRING("{}"), dto);
+        }
+
+        case tds_sql_type::VARBINARY:
+        case tds_sql_type::BINARY:
+        {
+            string s = "0x";
+
+            for (auto c : val) {
+                s += fmt::format(FMT_STRING("{:02x}"), (uint8_t)c);
+            }
+
+            return fmt::format(FMT_STRING("{}"), s);
+        }
+
+        case tds_sql_type::BITN:
+            return fmt::format(FMT_STRING("{}"), val[0] != 0);
+
+        default:
+            throw formatted_error(FMT_STRING("Cannot convert {} to string."), type);
+    }
 }
 
 tds_value::operator u16string() const {
@@ -2186,191 +2372,8 @@ struct fmt::formatter<tds_value> {
     auto format(const tds_value& p, format_context& ctx) {
         if (p.is_null)
             return format_to(ctx.out(), "NULL");
-
-        switch (p.type) {
-            case tds_sql_type::TINYINT:
-                return format_to(ctx.out(), "{}", *(uint8_t*)p.val.data());
-
-            case tds_sql_type::SMALLINT:
-                return format_to(ctx.out(), "{}", *(int16_t*)p.val.data());
-
-            case tds_sql_type::INT:
-                return format_to(ctx.out(), "{}", *(int32_t*)p.val.data());
-
-            case tds_sql_type::BIGINT:
-                return format_to(ctx.out(), "{}", *(int64_t*)p.val.data());
-
-            case tds_sql_type::INTN:
-                switch (p.val.length()) {
-                    case 1:
-                        return format_to(ctx.out(), "{}", *(uint8_t*)p.val.data());
-
-                    case 2:
-                        return format_to(ctx.out(), "{}", *(int16_t*)p.val.data());
-
-                    case 4:
-                        return format_to(ctx.out(), "{}", *(int32_t*)p.val.data());
-
-                    case 8:
-                        return format_to(ctx.out(), "{}", *(int64_t*)p.val.data());
-
-                    default:
-                        throw formatted_error(FMT_STRING("INTN has unexpected length {}."), p.val.length());
-                }
-            break;
-
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::NCHAR:
-            {
-                u16string_view sv((char16_t*)p.val.data(), p.val.length() / sizeof(char16_t));
-                auto s = utf16_to_utf8(sv);
-
-                return format_to(ctx.out(), "{}", s);
-            }
-
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::CHAR:
-            {
-                string_view sv(p.val.data(), p.val.length());
-
-                return format_to(ctx.out(), "{}", sv);
-            }
-
-            case tds_sql_type::REAL:
-                return format_to(ctx.out(), "{}", *(float*)p.val.data());
-
-            case tds_sql_type::FLOAT:
-                return format_to(ctx.out(), "{}", *(double*)p.val.data());
-
-            case tds_sql_type::FLTN:
-                switch (p.val.length()) {
-                    case sizeof(float):
-                        return format_to(ctx.out(), "{}", *(float*)p.val.data());
-
-                    case sizeof(double):
-                        return format_to(ctx.out(), "{}", *(double*)p.val.data());
-
-                    default:
-                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), p.val.length());
-                }
-            break;
-
-            case tds_sql_type::DATE: {
-                uint32_t v;
-
-                memcpy(&v, p.val.data(), 3);
-                v &= 0xffffff;
-
-                tds_date d(v - 693595);
-
-                return format_to(ctx.out(), "{}", d);
-            }
-
-            case tds_sql_type::TIME: {
-                uint64_t secs = 0;
-
-                memcpy(&secs, p.val.data(), min(sizeof(uint64_t), p.val.length()));
-
-                for (auto n = p.max_length; n > 0; n--) {
-                    secs /= 10;
-                }
-
-                tds_time t((uint32_t)secs);
-
-                return format_to(ctx.out(), "{}", t);
-            }
-
-            case tds_sql_type::DATETIME2: {
-                uint64_t secs = 0;
-                uint32_t v;
-
-                memcpy(&secs, p.val.data(), min(sizeof(uint64_t), p.val.length() - 3));
-
-                for (auto n = p.max_length; n > 0; n--) {
-                    secs /= 10;
-                }
-
-                memcpy(&v, p.val.data() + p.val.length() - 3, 3);
-                v &= 0xffffff;
-
-                tds_datetime dt(v - 693595, (uint32_t)secs);
-
-                return format_to(ctx.out(), "{}", dt);
-            }
-
-            case tds_sql_type::DATETIME: {
-                auto v = *(int32_t*)p.val.data();
-                auto secs = *(uint32_t*)(p.val.data() + sizeof(int32_t));
-
-                secs /= 300;
-
-                tds_datetime dt(v, secs);
-
-                return format_to(ctx.out(), "{}", dt);
-            }
-
-            case tds_sql_type::DATETIMN:
-                switch (p.val.length()) {
-                    case 4: {
-                        auto v = *(uint16_t*)p.val.data();
-                        auto mins = *(uint16_t*)(p.val.data() + sizeof(uint16_t));
-
-                        tds_datetime dt(v, mins * 60);
-
-                        return format_to(ctx.out(), "{}", dt);
-                    }
-
-                    case 8: {
-                        auto v = *(int32_t*)p.val.data();
-                        auto secs = *(uint32_t*)(p.val.data() + sizeof(int32_t));
-
-                        secs /= 300;
-
-                        tds_datetime dt(v, secs);
-
-                        return format_to(ctx.out(), "{}", dt);
-                    }
-
-                    default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), p.val.length());
-                }
-
-            case tds_sql_type::DATETIMEOFFSET: {
-                uint64_t secs = 0;
-                uint32_t v;
-
-                memcpy(&secs, p.val.data(), min(sizeof(uint64_t), p.val.length() - 5));
-
-                for (auto n = p.max_length; n > 0; n--) {
-                    secs /= 10;
-                }
-
-                memcpy(&v, p.val.data() + p.val.length() - 5, 3);
-                v &= 0xffffff;
-
-                tds_datetimeoffset dto(v - 693595, (uint32_t)secs, *(int16_t*)(p.val.data() + p.val.length() - sizeof(int16_t)));
-
-                return format_to(ctx.out(), "{}", dto);
-            }
-
-            case tds_sql_type::VARBINARY:
-            case tds_sql_type::BINARY:
-            {
-                string s = "0x";
-
-                for (auto c : p.val) {
-                    s += fmt::format(FMT_STRING("{:02x}"), (uint8_t)c);
-                }
-
-                return format_to(ctx.out(), "{}", s);
-            }
-
-            case tds_sql_type::BITN:
-                return format_to(ctx.out(), "{}", p.val[0] != 0);
-
-            default:
-                throw formatted_error(FMT_STRING("Unable to format type {} as string."), p.type);
-        }
+        else
+            return format_to(ctx.out(), "{}", (string)p);
     }
 };
 
