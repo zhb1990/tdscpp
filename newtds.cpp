@@ -1842,6 +1842,86 @@ tds_value::operator tds_time() const {
     }
 }
 
+tds_value::operator tds_datetime() const {
+    if (is_null)
+        return tds_datetime{1900, 1, 1, 0, 0, 0};
+
+    switch (type) {
+        // FIXME - VARCHAR / CHAR
+        // FIXME - NVARCHAR / NCHAR
+
+        case tds_sql_type::DATE: {
+            uint32_t n = 0;
+
+            memcpy(&n, val.data(), 3);
+
+            return tds_datetime{(int32_t)n - 693595, 0};
+        }
+
+        case tds_sql_type::TIME: {
+            uint64_t secs = 0;
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            return tds_datetime{0, (uint32_t)secs};
+        }
+
+        case tds_sql_type::DATETIME:
+            return tds_datetime{*(int32_t*)val.data(), *(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
+
+        case tds_sql_type::DATETIMN:
+            switch (val.length()) {
+                case 4:
+                    return tds_datetime{*(uint16_t*)val.data(), (uint32_t)(*(uint16_t*)(val.data() + sizeof(uint16_t)) * 60)};
+
+                case 8:
+                    return tds_datetime{*(int32_t*)val.data(), *(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
+
+                default:
+                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+            }
+
+        case tds_sql_type::DATETIME2: {
+            uint32_t n = 0;
+            uint64_t secs = 0;
+
+            memcpy(&n, val.data() + val.length() - 3, 3);
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 3));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            return tds_datetime{(int32_t)n - 693595, (uint32_t)secs};
+        }
+
+        case tds_sql_type::DATETIMEOFFSET: {
+            uint32_t n = 0;
+            uint64_t secs = 0;
+
+            memcpy(&n, val.data() + val.length() - 5, 3);
+
+            memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 5));
+
+            for (auto n = max_length; n > 0; n--) {
+                secs /= 10;
+            }
+
+            return tds_datetime{(int32_t)n - 693595, (uint32_t)secs};
+        }
+
+        // MSSQL doesn't allow conversion to DATETIME2 for integers, floats, or BIT
+
+        default:
+            throw formatted_error(FMT_STRING("Cannot convert {} to datetime."), type);
+    }
+}
+
 tds_value::operator double() const {
     if (is_null)
         return 0;

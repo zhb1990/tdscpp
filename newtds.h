@@ -441,6 +441,7 @@ public:
     operator double() const;
     operator tds_date() const;
     operator tds_time() const;
+    operator tds_datetime() const;
 
     enum tds_sql_type type;
     std::string val;
@@ -475,6 +476,10 @@ public:
 
     operator tds_time() const {
         return (tds_time)static_cast<tds_value>(*this);
+    }
+
+    operator tds_datetime() const {
+        return (tds_datetime)static_cast<tds_value>(*this);
     }
 };
 
