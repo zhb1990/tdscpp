@@ -1549,125 +1549,6 @@ static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
     return true;
 }
 
-tds_value::operator tds_date() const {
-    if (is_null)
-        return tds_date{1900, 1, 1};
-
-    switch (type) {
-        case tds_sql_type::VARCHAR:
-        case tds_sql_type::CHAR:
-        {
-            uint16_t y;
-            uint8_t m, d;
-
-            auto s = string_view(val);
-
-            // remove leading whitespace
-
-            while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
-                s = s.substr(1, s.length() - 1);
-            }
-
-            // remove trailing whitespace
-
-            while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) {
-                s = s.substr(0, s.length() - 1);
-            }
-
-            if (s.empty())
-                return tds_date{1900, 1, 1};
-
-            if (!parse_date(s, y, m, d) || !is_valid_date(y, m, d) || !s.empty())
-                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date."), val);
-
-            return tds_date{y, m, d};
-        }
-
-        case tds_sql_type::NVARCHAR:
-        case tds_sql_type::NCHAR:
-        {
-            uint16_t y;
-            uint8_t m, d;
-
-            auto s = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
-
-            // remove leading whitespace
-
-            while (!s.empty() && (s.front() == u' ' || s.front() == u'\t')) {
-                s = s.substr(1, s.length() - 1);
-            }
-
-            // remove trailing whitespace
-
-            while (!s.empty() && (s.back() == u' ' || s.back() == u'\t')) {
-                s = s.substr(0, s.length() - 1);
-            }
-
-            if (s.empty())
-                return tds_date{1900, 1, 1};
-
-            string s2;
-
-            s2.reserve(s.length());
-
-            for (auto c : s) {
-                s2 += (char)c;
-            }
-
-            auto sv = string_view(s2);
-
-            if (!parse_date(sv, y, m, d) || !is_valid_date(y, m, d) || !sv.empty())
-                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date."), utf16_to_utf8(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t))));
-
-            return tds_date{y, m, d};
-        }
-
-        case tds_sql_type::DATE: {
-            uint32_t n = 0;
-
-            memcpy(&n, val.data(), 3);
-
-            return tds_date{(int32_t)n - 693595};
-        }
-
-        case tds_sql_type::DATETIME:
-            return tds_date{*(int32_t*)val.data()};
-
-        case tds_sql_type::DATETIMN:
-            switch (val.length()) {
-                case 4:
-                    return tds_date{*(uint16_t*)val.data()};
-
-                case 8:
-                    return tds_date{*(int32_t*)val.data()};
-
-                default:
-                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
-            }
-
-        case tds_sql_type::DATETIME2: {
-            uint32_t n = 0;
-
-            memcpy(&n, val.data() + val.length() - 3, 3);
-
-            return tds_date{(int32_t)n - 693595};
-        }
-
-        case tds_sql_type::DATETIMEOFFSET: {
-            uint32_t n = 0;
-
-            memcpy(&n, val.data() + val.length() - 5, 3);
-
-            return tds_date{(int32_t)n - 693595};
-        }
-
-        // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
-
-        default:
-            throw formatted_error(FMT_STRING("Cannot convert {} to date."), type);
-    }
-}
-
 static bool parse_time(const string_view& t, uint8_t& h, uint8_t& m, uint8_t& s) {
     cmatch rm;
     static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?$");
@@ -1715,6 +1596,179 @@ static bool parse_time(const string_view& t, uint8_t& h, uint8_t& m, uint8_t& s)
         return false;
 
     return true;
+}
+
+static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, uint8_t& h, uint8_t& min, uint8_t& s) {
+    {
+        cmatch rm;
+        static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
+
+        if (regex_match(t.begin(), t.end(), rm, iso_date)) {
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
+            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+            from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
+            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
+
+            if (!is_valid_date(y, mon, d) || h >= 60 || min >= 60 || s >= 60)
+                return false;
+
+            return true;
+        }
+    }
+
+    if (parse_date(t, y, mon, d)) {
+        if (!is_valid_date(y, mon, d))
+            return false;
+
+        if (t.empty()) {
+            h = min = s = 0;
+            return true;
+        }
+
+        if (t.front() != ' ' && t.front() != '\t')
+            return false;
+
+        while (t.front() == ' ' || t.front() == '\t') {
+            t = t.substr(1);
+        }
+
+        if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+            return false;
+
+        return true;
+    }
+
+    // try to parse solo time
+
+    if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+        return false;
+
+    y = 1900;
+    mon = 1;
+    d = 1;
+
+    return true;
+}
+
+tds_value::operator tds_date() const {
+    if (is_null)
+        return tds_date{1900, 1, 1};
+
+    switch (type) {
+        case tds_sql_type::VARCHAR:
+        case tds_sql_type::CHAR:
+        {
+            uint16_t y;
+            uint8_t mon, d, h, min, s;
+
+            auto t = string_view(val);
+
+            // remove leading whitespace
+
+            while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
+                t = t.substr(1);
+            }
+
+            // remove trailing whitespace
+
+            while (!t.empty() && (t.back() == ' ' || t.back() == '\t')) {
+                t = t.substr(0, t.length() - 1);
+            }
+
+            if (t.empty())
+                return tds_date{1900, 1, 1};
+
+            if (!parse_datetime(t, y, mon, d, h, min, s) || !is_valid_date(y, mon, d))
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), val);
+
+            return tds_date{y, mon, d};
+        }
+
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::NCHAR:
+        {
+            uint16_t y;
+            uint8_t mon, d, h, min, s;
+
+            auto t = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
+
+            // remove leading whitespace
+
+            while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
+                t = t.substr(1);
+            }
+
+            // remove trailing whitespace
+
+            while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
+                t = t.substr(0, t.length() - 1);
+            }
+
+            if (t.empty())
+                return tds_date{1900, 1, 1};
+
+            string t2;
+
+            t2.reserve(t.length());
+
+            for (auto c : t) {
+                t2 += (char)c;
+            }
+
+            auto sv = string_view(t2);
+
+            if (!parse_datetime(sv, y, mon, d, h, min, s) || !is_valid_date(y, mon, d))
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date."), utf16_to_utf8(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t))));
+
+            return tds_date{y, mon, d};
+        }
+
+        case tds_sql_type::DATE: {
+            uint32_t n = 0;
+
+            memcpy(&n, val.data(), 3);
+
+            return tds_date{(int32_t)n - 693595};
+        }
+
+        case tds_sql_type::DATETIME:
+            return tds_date{*(int32_t*)val.data()};
+
+        case tds_sql_type::DATETIMN:
+            switch (val.length()) {
+                case 4:
+                    return tds_date{*(uint16_t*)val.data()};
+
+                case 8:
+                    return tds_date{*(int32_t*)val.data()};
+
+                default:
+                    throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+            }
+
+        case tds_sql_type::DATETIME2: {
+            uint32_t n = 0;
+
+            memcpy(&n, val.data() + val.length() - 3, 3);
+
+            return tds_date{(int32_t)n - 693595};
+        }
+
+        case tds_sql_type::DATETIMEOFFSET: {
+            uint32_t n = 0;
+
+            memcpy(&n, val.data() + val.length() - 5, 3);
+
+            return tds_date{(int32_t)n - 693595};
+        }
+
+        // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
+
+        default:
+            throw formatted_error(FMT_STRING("Cannot convert {} to date."), type);
+    }
 }
 
 tds_value::operator tds_time() const {
@@ -1842,60 +1896,6 @@ tds_value::operator tds_time() const {
         default:
             throw formatted_error(FMT_STRING("Cannot convert {} to time."), type);
     }
-}
-
-static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, uint8_t& h, uint8_t& min, uint8_t& s) {
-    {
-        cmatch rm;
-        static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
-
-        if (regex_match(t.begin(), t.end(), rm, iso_date)) {
-            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
-            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-            from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
-            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
-            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
-
-            if (!is_valid_date(y, mon, d) || h >= 60 || min >= 60 || s >= 60)
-                return false;
-
-            return true;
-        }
-    }
-
-    if (parse_date(t, y, mon, d)) {
-        if (!is_valid_date(y, mon, d))
-            return false;
-
-        if (t.empty()) {
-            h = min = s = 0;
-            return true;
-        }
-
-        if (t.front() != ' ' && t.front() != '\t')
-            return false;
-
-        while (t.front() == ' ' || t.front() == '\t') {
-            t = t.substr(1);
-        }
-
-        if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-            return false;
-
-        return true;
-    }
-
-    // try to parse solo time
-
-    if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-        return false;
-
-    y = 1900;
-    mon = 1;
-    d = 1;
-
-    return true;
 }
 
 tds_value::operator tds_datetime() const {
