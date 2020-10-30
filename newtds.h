@@ -54,6 +54,8 @@ namespace tds {
     using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
 
+    class query;
+
     // FIXME - use pimpl
     class tds {
     public:
@@ -64,6 +66,9 @@ namespace tds {
         void send_msg(enum tds_msg type, const std::span<uint8_t>& msg);
         void wait_for_msg(enum tds_msg& type, std::string& payload);
         void handle_info_msg(const std::string_view& sv, bool error);
+
+        template<typename... Args>
+        void run(const std::string_view& s, Args&&... args);
 
         msg_handler message_handler;
 
@@ -310,6 +315,14 @@ namespace tds {
         std::vector<column> cols;
         std::unique_ptr<rpc> r2;
     };
+
+    template<typename... Args>
+    void tds::run(const std::string_view& s, Args&&... args) {
+        query q(*this, s, args...);
+
+        while (q.fetch_row()) {
+        }
+    }
 };
 
 template<>

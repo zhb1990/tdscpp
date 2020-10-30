@@ -40,20 +40,23 @@ int main() {
         fmt::print("{}\n", (tds::time)tds::value("2:56:34 pm"));
         fmt::print("{}\n", (tds::time)tds::value("2:56 pm"));
 #endif
+        {
+            tds::query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, ? AS test", 42, "Hello", tds::datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f, true);
 
-        tds::query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, ? AS test", 42, "Hello", tds::datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f, true);
-
-        for (uint16_t i = 0; i < sq.num_columns(); i++) {
-            fmt::print(FMT_STRING("{}\t"), sq[i].name);
-        }
-        fmt::print("\n");
-
-        while (sq.fetch_row()) {
             for (uint16_t i = 0; i < sq.num_columns(); i++) {
-                fmt::print(FMT_STRING("{}\t"), sq[i]);
+                fmt::print(FMT_STRING("{}\t"), sq[i].name);
             }
-            fmt::print(FMT_STRING("\n"));
+            fmt::print("\n");
+
+            while (sq.fetch_row()) {
+                for (uint16_t i = 0; i < sq.num_columns(); i++) {
+                    fmt::print(FMT_STRING("{}\t"), sq[i]);
+                }
+                fmt::print(FMT_STRING("\n"));
+            }
         }
+
+        n.run("RAISERROR('Hello, world!', 0, 1)");
     } catch (const exception& e) {
         fmt::print(stderr, FMT_STRING("Exception: {}\n"), e.what());
         return 1;
