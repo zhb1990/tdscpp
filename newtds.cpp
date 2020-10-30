@@ -1,3 +1,4 @@
+#include "newtds-private.h"
 #include "newtds.h"
 #include <iostream>
 #include <string>
