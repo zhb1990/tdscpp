@@ -1779,7 +1779,8 @@ tds_value::operator tds_time() const {
         case tds_sql_type::VARCHAR:
         case tds_sql_type::CHAR:
         {
-            uint8_t h, m, s;
+            uint16_t y;
+            uint8_t mon, d, h, min, s;
 
             auto t = string_view(val);
 
@@ -1798,16 +1799,17 @@ tds_value::operator tds_time() const {
             if (t.empty())
                 return tds_time{0, 0, 0};
 
-            if (!parse_time(t, h, m, s) || h >= 60 || m >= 60 || s >= 60)
+            if (!parse_datetime(t, y, mon, d, h, min, s) || h >= 60 || min >= 60 || s >= 60)
                 throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), val);
 
-            return tds_time{h, m, s};
+            return tds_time{h, min, s};
         }
 
         case tds_sql_type::NVARCHAR:
         case tds_sql_type::NCHAR:
         {
-            uint8_t h, m, s;
+            uint16_t y;
+            uint8_t mon, d, h, min, s;
 
             auto t = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
 
@@ -1834,10 +1836,10 @@ tds_value::operator tds_time() const {
                 t2 += (char)c;
             }
 
-            if (!parse_time(t2, h, m, s) || h >= 60 || m >= 60 || s >= 60)
+            if (!parse_datetime(t2, y, mon, d, h, min, s) || h >= 60 || min >= 60 || s >= 60)
                 throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), utf16_to_utf8(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t))));
 
-            return tds_time{h, m, s};
+            return tds_time{h, min, s};
         }
 
         case tds_sql_type::TIME: {
