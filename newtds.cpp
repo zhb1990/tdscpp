@@ -1844,6 +1844,60 @@ tds_value::operator tds_time() const {
     }
 }
 
+static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, uint8_t& h, uint8_t& min, uint8_t& s) {
+    {
+        cmatch rm;
+        static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
+
+        if (regex_match(t.begin(), t.end(), rm, iso_date)) {
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
+            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+            from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
+            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
+
+            if (!is_valid_date(y, mon, d) || h >= 60 || min >= 60 || s >= 60)
+                return false;
+
+            return true;
+        }
+    }
+
+    if (parse_date(t, y, mon, d)) {
+        if (!is_valid_date(y, mon, d))
+            return false;
+
+        if (t.empty()) {
+            h = min = s = 0;
+            return true;
+        }
+
+        if (t.front() != ' ' && t.front() != '\t')
+            return false;
+
+        while (t.front() == ' ' || t.front() == '\t') {
+            t = t.substr(1);
+        }
+
+        if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+            return false;
+
+        return true;
+    }
+
+    // try to parse solo time
+
+    if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+        return false;
+
+    y = 1900;
+    mon = 1;
+    d = 1;
+
+    return true;
+}
+
 tds_value::operator tds_datetime() const {
     if (is_null)
         return tds_datetime{1900, 1, 1, 0, 0, 0};
@@ -1872,54 +1926,48 @@ tds_value::operator tds_datetime() const {
             if (t.empty())
                 return tds_datetime{1900, 1, 1, 0, 0, 0};
 
-            {
-                cmatch rm;
-                static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
-
-                if (regex_match(t.begin(), t.end(), rm, iso_date)) {
-                    from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-                    from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
-                    from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-                    from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
-                    from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
-                    from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
-
-                    if (!is_valid_date(y, mon, d) || h >= 60 || min >= 60 || s >= 60)
-                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), val);
-
-                    return tds_datetime{y, mon, d, h, min, s};
-                }
-            }
-
-            if (parse_date(t, y, mon, d)) {
-                if (!is_valid_date(y, mon, d))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), val);
-
-                if (t.empty())
-                    return tds_datetime{y, mon, d, 0, 0, 0};
-
-                if (t.front() != ' ' && t.front() != '\t')
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), val);
-
-                while (t.front() == ' ' || t.front() == '\t') {
-                    t = t.substr(1);
-                }
-
-                if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), val);
-
-                return tds_datetime{y, mon, d, h, min, s};
-            }
-
-            // try to parse solo time
-
-            if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+            if (!parse_datetime(t, y, mon, d, h, min, s))
                 throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), val);
 
-            return tds_datetime{1900, 1, 1, h, min, s};
+            return tds_datetime{y, mon, d, h, min, s};
         }
 
-        // FIXME - NVARCHAR / NCHAR
+        case tds_sql_type::NVARCHAR:
+        case tds_sql_type::NCHAR:
+        {
+            uint16_t y;
+            uint8_t mon, d, h, min, s;
+
+            auto t = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
+
+            // remove leading whitespace
+
+            while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
+                t = t.substr(1);
+            }
+
+            // remove trailing whitespace
+
+            while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
+                t = t.substr(0, t.length() - 1);
+            }
+
+            if (t.empty())
+                return tds_datetime{1900, 1, 1, 0, 0, 0};
+
+            string t2;
+
+            t2.reserve(t.length());
+
+            for (auto c : t) {
+                t2 += (char)c;
+            }
+
+            if (!parse_datetime(t2, y, mon, d, h, min, s))
+                throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), utf16_to_utf8(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t))));
+
+            return tds_datetime{y, mon, d, h, min, s};
+        }
 
         case tds_sql_type::DATE: {
             uint32_t n = 0;
