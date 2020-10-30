@@ -205,49 +205,14 @@ struct tds_rpc_batch {
 
 static_assert(sizeof(tds_rpc_batch) == 28, "tds_rpc_batch has wrong size");
 
-enum class tds_sql_type : uint8_t {
-    SQL_NULL = 0x1F,
-    IMAGE = 0x22,
-    TEXT = 0x23,
-    UNIQUEIDENTIFIER = 0x24,
-    INTN = 0x26,
-    DATE = 0x28,
-    TIME = 0x29,
-    DATETIME2 = 0x2A,
-    DATETIMEOFFSET = 0x2B,
-    TINYINT = 0x30,
-    BIT = 0x32,
-    SMALLINT = 0x34,
-    INT = 0x38,
-    DATETIM4 = 0x3A,
-    REAL = 0x3B,
-    MONEY = 0x3C,
-    DATETIME = 0x3D,
-    FLOAT = 0x3E,
-    SQL_VARIANT = 0x62,
-    NTEXT = 0x63,
-    BITN = 0x68,
-    DECIMAL = 0x6A,
-    NUMERIC = 0x6C,
-    FLTN = 0x6D,
-    MONEYN = 0x6E,
-    DATETIMN = 0x6F,
-    SMALLMONEY = 0x7A,
-    BIGINT = 0x7F,
-    VARBINARY = 0xA5,
-    VARCHAR = 0xA7,
-    BINARY = 0xAD,
-    CHAR = 0xAF,
-    NVARCHAR = 0xE7,
-    NCHAR = 0xEF,
-    UDT = 0xF0,
-    XML = 0xF1,
-};
+namespace tds {
+    enum class sql_type : uint8_t;
+}
 
 struct tds_param_header {
     uint8_t name_len;
     uint8_t flags;
-    tds_sql_type type;
+    tds::sql_type type;
 };
 
 struct tds_INT_param {
@@ -317,7 +282,7 @@ struct tds_return_value {
     uint8_t status;
     uint32_t user_type;
     uint16_t flags;
-    tds_sql_type type;
+    tds::sql_type type;
 };
 
 static_assert(sizeof(tds_return_value) == 11, "tds_return_value has wrong size");
@@ -325,7 +290,7 @@ static_assert(sizeof(tds_return_value) == 11, "tds_return_value has wrong size")
 struct tds_colmetadata_col {
     uint32_t user_type;
     uint16_t flags;
-    tds_sql_type type;
+    tds::sql_type type;
 };
 
 static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong size");
@@ -333,6 +298,45 @@ static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong s
 #pragma pack(pop)
 
 namespace tds {
+    enum class sql_type : uint8_t {
+        SQL_NULL = 0x1F,
+        IMAGE = 0x22,
+        TEXT = 0x23,
+        UNIQUEIDENTIFIER = 0x24,
+        INTN = 0x26,
+        DATE = 0x28,
+        TIME = 0x29,
+        DATETIME2 = 0x2A,
+        DATETIMEOFFSET = 0x2B,
+        TINYINT = 0x30,
+        BIT = 0x32,
+        SMALLINT = 0x34,
+        INT = 0x38,
+        DATETIM4 = 0x3A,
+        REAL = 0x3B,
+        MONEY = 0x3C,
+        DATETIME = 0x3D,
+        FLOAT = 0x3E,
+        SQL_VARIANT = 0x62,
+        NTEXT = 0x63,
+        BITN = 0x68,
+        DECIMAL = 0x6A,
+        NUMERIC = 0x6C,
+        FLTN = 0x6D,
+        MONEYN = 0x6E,
+        DATETIMN = 0x6F,
+        SMALLMONEY = 0x7A,
+        BIGINT = 0x7F,
+        VARBINARY = 0xA5,
+        VARCHAR = 0xA7,
+        BINARY = 0xAD,
+        CHAR = 0xAF,
+        NVARCHAR = 0xE7,
+        NCHAR = 0xEF,
+        UDT = 0xF0,
+        XML = 0xF1,
+    };
+
     using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
                                         int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
 
@@ -445,7 +449,7 @@ namespace tds {
         operator time() const;
         operator datetime() const;
 
-        enum tds_sql_type type;
+        enum sql_type type;
         std::string val;
         bool is_null = false;
         bool is_output = false;
@@ -534,7 +538,7 @@ namespace tds {
 
     private:
         void do_rpc(tds& conn, const std::u16string_view& name);
-        void handle_row_col(value& col, enum tds_sql_type type, unsigned int max_length, std::string_view& sv);
+        void handle_row_col(value& col, enum sql_type type, unsigned int max_length, std::string_view& sv);
 
         std::vector<value> params;
         std::map<unsigned int, value*> output_params;

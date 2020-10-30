@@ -113,7 +113,7 @@ struct fmt::formatter<enum tds_token> {
 };
 
 template<>
-struct fmt::formatter<enum tds_sql_type> {
+struct fmt::formatter<enum tds::sql_type> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin();
 
@@ -124,114 +124,114 @@ struct fmt::formatter<enum tds_sql_type> {
     }
 
     template<typename format_context>
-    auto format(enum tds_sql_type t, format_context& ctx) {
+    auto format(enum tds::sql_type t, format_context& ctx) {
         switch (t) {
-            case tds_sql_type::IMAGE:
+            case tds::sql_type::IMAGE:
                 return format_to(ctx.out(), "IMAGE");
 
-            case tds_sql_type::TEXT:
+            case tds::sql_type::TEXT:
                 return format_to(ctx.out(), "TEXT");
 
-            case tds_sql_type::UNIQUEIDENTIFIER:
+            case tds::sql_type::UNIQUEIDENTIFIER:
                 return format_to(ctx.out(), "UNIQUEIDENTIFIER");
 
-            case tds_sql_type::INTN:
+            case tds::sql_type::INTN:
                 return format_to(ctx.out(), "INTN");
 
-            case tds_sql_type::DATE:
+            case tds::sql_type::DATE:
                 return format_to(ctx.out(), "DATE");
 
-            case tds_sql_type::TIME:
+            case tds::sql_type::TIME:
                 return format_to(ctx.out(), "TIME");
 
-            case tds_sql_type::DATETIME2:
+            case tds::sql_type::DATETIME2:
                 return format_to(ctx.out(), "DATETIME2");
 
-            case tds_sql_type::DATETIMEOFFSET:
+            case tds::sql_type::DATETIMEOFFSET:
                 return format_to(ctx.out(), "DATETIMEOFFSET");
 
-            case tds_sql_type::SQL_VARIANT:
+            case tds::sql_type::SQL_VARIANT:
                 return format_to(ctx.out(), "SQL_VARIANT");
 
-            case tds_sql_type::NTEXT:
+            case tds::sql_type::NTEXT:
                 return format_to(ctx.out(), "NTEXT");
 
-            case tds_sql_type::BITN:
+            case tds::sql_type::BITN:
                 return format_to(ctx.out(), "BITN");
 
-            case tds_sql_type::DECIMAL:
+            case tds::sql_type::DECIMAL:
                 return format_to(ctx.out(), "DECIMAL");
 
-            case tds_sql_type::NUMERIC:
+            case tds::sql_type::NUMERIC:
                 return format_to(ctx.out(), "NUMERIC");
 
-            case tds_sql_type::FLTN:
+            case tds::sql_type::FLTN:
                 return format_to(ctx.out(), "FLTN");
 
-            case tds_sql_type::MONEYN:
+            case tds::sql_type::MONEYN:
                 return format_to(ctx.out(), "MONEYN");
 
-            case tds_sql_type::DATETIMN:
+            case tds::sql_type::DATETIMN:
                 return format_to(ctx.out(), "DATETIMN");
 
-            case tds_sql_type::VARBINARY:
+            case tds::sql_type::VARBINARY:
                 return format_to(ctx.out(), "VARBINARY");
 
-            case tds_sql_type::VARCHAR:
+            case tds::sql_type::VARCHAR:
                 return format_to(ctx.out(), "VARCHAR");
 
-            case tds_sql_type::BINARY:
+            case tds::sql_type::BINARY:
                 return format_to(ctx.out(), "BINARY");
 
-            case tds_sql_type::CHAR:
+            case tds::sql_type::CHAR:
                 return format_to(ctx.out(), "CHAR");
 
-            case tds_sql_type::NVARCHAR:
+            case tds::sql_type::NVARCHAR:
                 return format_to(ctx.out(), "NVARCHAR");
 
-            case tds_sql_type::NCHAR:
+            case tds::sql_type::NCHAR:
                 return format_to(ctx.out(), "NCHAR");
 
-            case tds_sql_type::UDT:
+            case tds::sql_type::UDT:
                 return format_to(ctx.out(), "UDT");
 
-            case tds_sql_type::XML:
+            case tds::sql_type::XML:
                 return format_to(ctx.out(), "XML");
 
-            case tds_sql_type::SQL_NULL:
+            case tds::sql_type::SQL_NULL:
                 return format_to(ctx.out(), "NULL");
 
-            case tds_sql_type::TINYINT:
+            case tds::sql_type::TINYINT:
                 return format_to(ctx.out(), "TINYINT");
 
-            case tds_sql_type::BIT:
+            case tds::sql_type::BIT:
                 return format_to(ctx.out(), "BIT");
 
-            case tds_sql_type::SMALLINT:
+            case tds::sql_type::SMALLINT:
                 return format_to(ctx.out(), "SMALLINT");
 
-            case tds_sql_type::INT:
+            case tds::sql_type::INT:
                 return format_to(ctx.out(), "INT");
 
-            case tds_sql_type::DATETIM4:
+            case tds::sql_type::DATETIM4:
                 return format_to(ctx.out(), "DATETIM4");
 
-            case tds_sql_type::REAL:
+            case tds::sql_type::REAL:
                 return format_to(ctx.out(), "REAL");
 
-            case tds_sql_type::MONEY:
+            case tds::sql_type::MONEY:
                 return format_to(ctx.out(), "MONEY");
 
-            case tds_sql_type::DATETIME:
+            case tds::sql_type::DATETIME:
                 return format_to(ctx.out(), "DATETIME");
 
-            case tds_sql_type::FLOAT:
+            case tds::sql_type::FLOAT:
                 return format_to(ctx.out(), "FLOAT");
 
-            case tds_sql_type::SMALLMONEY:
+            case tds::sql_type::SMALLMONEY:
                 return format_to(ctx.out(), "SMALLMONEY");
 
-            case tds_sql_type::BIGINT:
+            case tds::sql_type::BIGINT:
                 return format_to(ctx.out(), "BIGINT");
 
             default:
@@ -379,20 +379,20 @@ static string utf16_to_utf8(const u16string_view& sv) {
 }
 
 namespace tds {
-    static bool is_byte_len_type(enum tds_sql_type type) {
+    static bool is_byte_len_type(enum sql_type type) {
         switch (type) {
-            case tds_sql_type::UNIQUEIDENTIFIER:
-            case tds_sql_type::INTN:
-            case tds_sql_type::DECIMAL:
-            case tds_sql_type::NUMERIC:
-            case tds_sql_type::BITN:
-            case tds_sql_type::FLTN:
-            case tds_sql_type::MONEYN:
-            case tds_sql_type::DATETIMN:
-            case tds_sql_type::DATE:
-            case tds_sql_type::TIME:
-            case tds_sql_type::DATETIME2:
-            case tds_sql_type::DATETIMEOFFSET:
+            case sql_type::UNIQUEIDENTIFIER:
+            case sql_type::INTN:
+            case sql_type::DECIMAL:
+            case sql_type::NUMERIC:
+            case sql_type::BITN:
+            case sql_type::FLTN:
+            case sql_type::MONEYN:
+            case sql_type::DATETIMN:
+            case sql_type::DATE:
+            case sql_type::TIME:
+            case sql_type::DATETIME2:
+            case sql_type::DATETIMEOFFSET:
                 return true;
 
             default:
@@ -991,18 +991,18 @@ namespace tds {
     }
 
     value::value() {
-        type = tds_sql_type::SQL_NULL;
+        type = sql_type::SQL_NULL;
     }
 
     value::value(int32_t i) {
-        type = tds_sql_type::INTN;
+        type = sql_type::INTN;
 
         val.resize(sizeof(int32_t));
         *(int32_t*)val.data() = i;
     }
 
     value::value(const optional<int32_t>& i) {
-        type = tds_sql_type::INTN;
+        type = sql_type::INTN;
 
         val.resize(sizeof(int32_t));
 
@@ -1013,7 +1013,7 @@ namespace tds {
     }
 
     value::value(const u16string_view& sv) {
-        type = tds_sql_type::NVARCHAR;
+        type = sql_type::NVARCHAR;
         val.resize(sv.length() * sizeof(char16_t));
         memcpy(val.data(), sv.data(), val.length());
     }
@@ -1025,7 +1025,7 @@ namespace tds {
     }
 
     value::value(const optional<u16string_view>& sv) {
-        type = tds_sql_type::NVARCHAR;
+        type = sql_type::NVARCHAR;
 
         if (!sv.has_value())
             is_null = true;
@@ -1036,7 +1036,7 @@ namespace tds {
     }
 
     value::value(const string_view& sv) {
-        type = tds_sql_type::VARCHAR;
+        type = sql_type::VARCHAR;
         val.resize(sv.length());
         memcpy(val.data(), sv.data(), val.length());
     }
@@ -1048,7 +1048,7 @@ namespace tds {
     }
 
     value::value(const optional<string_view>& sv) {
-        type = tds_sql_type::VARCHAR;
+        type = sql_type::VARCHAR;
 
         if (!sv.has_value())
             is_null = true;
@@ -1061,7 +1061,7 @@ namespace tds {
     value::value(const u8string_view& sv) {
         auto s = utf8_to_utf16(string_view((char*)sv.data(), sv.length()));
 
-        type = tds_sql_type::NVARCHAR;
+        type = sql_type::NVARCHAR;
         val.resize(s.length() * sizeof(char16_t));
         memcpy(val.data(), s.data(), val.length());
     }
@@ -1073,7 +1073,7 @@ namespace tds {
     }
 
     value::value(const optional<u8string_view>& sv) {
-        type = tds_sql_type::NVARCHAR;
+        type = sql_type::NVARCHAR;
 
         if (!sv.has_value())
             is_null = true;
@@ -1086,14 +1086,14 @@ namespace tds {
     }
 
     value::value(float f) {
-        type = tds_sql_type::FLTN;
+        type = sql_type::FLTN;
 
         val.resize(sizeof(float));
         memcpy(val.data(), &f, sizeof(float));
     }
 
     value::value(const optional<float>& f) {
-        type = tds_sql_type::FLTN;
+        type = sql_type::FLTN;
         val.resize(sizeof(float));
 
         if (!f.has_value())
@@ -1106,14 +1106,14 @@ namespace tds {
     }
 
     value::value(double d) {
-        type = tds_sql_type::FLTN;
+        type = sql_type::FLTN;
 
         val.resize(sizeof(double));
         memcpy(val.data(), &d, sizeof(double));
     }
 
     value::value(const optional<double>& d) {
-        type = tds_sql_type::FLTN;
+        type = sql_type::FLTN;
         val.resize(sizeof(double));
 
         if (!d.has_value())
@@ -1128,7 +1128,7 @@ namespace tds {
     value::value(const date& d) {
         int32_t n;
 
-        type = tds_sql_type::DATE;
+        type = sql_type::DATE;
         val.resize(3);
 
         n = d.num + 693595;
@@ -1136,7 +1136,7 @@ namespace tds {
     }
 
     value::value(const optional<date>& d) {
-        type = tds_sql_type::DATE;
+        type = sql_type::DATE;
 
         if (!d.has_value())
             is_null = true;
@@ -1154,7 +1154,7 @@ namespace tds {
         secs += (unsigned int)t.minute * 60;
         secs += t.second;
 
-        type = tds_sql_type::TIME;
+        type = sql_type::TIME;
         max_length = 0; // TIME(0)
 
         val.resize(3);
@@ -1162,7 +1162,7 @@ namespace tds {
     }
 
     value::value(const optional<time>& t) {
-        type = tds_sql_type::TIME;
+        type = sql_type::TIME;
         max_length = 0; // TIME(0)
 
         if (!t.has_value())
@@ -1183,7 +1183,7 @@ namespace tds {
         int32_t n;
         uint32_t secs;
 
-        type = tds_sql_type::DATETIME2;
+        type = sql_type::DATETIME2;
         val.resize(6);
         max_length = 0; // DATETIME2(0)
 
@@ -1198,7 +1198,7 @@ namespace tds {
     }
 
     value::value(const optional<datetime>& dt) {
-        type = tds_sql_type::DATETIME2;
+        type = sql_type::DATETIME2;
         val.resize(6);
         max_length = 0; // DATETIME2(0)
 
@@ -1223,7 +1223,7 @@ namespace tds {
         int32_t n;
         uint32_t secs;
 
-        type = tds_sql_type::DATETIMEOFFSET;
+        type = sql_type::DATETIMEOFFSET;
         val.resize(8);
         max_length = 0; // DATETIMEOFFSET(0)
 
@@ -1240,7 +1240,7 @@ namespace tds {
     }
 
     value::value(const optional<datetimeoffset>& dto) {
-        type = tds_sql_type::DATETIMEOFFSET;
+        type = sql_type::DATETIMEOFFSET;
         val.resize(8);
         max_length = 0; // DATETIMEOFFSET(0)
 
@@ -1266,19 +1266,19 @@ namespace tds {
     value::value(const span<byte>& bin) {
         // FIXME - std::optional version of this too
 
-        type = tds_sql_type::VARBINARY;
+        type = sql_type::VARBINARY;
         val.resize(bin.size());
         memcpy(val.data(), bin.data(), bin.size());
     }
 
     value::value(bool b) {
-        type = tds_sql_type::BITN;
+        type = sql_type::BITN;
         val.resize(sizeof(uint8_t));
         *(uint8_t*)val.data() = b ? 1 : 0;
     }
 
     value::value(const optional<bool>& b) {
-        type = tds_sql_type::BITN;
+        type = sql_type::BITN;
         val.resize(sizeof(uint8_t));
 
         if (b.has_value())
@@ -1292,19 +1292,19 @@ namespace tds {
             return "";
 
         switch (type) {
-            case tds_sql_type::TINYINT:
+            case sql_type::TINYINT:
                 return fmt::format(FMT_STRING("{}"), *(uint8_t*)val.data());
 
-            case tds_sql_type::SMALLINT:
+            case sql_type::SMALLINT:
                 return fmt::format(FMT_STRING("{}"), *(int16_t*)val.data());
 
-            case tds_sql_type::INT:
+            case sql_type::INT:
                 return fmt::format(FMT_STRING("{}"), *(int32_t*)val.data());
 
-            case tds_sql_type::BIGINT:
+            case sql_type::BIGINT:
                 return fmt::format(FMT_STRING("{}"), *(int64_t*)val.data());
 
-            case tds_sql_type::INTN:
+            case sql_type::INTN:
                 switch (val.length()) {
                     case 1:
                         return fmt::format(FMT_STRING("{}"), *(uint8_t*)val.data());
@@ -1323,8 +1323,8 @@ namespace tds {
                 }
             break;
 
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::NCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
             {
                 u16string_view sv((char16_t*)val.data(), val.length() / sizeof(char16_t));
                 auto s = utf16_to_utf8(sv);
@@ -1332,21 +1332,21 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}"), s);
             }
 
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::CHAR:
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
             {
                 string_view sv(val.data(), val.length());
 
                 return fmt::format(FMT_STRING("{}"), sv);
             }
 
-            case tds_sql_type::REAL:
+            case sql_type::REAL:
                 return fmt::format(FMT_STRING("{}"), *(float*)val.data());
 
-            case tds_sql_type::FLOAT:
+            case sql_type::FLOAT:
                 return fmt::format(FMT_STRING("{}"), *(double*)val.data());
 
-            case tds_sql_type::FLTN:
+            case sql_type::FLTN:
                 switch (val.length()) {
                     case sizeof(float):
                         return fmt::format(FMT_STRING("{}"), *(float*)val.data());
@@ -1359,7 +1359,7 @@ namespace tds {
                 }
             break;
 
-            case tds_sql_type::DATE: {
+            case sql_type::DATE: {
                 uint32_t v;
 
                 memcpy(&v, val.data(), 3);
@@ -1370,7 +1370,7 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}"), d);
             }
 
-            case tds_sql_type::TIME: {
+            case sql_type::TIME: {
                 uint64_t secs = 0;
 
                 memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
@@ -1384,7 +1384,7 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}"), t);
             }
 
-            case tds_sql_type::DATETIME2: {
+            case sql_type::DATETIME2: {
                 uint64_t secs = 0;
                 uint32_t v;
 
@@ -1402,7 +1402,7 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}"), dt);
             }
 
-            case tds_sql_type::DATETIME: {
+            case sql_type::DATETIME: {
                 auto v = *(int32_t*)val.data();
                 auto secs = *(uint32_t*)(val.data() + sizeof(int32_t));
 
@@ -1413,7 +1413,7 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}"), dt);
             }
 
-            case tds_sql_type::DATETIMN:
+            case sql_type::DATETIMN:
                 switch (val.length()) {
                     case 4: {
                         auto v = *(uint16_t*)val.data();
@@ -1439,7 +1439,7 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
                 }
 
-            case tds_sql_type::DATETIMEOFFSET: {
+            case sql_type::DATETIMEOFFSET: {
                 uint64_t secs = 0;
                 uint32_t v;
 
@@ -1457,8 +1457,8 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}"), dto);
             }
 
-            case tds_sql_type::VARBINARY:
-            case tds_sql_type::BINARY:
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
             {
                 string s = "0x";
 
@@ -1469,7 +1469,7 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}"), s);
             }
 
-            case tds_sql_type::BITN:
+            case sql_type::BITN:
                 return fmt::format(FMT_STRING("{}"), val[0] != 0);
 
             default:
@@ -1478,7 +1478,7 @@ namespace tds {
     }
 
     value::operator u16string() const {
-        if (type == tds_sql_type::NVARCHAR || type == tds_sql_type::NCHAR)
+        if (type == sql_type::NVARCHAR || type == sql_type::NCHAR)
             return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
         else
             return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
@@ -1489,19 +1489,19 @@ namespace tds {
             return 0;
 
         switch (type) {
-            case tds_sql_type::TINYINT:
+            case sql_type::TINYINT:
                 return *(uint8_t*)val.data();
 
-            case tds_sql_type::SMALLINT:
+            case sql_type::SMALLINT:
                 return *(int16_t*)val.data();
 
-            case tds_sql_type::INT:
+            case sql_type::INT:
                 return *(int32_t*)val.data();
 
-            case tds_sql_type::BIGINT:
+            case sql_type::BIGINT:
                 return *(int64_t*)val.data();
 
-            case tds_sql_type::INTN:
+            case sql_type::INTN:
                 switch (val.length()) {
                     case 1:
                         return *(uint8_t*)val.data();
@@ -1519,13 +1519,13 @@ namespace tds {
                         throw formatted_error(FMT_STRING("INTN has unexpected length {}."), val.length());
                 }
 
-            case tds_sql_type::REAL:
+            case sql_type::REAL:
                 return (int64_t)*(float*)val.data();
 
-            case tds_sql_type::FLOAT:
+            case sql_type::FLOAT:
                 return (int64_t)*(double*)val.data();
 
-            case tds_sql_type::FLTN:
+            case sql_type::FLTN:
                 switch (val.length()) {
                     case sizeof(float):
                         return (int64_t)*(float*)val.data();
@@ -1537,11 +1537,11 @@ namespace tds {
                         throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), val.length());
                 }
 
-            case tds_sql_type::BITN:
+            case sql_type::BITN:
                 return val[0] != 0 ? 1 : 0;
 
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::CHAR:
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
             {
                 if (val.empty())
                     return 0;
@@ -1570,8 +1570,8 @@ namespace tds {
                 return res;
             }
 
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::NCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
             {
                 if (val.empty())
                     return 0;
@@ -1606,10 +1606,10 @@ namespace tds {
                 return res;
             }
 
-            case tds_sql_type::DATETIME:
+            case sql_type::DATETIME:
                 return *(int32_t*)val.data(); // MSSQL adds 1 if after midday
 
-            case tds_sql_type::DATETIMN:
+            case sql_type::DATETIMN:
                 switch (val.length()) {
                     case 4:
                         return *(uint16_t*)val.data(); // MSSQL adds 1 if after midday
@@ -1898,8 +1898,8 @@ namespace tds {
             return date{1900, 1, 1};
 
         switch (type) {
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::CHAR:
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
             {
                 uint16_t y;
                 uint8_t mon, d, h, min, s;
@@ -1927,8 +1927,8 @@ namespace tds {
                 return date{y, mon, d};
             }
 
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::NCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
             {
                 uint16_t y;
                 uint8_t mon, d, h, min, s;
@@ -1966,7 +1966,7 @@ namespace tds {
                 return date{y, mon, d};
             }
 
-            case tds_sql_type::DATE: {
+            case sql_type::DATE: {
                 uint32_t n = 0;
 
                 memcpy(&n, val.data(), 3);
@@ -1974,10 +1974,10 @@ namespace tds {
                 return date{(int32_t)n - 693595};
             }
 
-            case tds_sql_type::DATETIME:
+            case sql_type::DATETIME:
                 return date{*(int32_t*)val.data()};
 
-            case tds_sql_type::DATETIMN:
+            case sql_type::DATETIMN:
                 switch (val.length()) {
                     case 4:
                         return date{*(uint16_t*)val.data()};
@@ -1989,7 +1989,7 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
                 }
 
-            case tds_sql_type::DATETIME2: {
+            case sql_type::DATETIME2: {
                 uint32_t n = 0;
 
                 memcpy(&n, val.data() + val.length() - 3, 3);
@@ -1997,7 +1997,7 @@ namespace tds {
                 return date{(int32_t)n - 693595};
             }
 
-            case tds_sql_type::DATETIMEOFFSET: {
+            case sql_type::DATETIMEOFFSET: {
                 uint32_t n = 0;
 
                 memcpy(&n, val.data() + val.length() - 5, 3);
@@ -2017,8 +2017,8 @@ namespace tds {
             return time{0, 0, 0};
 
         switch (type) {
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::CHAR:
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
             {
                 uint16_t y;
                 uint8_t mon, d, h, min, s;
@@ -2046,8 +2046,8 @@ namespace tds {
                 return time{h, min, s};
             }
 
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::NCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
             {
                 uint16_t y;
                 uint8_t mon, d, h, min, s;
@@ -2083,7 +2083,7 @@ namespace tds {
                 return time{h, min, s};
             }
 
-            case tds_sql_type::TIME: {
+            case sql_type::TIME: {
                 uint64_t secs = 0;
 
                 memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
@@ -2095,10 +2095,10 @@ namespace tds {
                 return time{(uint32_t)secs};
             }
 
-            case tds_sql_type::DATETIME:
+            case sql_type::DATETIME:
                 return time{*(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
 
-            case tds_sql_type::DATETIMN:
+            case sql_type::DATETIMN:
                 switch (val.length()) {
                     case 4:
                         return time{(uint32_t)(*(uint16_t*)(val.data() + sizeof(uint16_t)) * 60)};
@@ -2110,7 +2110,7 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
                 }
 
-            case tds_sql_type::DATETIME2: {
+            case sql_type::DATETIME2: {
                 uint64_t secs = 0;
 
                 memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 3));
@@ -2122,7 +2122,7 @@ namespace tds {
                 return time{(uint32_t)secs};
             }
 
-            case tds_sql_type::DATETIMEOFFSET: {
+            case sql_type::DATETIMEOFFSET: {
                 uint64_t secs = 0;
 
                 memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 5));
@@ -2146,8 +2146,8 @@ namespace tds {
             return datetime{1900, 1, 1, 0, 0, 0};
 
         switch (type) {
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::CHAR:
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
             {
                 uint16_t y;
                 uint8_t mon, d, h, min, s;
@@ -2175,8 +2175,8 @@ namespace tds {
                 return datetime{y, mon, d, h, min, s};
             }
 
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::NCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
             {
                 uint16_t y;
                 uint8_t mon, d, h, min, s;
@@ -2212,7 +2212,7 @@ namespace tds {
                 return datetime{y, mon, d, h, min, s};
             }
 
-            case tds_sql_type::DATE: {
+            case sql_type::DATE: {
                 uint32_t n = 0;
 
                 memcpy(&n, val.data(), 3);
@@ -2220,7 +2220,7 @@ namespace tds {
                 return datetime{(int32_t)n - 693595, 0};
             }
 
-            case tds_sql_type::TIME: {
+            case sql_type::TIME: {
                 uint64_t secs = 0;
 
                 memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
@@ -2232,10 +2232,10 @@ namespace tds {
                 return datetime{0, (uint32_t)secs};
             }
 
-            case tds_sql_type::DATETIME:
+            case sql_type::DATETIME:
                 return datetime{*(int32_t*)val.data(), *(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
 
-            case tds_sql_type::DATETIMN:
+            case sql_type::DATETIMN:
                 switch (val.length()) {
                     case 4:
                         return datetime{*(uint16_t*)val.data(), (uint32_t)(*(uint16_t*)(val.data() + sizeof(uint16_t)) * 60)};
@@ -2247,7 +2247,7 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
                 }
 
-            case tds_sql_type::DATETIME2: {
+            case sql_type::DATETIME2: {
                 uint32_t n = 0;
                 uint64_t secs = 0;
 
@@ -2262,7 +2262,7 @@ namespace tds {
                 return datetime{(int32_t)n - 693595, (uint32_t)secs};
             }
 
-            case tds_sql_type::DATETIMEOFFSET: {
+            case sql_type::DATETIMEOFFSET: {
                 uint32_t n = 0;
                 uint64_t secs = 0;
 
@@ -2289,21 +2289,21 @@ namespace tds {
             return 0;
 
         switch (type) {
-            case tds_sql_type::TINYINT:
-            case tds_sql_type::SMALLINT:
-            case tds_sql_type::INT:
-            case tds_sql_type::BIGINT:
-            case tds_sql_type::INTN:
-            case tds_sql_type::BITN:
+            case sql_type::TINYINT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::BIGINT:
+            case sql_type::INTN:
+            case sql_type::BITN:
                 return (double)operator int64_t();
 
-            case tds_sql_type::REAL:
+            case sql_type::REAL:
                 return *(float*)val.data();
 
-            case tds_sql_type::FLOAT:
+            case sql_type::FLOAT:
                 return *(double*)val.data();
 
-            case tds_sql_type::FLTN:
+            case sql_type::FLTN:
                 switch (val.length()) {
                     case sizeof(float):
                         return *(float*)val.data();
@@ -2315,8 +2315,8 @@ namespace tds {
                         throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), val.length());
                 }
 
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::CHAR:
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
             {
                 if (val.empty())
                     return 0.0;
@@ -2342,8 +2342,8 @@ namespace tds {
     #endif
             }
 
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::NCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
             {
                 if (val.empty())
                     return 0.0;
@@ -2378,14 +2378,14 @@ namespace tds {
     #endif
             }
 
-            case tds_sql_type::DATETIME: {
+            case sql_type::DATETIME: {
                 auto d = *(int32_t*)val.data();
                 auto t = *(uint32_t*)(val.data() + sizeof(int32_t));
 
                 return (double)d + ((double)t / 25920000.0);
             }
 
-            case tds_sql_type::DATETIMN:
+            case sql_type::DATETIMN:
                 switch (val.length()) {
                     case 4: {
                         auto d = *(uint16_t*)val.data();
@@ -2412,40 +2412,40 @@ namespace tds {
         }
     }
 
-    static size_t fixed_len_size(enum tds_sql_type type) {
+    static size_t fixed_len_size(enum sql_type type) {
         switch (type) {
-            case tds_sql_type::TINYINT:
+            case sql_type::TINYINT:
                 return 1;
 
-            case tds_sql_type::SMALLINT:
+            case sql_type::SMALLINT:
                 return 2;
 
-            case tds_sql_type::INT:
+            case sql_type::INT:
                 return 4;
 
-            case tds_sql_type::BIGINT:
+            case sql_type::BIGINT:
                 return 8;
 
-            case tds_sql_type::DATETIME:
+            case sql_type::DATETIME:
                 return 8;
 
-            case tds_sql_type::DATETIM4:
+            case sql_type::DATETIM4:
                 return 4;
 
-            case tds_sql_type::SMALLMONEY:
+            case sql_type::SMALLMONEY:
                 return 4;
 
-            case tds_sql_type::MONEY:
+            case sql_type::MONEY:
                 return 8;
 
-            case tds_sql_type::REAL:
+            case sql_type::REAL:
                 return 4;
 
-            case tds_sql_type::FLOAT:
+            case sql_type::FLOAT:
                 return 8;
 
-            case tds_sql_type::SQL_NULL:
-            case tds_sql_type::BIT:
+            case sql_type::SQL_NULL:
+            case sql_type::BIT:
                 throw formatted_error(FMT_STRING("FIXME - fixed_len_size for {}"), type); // FIXME
 
             default:
@@ -2460,41 +2460,41 @@ namespace tds {
 
         for (const auto& p : params) {
             switch (p.type) {
-                case tds_sql_type::SQL_NULL:
-                case tds_sql_type::TINYINT:
-                case tds_sql_type::BIT:
-                case tds_sql_type::SMALLINT:
-                case tds_sql_type::INT:
-                case tds_sql_type::DATETIM4:
-                case tds_sql_type::REAL:
-                case tds_sql_type::MONEY:
-                case tds_sql_type::DATETIME:
-                case tds_sql_type::FLOAT:
-                case tds_sql_type::SMALLMONEY:
-                case tds_sql_type::BIGINT:
+                case sql_type::SQL_NULL:
+                case sql_type::TINYINT:
+                case sql_type::BIT:
+                case sql_type::SMALLINT:
+                case sql_type::INT:
+                case sql_type::DATETIM4:
+                case sql_type::REAL:
+                case sql_type::MONEY:
+                case sql_type::DATETIME:
+                case sql_type::FLOAT:
+                case sql_type::SMALLMONEY:
+                case sql_type::BIGINT:
                     bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
                     break;
 
-                case tds_sql_type::UNIQUEIDENTIFIER:
-                case tds_sql_type::DECIMAL:
-                case tds_sql_type::NUMERIC:
-                case tds_sql_type::MONEYN:
-                case tds_sql_type::DATETIMN:
-                case tds_sql_type::DATE:
+                case sql_type::UNIQUEIDENTIFIER:
+                case sql_type::DECIMAL:
+                case sql_type::NUMERIC:
+                case sql_type::MONEYN:
+                case sql_type::DATETIMN:
+                case sql_type::DATE:
                     bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
                     break;
 
-                case tds_sql_type::INTN:
-                case tds_sql_type::FLTN:
-                case tds_sql_type::TIME:
-                case tds_sql_type::DATETIME2:
-                case tds_sql_type::DATETIMEOFFSET:
-                case tds_sql_type::BITN:
+                case sql_type::INTN:
+                case sql_type::FLTN:
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMEOFFSET:
+                case sql_type::BITN:
                     bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length()) + sizeof(uint8_t);
                     break;
 
-                case tds_sql_type::NVARCHAR:
-                case tds_sql_type::VARCHAR:
+                case sql_type::NVARCHAR:
+                case sql_type::VARCHAR:
                     if (!p.is_null && p.val.length() > 8000) // MAX
                         bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
                     else
@@ -2502,7 +2502,7 @@ namespace tds {
 
                     break;
 
-                case tds_sql_type::VARBINARY:
+                case sql_type::VARBINARY:
                     if (!p.is_null && p.val.length() > 8000) // MAX
                         bufsize += sizeof(tds_VARBINARY_MAX_param) + p.val.length() + sizeof(uint32_t);
                     else
@@ -2546,27 +2546,27 @@ namespace tds {
             ptr += sizeof(tds_param_header);
 
             switch (p.type) {
-                case tds_sql_type::SQL_NULL:
-                case tds_sql_type::TINYINT:
-                case tds_sql_type::BIT:
-                case tds_sql_type::SMALLINT:
-                case tds_sql_type::INT:
-                case tds_sql_type::DATETIM4:
-                case tds_sql_type::REAL:
-                case tds_sql_type::MONEY:
-                case tds_sql_type::DATETIME:
-                case tds_sql_type::FLOAT:
-                case tds_sql_type::SMALLMONEY:
-                case tds_sql_type::BIGINT:
+                case sql_type::SQL_NULL:
+                case sql_type::TINYINT:
+                case sql_type::BIT:
+                case sql_type::SMALLINT:
+                case sql_type::INT:
+                case sql_type::DATETIM4:
+                case sql_type::REAL:
+                case sql_type::MONEY:
+                case sql_type::DATETIME:
+                case sql_type::FLOAT:
+                case sql_type::SMALLMONEY:
+                case sql_type::BIGINT:
                     memcpy(ptr, p.val.data(), p.val.length());
 
                     ptr += p.val.length();
 
                     break;
 
-                case tds_sql_type::INTN:
-                case tds_sql_type::FLTN:
-                case tds_sql_type::BITN:
+                case sql_type::INTN:
+                case sql_type::FLTN:
+                case sql_type::BITN:
                     *ptr = (uint8_t)p.val.length();
                     ptr++;
 
@@ -2582,9 +2582,9 @@ namespace tds {
 
                     break;
 
-                case tds_sql_type::TIME:
-                case tds_sql_type::DATETIME2:
-                case tds_sql_type::DATETIMEOFFSET:
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMEOFFSET:
                     *ptr = (uint8_t)p.max_length;
                     ptr++;
 
@@ -2600,12 +2600,12 @@ namespace tds {
 
                     break;
 
-                case tds_sql_type::UNIQUEIDENTIFIER:
-                case tds_sql_type::DECIMAL:
-                case tds_sql_type::NUMERIC:
-                case tds_sql_type::MONEYN:
-                case tds_sql_type::DATETIMN:
-                case tds_sql_type::DATE:
+                case sql_type::UNIQUEIDENTIFIER:
+                case sql_type::DECIMAL:
+                case sql_type::NUMERIC:
+                case sql_type::MONEYN:
+                case sql_type::DATETIMN:
+                case sql_type::DATE:
                     if (p.is_null) {
                         *ptr = 0;
                         ptr++;
@@ -2618,8 +2618,8 @@ namespace tds {
 
                     break;
 
-                case tds_sql_type::NVARCHAR:
-                case tds_sql_type::VARCHAR:
+                case sql_type::NVARCHAR:
+                case sql_type::VARCHAR:
                 {
                     auto h2 = (tds_VARCHAR_param*)h;
 
@@ -2668,7 +2668,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_sql_type::VARBINARY: {
+                case sql_type::VARBINARY: {
                     auto h2 = (tds_VARBINARY_param*)h;
 
                     if (p.is_null || p.val.empty())
@@ -2822,33 +2822,33 @@ namespace tds {
                         col.type = c.type;
 
                         switch (c.type) {
-                            case tds_sql_type::SQL_NULL:
-                            case tds_sql_type::TINYINT:
-                            case tds_sql_type::BIT:
-                            case tds_sql_type::SMALLINT:
-                            case tds_sql_type::INT:
-                            case tds_sql_type::DATETIM4:
-                            case tds_sql_type::REAL:
-                            case tds_sql_type::MONEY:
-                            case tds_sql_type::DATETIME:
-                            case tds_sql_type::FLOAT:
-                            case tds_sql_type::SMALLMONEY:
-                            case tds_sql_type::BIGINT:
-                            case tds_sql_type::UNIQUEIDENTIFIER:
-                            case tds_sql_type::DECIMAL:
-                            case tds_sql_type::NUMERIC:
-                            case tds_sql_type::MONEYN:
-                            case tds_sql_type::DATE:
+                            case sql_type::SQL_NULL:
+                            case sql_type::TINYINT:
+                            case sql_type::BIT:
+                            case sql_type::SMALLINT:
+                            case sql_type::INT:
+                            case sql_type::DATETIM4:
+                            case sql_type::REAL:
+                            case sql_type::MONEY:
+                            case sql_type::DATETIME:
+                            case sql_type::FLOAT:
+                            case sql_type::SMALLMONEY:
+                            case sql_type::BIGINT:
+                            case sql_type::UNIQUEIDENTIFIER:
+                            case sql_type::DECIMAL:
+                            case sql_type::NUMERIC:
+                            case sql_type::MONEYN:
+                            case sql_type::DATE:
                                 // nop
                                 break;
 
-                            case tds_sql_type::INTN:
-                            case tds_sql_type::FLTN:
-                            case tds_sql_type::TIME:
-                            case tds_sql_type::DATETIME2:
-                            case tds_sql_type::DATETIMN:
-                            case tds_sql_type::DATETIMEOFFSET:
-                            case tds_sql_type::BITN:
+                            case sql_type::INTN:
+                            case sql_type::FLTN:
+                            case sql_type::TIME:
+                            case sql_type::DATETIME2:
+                            case sql_type::DATETIMN:
+                            case sql_type::DATETIMEOFFSET:
+                            case sql_type::BITN:
                                 if (sv2.length() < sizeof(uint8_t))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
@@ -2858,10 +2858,10 @@ namespace tds {
                                 sv2 = sv2.substr(1);
                                 break;
 
-                            case tds_sql_type::VARCHAR:
-                            case tds_sql_type::NVARCHAR:
-                            case tds_sql_type::CHAR:
-                            case tds_sql_type::NCHAR:
+                            case sql_type::VARCHAR:
+                            case sql_type::NVARCHAR:
+                            case sql_type::CHAR:
+                            case sql_type::NCHAR:
                                 if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
 
@@ -2871,8 +2871,8 @@ namespace tds {
                                 sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
                                 break;
 
-                            case tds_sql_type::VARBINARY:
-                            case tds_sql_type::BINARY:
+                            case sql_type::VARBINARY:
+                            case sql_type::BINARY:
                                 if (sv2.length() < sizeof(uint16_t))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t));
 
@@ -3038,20 +3038,20 @@ namespace tds {
         return false;
     }
 
-    void rpc::handle_row_col(value& col, enum tds_sql_type type, unsigned int max_length, string_view& sv) {
+    void rpc::handle_row_col(value& col, enum sql_type type, unsigned int max_length, string_view& sv) {
         switch (type) {
-            case tds_sql_type::SQL_NULL:
-            case tds_sql_type::TINYINT:
-            case tds_sql_type::BIT:
-            case tds_sql_type::SMALLINT:
-            case tds_sql_type::INT:
-            case tds_sql_type::DATETIM4:
-            case tds_sql_type::REAL:
-            case tds_sql_type::MONEY:
-            case tds_sql_type::DATETIME:
-            case tds_sql_type::FLOAT:
-            case tds_sql_type::SMALLMONEY:
-            case tds_sql_type::BIGINT:
+            case sql_type::SQL_NULL:
+            case sql_type::TINYINT:
+            case sql_type::BIT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::DATETIM4:
+            case sql_type::REAL:
+            case sql_type::MONEY:
+            case sql_type::DATETIME:
+            case sql_type::FLOAT:
+            case sql_type::SMALLMONEY:
+            case sql_type::BIGINT:
             {
                 auto len = fixed_len_size(type);
 
@@ -3067,18 +3067,18 @@ namespace tds {
                 break;
             }
 
-            case tds_sql_type::UNIQUEIDENTIFIER:
-            case tds_sql_type::INTN:
-            case tds_sql_type::DECIMAL:
-            case tds_sql_type::NUMERIC:
-            case tds_sql_type::BITN:
-            case tds_sql_type::FLTN:
-            case tds_sql_type::MONEYN:
-            case tds_sql_type::DATETIMN:
-            case tds_sql_type::DATE:
-            case tds_sql_type::TIME:
-            case tds_sql_type::DATETIME2:
-            case tds_sql_type::DATETIMEOFFSET:
+            case sql_type::UNIQUEIDENTIFIER:
+            case sql_type::INTN:
+            case sql_type::DECIMAL:
+            case sql_type::NUMERIC:
+            case sql_type::BITN:
+            case sql_type::FLTN:
+            case sql_type::MONEYN:
+            case sql_type::DATETIMN:
+            case sql_type::DATE:
+            case sql_type::TIME:
+            case sql_type::DATETIME2:
+            case sql_type::DATETIMEOFFSET:
             {
                 if (sv.length() < sizeof(uint8_t))
                     throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
@@ -3099,12 +3099,12 @@ namespace tds {
                 break;
             }
 
-            case tds_sql_type::VARCHAR:
-            case tds_sql_type::NVARCHAR:
-            case tds_sql_type::VARBINARY:
-            case tds_sql_type::CHAR:
-            case tds_sql_type::NCHAR:
-            case tds_sql_type::BINARY:
+            case sql_type::VARCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::VARBINARY:
+            case sql_type::CHAR:
+            case sql_type::NCHAR:
+            case sql_type::BINARY:
                 if (max_length == 0xffff) {
                     if (sv.length() < sizeof(uint64_t))
                         throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
