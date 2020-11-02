@@ -3278,6 +3278,10 @@ namespace tds {
                     bufsize += sizeof(uint8_t) + cols[i].max_length;
                 break;
 
+                case sql_type::FLTN:
+                    bufsize += sizeof(uint8_t) + cols[i].max_length;
+                    break;
+
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
             }
@@ -3632,6 +3636,32 @@ namespace tds {
 
                         default:
                             throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].max_length);
+                    }
+
+                    break;
+                }
+
+                case sql_type::FLTN: {
+                    auto d = (double)v[i];
+
+                    *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                    ptr++;
+
+                    switch (cols[i].max_length) {
+                        case sizeof(float): {
+                            auto f = (float)d;
+                            memcpy(ptr, &f, sizeof(float));
+                            ptr += sizeof(float);
+                            break;
+                        }
+
+                        case sizeof(double):
+                            memcpy(ptr, &d, sizeof(double));
+                            ptr += sizeof(double);
+                        break;
+
+                        default:
+                            throw formatted_error(FMT_STRING("FLTN has invalid length {}."), cols[i].max_length);
                     }
 
                     break;
