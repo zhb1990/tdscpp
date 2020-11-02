@@ -3280,7 +3280,11 @@ namespace tds {
 
                 case sql_type::FLTN:
                     bufsize += sizeof(uint8_t) + cols[i].max_length;
-                    break;
+                break;
+
+                case sql_type::BITN:
+                    bufsize += sizeof(uint8_t) + sizeof(uint8_t);
+                break;
 
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
@@ -3663,6 +3667,17 @@ namespace tds {
                         default:
                             throw formatted_error(FMT_STRING("FLTN has invalid length {}."), cols[i].max_length);
                     }
+
+                    break;
+                }
+
+                case sql_type::BITN: {
+                    auto n = (int64_t)v[i];
+
+                    *(uint8_t*)ptr = sizeof(uint8_t);
+                    ptr++;
+                    *(uint8_t*)ptr = n != 0 ? 1 : 0;
+                    ptr++;
 
                     break;
                 }
