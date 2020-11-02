@@ -56,6 +56,7 @@ namespace tds {
 
     class query;
     class value;
+    class column;
 
     // FIXME - use pimpl
     class tds {
@@ -87,6 +88,7 @@ namespace tds {
                             const std::u16string_view& locale, const std::u16string_view& database, const std::u16string_view& attach_db,
                             const std::u16string_view& new_password);
         void handle_loginack_msg(std::string_view sv);
+        std::vector<uint8_t> bcp_colmetadata(const std::vector<column>& cols);
 
         int sock = 0;
     };

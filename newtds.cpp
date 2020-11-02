@@ -3094,6 +3094,9 @@ namespace tds {
     void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp) {
         vector<column> cols;
 
+        if (np.empty())
+            throw runtime_error("List of columns not supplied.");
+
         {
             output_param<int32_t> handle;
             bool first = true;
@@ -3138,12 +3141,164 @@ namespace tds {
             batch b(*this, q);
         }
 
-        // FIXME - wait for DONE token
-        // FIXME - send COLMETADATA for rows
+        // send COLMETADATA for rows
+        auto buf = bcp_colmetadata(cols);
+
         // FIXME - send ROW / NBC_ROW data
+
+        send_msg(tds_msg::bulk_load_data, string_view((char*)buf.data(), buf.size()));
+
+        // FIXME - wait for response
 
         // FIXME - handle INT NULLs and VARCHAR NULLs
         // FIXME - handle maximum packet size (4096?)
+    }
+
+    vector<uint8_t> tds::bcp_colmetadata(const vector<column>& cols) {
+        size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
+
+        for (const auto& col : cols) {
+            switch (col.type) {
+                case sql_type::SQL_NULL:
+                case sql_type::TINYINT:
+                case sql_type::BIT:
+                case sql_type::SMALLINT:
+                case sql_type::INT:
+                case sql_type::DATETIM4:
+                case sql_type::REAL:
+                case sql_type::MONEY:
+                case sql_type::DATETIME:
+                case sql_type::FLOAT:
+                case sql_type::SMALLMONEY:
+                case sql_type::BIGINT:
+                case sql_type::UNIQUEIDENTIFIER:
+                case sql_type::DECIMAL:
+                case sql_type::NUMERIC:
+                case sql_type::MONEYN:
+                case sql_type::DATE:
+                    // nop
+                    break;
+
+                case sql_type::INTN:
+                case sql_type::FLTN:
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMN:
+                case sql_type::DATETIMEOFFSET:
+                case sql_type::BITN:
+                    bufsize++;
+                    break;
+
+                case sql_type::VARCHAR:
+                case sql_type::NVARCHAR:
+                case sql_type::CHAR:
+                case sql_type::NCHAR:
+                    bufsize += sizeof(uint16_t) + sizeof(tds_collation);
+                    break;
+
+                case sql_type::VARBINARY:
+                case sql_type::BINARY:
+                    bufsize += sizeof(uint16_t);
+                    break;
+
+                default:
+                    throw formatted_error(FMT_STRING("Unhandled type {} when creating COLMETADATA token."), col.type);
+            }
+
+            bufsize += sizeof(uint8_t) + (col.name.length() * sizeof(char16_t));
+        }
+
+        vector<uint8_t> buf(bufsize);
+        auto ptr = (uint8_t*)buf.data();
+
+        *(tds_token*)ptr = tds_token::COLMETADATA; ptr++;
+        *(uint16_t*)ptr = (uint16_t)cols.size(); ptr += sizeof(uint16_t);
+
+        for (const auto& col : cols) {
+            auto c = (tds_colmetadata_col*)ptr;
+
+            c->user_type = 0;
+            c->flags = 9; // nullable, read/write
+            c->type = col.type;
+
+            ptr += sizeof(tds_colmetadata_col);
+
+            switch (col.type) {
+                case sql_type::SQL_NULL:
+                case sql_type::TINYINT:
+                case sql_type::BIT:
+                case sql_type::SMALLINT:
+                case sql_type::INT:
+                case sql_type::DATETIM4:
+                case sql_type::REAL:
+                case sql_type::MONEY:
+                case sql_type::DATETIME:
+                case sql_type::FLOAT:
+                case sql_type::SMALLMONEY:
+                case sql_type::BIGINT:
+                case sql_type::UNIQUEIDENTIFIER:
+                case sql_type::DECIMAL:
+                case sql_type::NUMERIC:
+                case sql_type::MONEYN:
+                case sql_type::DATE:
+                    // nop
+                break;
+
+                case sql_type::INTN:
+                case sql_type::FLTN:
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMN:
+                case sql_type::DATETIMEOFFSET:
+                case sql_type::BITN:
+                    *(uint8_t*)ptr = (uint8_t)col.max_length;
+                    ptr++;
+                break;
+
+                case sql_type::VARCHAR:
+                case sql_type::NVARCHAR:
+                case sql_type::CHAR:
+                case sql_type::NCHAR: {
+                    *(uint16_t*)ptr = (uint16_t)col.max_length;
+                    ptr += sizeof(uint16_t);
+
+                    auto c = (tds_collation*)ptr;
+
+                    c->lcid = 0x0409; // en-US
+                    c->ignore_case = 1;
+                    c->ignore_accent = 0;
+                    c->ignore_width = 1;
+                    c->ignore_kana = 1;
+                    c->binary = 0;
+                    c->binary2 = 0;
+                    c->utf8 = 0;
+                    c->reserved = 0;
+                    c->version = 0;
+                    c->sort_id = 52; // nocase.iso
+
+                    ptr += sizeof(tds_collation);
+
+                    break;
+                }
+
+                case sql_type::VARBINARY:
+                case sql_type::BINARY:
+                    *(uint16_t*)ptr = (uint16_t)col.max_length;
+                    ptr++;
+                break;
+
+                default:
+                    throw formatted_error(FMT_STRING("Unhandled type {} when creating COLMETADATA token."), col.type);
+            }
+
+            *(uint8_t*)ptr = (uint8_t)col.name.length();
+            ptr++;
+
+            memcpy(ptr, col.name.data(), col.name.length() * sizeof(char16_t));
+            ptr += col.name.length() * sizeof(char16_t);
+        }
+
+        return buf;
     }
 
     batch::batch(tds& conn, const u16string_view& q) {
