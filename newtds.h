@@ -269,7 +269,6 @@ namespace tds {
         }
 
         void do_rpc(tds& conn, const std::u16string_view& name);
-        void handle_row_col(value& col, enum sql_type type, unsigned int max_length, std::string_view& sv);
 
         std::vector<value> params;
         std::map<unsigned int, value*> output_params;
@@ -326,6 +325,19 @@ namespace tds {
         while (q.fetch_row()) {
         }
     }
+
+    class batch {
+    public:
+        batch(tds& conn, const std::u16string_view& q);
+
+        bool fetch_row();
+
+        std::vector<column> cols;
+
+    private:
+        bool finished = false;
+        std::list<std::vector<value>> rows;
+    };
 };
 
 template<>
