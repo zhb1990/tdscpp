@@ -3221,6 +3221,10 @@ namespace tds {
                     }
                 break;
 
+                case sql_type::DATE:
+                    bufsize += sizeof(uint8_t) + 3;
+                break;
+
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
             }
@@ -3403,6 +3407,19 @@ namespace tds {
                         }
                     }
                 break;
+
+                case sql_type::DATE: {
+                    auto d = (date)v[i];
+                    uint32_t n = d.num + 693595;
+
+                    *(uint8_t*)ptr = 3;
+                    ptr++;
+
+                    memcpy(ptr, &n, 3);
+                    ptr += 3;
+
+                    break;
+                }
 
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
