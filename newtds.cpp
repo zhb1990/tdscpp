@@ -3097,6 +3097,8 @@ namespace tds {
         if (np.empty())
             throw runtime_error("List of columns not supplied.");
 
+        // FIXME - do we need to make sure no duplicates in np?
+
         {
             output_param<int32_t> handle;
             bool first = true;
@@ -3142,14 +3144,105 @@ namespace tds {
         }
 
         // FIXME - handle INT NULLs and VARCHAR NULLs
-        // FIXME - handle maximum packet size (4096?)
 
         // send COLMETADATA for rows
         auto buf = bcp_colmetadata(cols);
 
-        // FIXME - send ROW / NBC_ROW data
+        for (const auto& v : vp) {
+            auto buf2 = bcp_row(v, cols);
+
+            // FIXME - if buf full, send packet (maximum packet size is 4096?)
+
+            auto oldlen = buf.size();
+            buf.resize(oldlen + buf2.size());
+            memcpy(&buf[oldlen], buf2.data(), buf2.size());
+        }
 
         bcp_sendmsg(string_view((char*)buf.data(), buf.size()));
+    }
+
+    vector<uint8_t> tds::bcp_row(const vector<value>& v, const vector<column>& cols) {
+        size_t bufsize = sizeof(uint8_t);
+
+        // FIXME - if VARCHAR etc. is NULL, will need to send NBC_ROW instead of ROW
+
+        for (unsigned int i = 0; i < v.size(); i++) {
+            switch (cols[i].type) {
+                case sql_type::INTN:
+                    bufsize++;
+
+                    if (!v[i].is_null)
+                        bufsize += cols[i].max_length;
+
+                break;
+
+                default:
+                    throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
+            }
+        }
+
+        vector<uint8_t> buf(bufsize);
+        uint8_t* ptr = buf.data();
+
+        *(tds_token*)ptr = tds_token::ROW;
+        ptr++;
+
+        for (unsigned int i = 0; i < v.size(); i++) {
+            switch (cols[i].type) {
+                case sql_type::INTN: {
+                    if (v[i].is_null) {
+                        *ptr = 0;
+                        ptr++;
+                    } else {
+                        *ptr = (uint8_t)cols[i].max_length;
+                        ptr++;
+
+                        auto n = (int64_t)v[i];
+
+                        switch (cols[i].max_length) {
+                            case sizeof(uint8_t):
+                                if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
+                                    throw formatted_error(FMT_STRING("{} is out of bounds for TINYINT."), n);
+
+                                *ptr = (uint8_t)n;
+                                ptr++;
+                            break;
+
+                            case sizeof(int16_t):
+                                if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
+                                    throw formatted_error(FMT_STRING("{} is out of bounds for SMALLINT."), n);
+
+                                *(int16_t*)ptr = (int16_t)n;
+                                ptr += sizeof(int16_t);
+                            break;
+
+                            case sizeof(int32_t):
+                                if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
+                                    throw formatted_error(FMT_STRING("{} is out of bounds for INT."), n);
+
+                                *(int32_t*)ptr = (int32_t)n;
+                                ptr += sizeof(int32_t);
+                            break;
+
+                            case sizeof(int64_t):
+                                *(int64_t*)ptr = n;
+                                ptr += sizeof(int64_t);
+                            break;
+
+                            default:
+                                throw formatted_error(FMT_STRING("Invalid INTN size {}."), cols[i].max_length);
+                        }
+                    }
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
+            }
+        }
+
+        return buf;
     }
 
     void tds::bcp_sendmsg(const string_view& data) {
