@@ -55,6 +55,7 @@ namespace tds {
                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
 
     class query;
+    class value;
 
     // FIXME - use pimpl
     class tds {
@@ -69,6 +70,8 @@ namespace tds {
 
         template<typename... Args>
         void run(const std::string_view& s, Args&&... args);
+
+        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp);
 
         msg_handler message_handler;
 

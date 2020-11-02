@@ -57,6 +57,8 @@ int main() {
         }
 
         n.run("RAISERROR('Hello, world!', 0, 1)");
+
+        n.bcp(u"dbo.test", {u"a"}, {{"229"}, {"171"}});
     } catch (const exception& e) {
         fmt::print(stderr, FMT_STRING("Exception: {}\n"), e.what());
         return 1;

@@ -3080,4 +3080,60 @@ namespace tds {
 
         return s;
     }
+
+    static u16string sql_escape(const u16string_view& sv) {
+        u16string s;
+
+        s.reserve(sv.length() + 2);
+
+        s = u"[";
+
+        for (auto c : sv) {
+            if (c == u']')
+                s += u"]]";
+            else
+                s += c;
+        }
+
+        s += u"]";
+
+        return s;
+    }
+
+    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp) {
+        vector<column> cols;
+
+        {
+            output_param<int32_t> handle;
+            bool first = true;
+
+            u16string q = u"SELECT TOP 0 ";
+
+            for (const auto& n : np) {
+                if (!first)
+                    q += u", ";
+
+                q += sql_escape(n);
+                first = false;
+            }
+
+            q += u" FROM "s + u16string(table); // FIXME - escape schema name and table name
+
+            {
+                rpc r1(*this, u"sp_prepare", handle, u"", q, 1);
+
+                cols = r1.cols; // get column types
+            }
+
+            rpc r2(*this, u"sp_unprepare", static_cast<value>(handle));
+        }
+
+        // FIXME - send INSERT BULK message
+        // FIXME - wait for DONE token
+        // FIXME - send COLMETADATA for rows
+        // FIXME - send ROW / NBC_ROW data
+
+        // FIXME - handle INT NULLs and VARCHAR NULLs
+        // FIXME - handle maximum packet size (4096?)
+    }
 };
