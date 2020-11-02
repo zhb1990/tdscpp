@@ -2936,9 +2936,7 @@ namespace tds {
             }
 
             {
-                auto params_string = create_params_string();
-
-                rpc r1(conn, u"sp_prepare", handle, utf8_to_utf16(params_string), utf8_to_utf16(q2), 1); // 1 means return metadata
+                rpc r1(conn, u"sp_prepare", handle, create_params_string(), utf8_to_utf16(q2), 1); // 1 means return metadata
 
                 cols = r1.cols;
             }
@@ -2967,113 +2965,106 @@ namespace tds {
         return r2->fetch_row();
     }
 
-    string query::create_params_string() {
+    static u16string to_u16string(uint64_t num) {
+        char16_t s[22], *p;
+
+        if (num == 0)
+            return u"0";
+
+        s[21] = 0;
+        p = &s[21];
+
+        while (num != 0) {
+            p = &p[-1];
+
+            *p = (char16_t)((num % 10) + '0');
+
+            num /= 10;
+        }
+
+        return p;
+    }
+
+    u16string type_to_string(enum sql_type type, size_t length) {
+        switch (type) {
+            case sql_type::INTN:
+                switch (length) {
+                    case sizeof(uint8_t):
+                        return u"TINYINT";
+
+                    case sizeof(int16_t):
+                        return u"SMALLINT";
+
+                    case sizeof(int32_t):
+                        return u"INT";
+
+                    case sizeof(int64_t):
+                        return u"BIGINT";
+
+                    default:
+                        throw formatted_error(FMT_STRING("INTN has invalid length {}."), length);
+                }
+
+            case sql_type::NVARCHAR:
+                if (length > 4000)
+                    return u"NVARCHAR(MAX)";
+                else
+                    return u"NVARCHAR(" + to_u16string(length == 0 ? 1 : (length / sizeof(char16_t))) + u")";
+
+            case sql_type::VARCHAR:
+                if (length > 8000)
+                    return u"VARCHAR(MAX)";
+                else
+                    return u"VARCHAR(" + to_u16string(length == 0 ? 1 : length) + u")";
+
+            case sql_type::FLTN:
+                switch (length) {
+                    case 4:
+                        return u"REAL";
+
+                    case 8:
+                        return u"FLOAT";
+
+                    default:
+                        throw formatted_error(FMT_STRING("FLTN has invalid length {}."), length);
+                }
+
+            case sql_type::DATE:
+                return u"DATE";
+
+            case sql_type::TIME:
+                return u"DATE";
+
+            case sql_type::DATETIME2:
+                return u"DATETIME2";
+
+            case sql_type::DATETIMEOFFSET:
+                return u"DATETIMEOFFSET";
+
+            case sql_type::VARBINARY:
+                if (length > 8000)
+                    return u"VARBINARY(MAX)";
+                else
+                    return u"VARBINARY(" + to_u16string(length == 0 ? 1 : length) + u")";
+
+            case sql_type::BITN:
+                return u"BIT";
+
+            default:
+                throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
+        }
+    }
+
+    u16string query::create_params_string() {
         unsigned int num = 1;
-        string s;
+        u16string s;
 
         for (const auto& p : params) {
             if (!s.empty())
-                s += ", ";
+                s += u", ";
 
-            s += "@P" + to_string(num) + " ";
-
-            switch (p.type) {
-                case sql_type::INTN:
-                    switch (p.val.length()) {
-                        case sizeof(uint8_t):
-                            s += "TINYINT";
-                            break;
-
-                        case sizeof(int16_t):
-                            s += "SMALLINT";
-                            break;
-
-                        case sizeof(int32_t):
-                            s += "INT";
-                            break;
-
-                        case sizeof(int64_t):
-                            s += "BIGINT";
-                            break;
-
-                        default:
-                            throw formatted_error(FMT_STRING("INTN has invalid length {}."), p.val.length());
-                    }
-
-                break;
-
-                case sql_type::NVARCHAR: {
-                    auto len = p.val.length();
-
-                    if (p.val.length() > 4000)
-                        s += "NVARCHAR(MAX)";
-                    else
-                        s += "NVARCHAR(" + to_string(len == 0 ? 1 : (p.val.length() / sizeof(char16_t))) + ")";
-
-                    break;
-                }
-
-                case sql_type::VARCHAR: {
-                    auto len = p.val.length();
-
-                    if (p.val.length() > 8000)
-                        s += "VARCHAR(MAX)";
-                    else
-                        s += "VARCHAR(" + to_string(len == 0 ? 1 : p.val.length()) + ")";
-
-                    break;
-                }
-
-                case sql_type::FLTN:
-                    switch (p.val.length()) {
-                        case 4:
-                            s += "REAL";
-                            break;
-
-                        case 8:
-                            s += "FLOAT";
-                            break;
-
-                        default:
-                            throw formatted_error(FMT_STRING("FLTN has invalid length {}."), p.val.length());
-                    }
-
-                break;
-
-                case sql_type::DATE:
-                    s += "DATE";
-                break;
-
-                case sql_type::TIME:
-                    s += "DATE";
-                break;
-
-                case sql_type::DATETIME2:
-                    s += "DATETIME2";
-                break;
-
-                case sql_type::DATETIMEOFFSET:
-                    s += "DATETIMEOFFSET";
-                break;
-
-                case sql_type::VARBINARY: {
-                    auto len = p.val.length();
-
-                    if (p.val.length() > 8000)
-                        s += "VARBINARY(MAX)";
-                    else
-                        s += "VARBINARY(" + to_string(len == 0 ? 1 : p.val.length()) + ")";
-
-                    break;
-                }
-
-                case sql_type::BITN:
-                    s += "BIT";
-                break;
-
-                default:
-                    throw formatted_error(FMT_STRING("Type {} not supported as parameter."), p.type);
-            }
+            s += u"@P" + to_u16string(num) + u" ";
+            s += type_to_string(p.type, p.val.length());
 
             num++;
         }
@@ -3128,7 +3119,25 @@ namespace tds {
             rpc r2(*this, u"sp_unprepare", static_cast<value>(handle));
         }
 
-        // FIXME - send INSERT BULK message (SQL batch)
+        {
+            u16string q = u"INSERT BULK " + u16string(table) + u"(";
+            bool first = true;
+
+            for (unsigned int i = 0; i < cols.size(); i++) {
+                if (!first)
+                    q += u", ";
+
+                q += sql_escape(np[i]) + u" ";
+                q += type_to_string(cols[i].type, cols[i].max_length);
+
+                first = false;
+            }
+
+            q += u")";
+
+            batch b(*this, q);
+        }
+
         // FIXME - wait for DONE token
         // FIXME - send COLMETADATA for rows
         // FIXME - send ROW / NBC_ROW data
