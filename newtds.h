@@ -89,6 +89,7 @@ namespace tds {
                             const std::u16string_view& new_password);
         void handle_loginack_msg(std::string_view sv);
         std::vector<uint8_t> bcp_colmetadata(const std::vector<column>& cols);
+        void bcp_sendmsg(const std::string_view& msg);
 
         int sock = 0;
     };

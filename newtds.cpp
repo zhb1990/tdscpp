@@ -3141,17 +3141,81 @@ namespace tds {
             batch b(*this, q);
         }
 
+        // FIXME - handle INT NULLs and VARCHAR NULLs
+        // FIXME - handle maximum packet size (4096?)
+
         // send COLMETADATA for rows
         auto buf = bcp_colmetadata(cols);
 
         // FIXME - send ROW / NBC_ROW data
 
-        send_msg(tds_msg::bulk_load_data, string_view((char*)buf.data(), buf.size()));
+        bcp_sendmsg(string_view((char*)buf.data(), buf.size()));
+    }
 
-        // FIXME - wait for response
+    void tds::bcp_sendmsg(const string_view& data) {
+        send_msg(tds_msg::bulk_load_data, data);
 
-        // FIXME - handle INT NULLs and VARCHAR NULLs
-        // FIXME - handle maximum packet size (4096?)
+        enum tds_msg type;
+        string payload;
+
+        wait_for_msg(type, payload);
+        // FIXME - timeout
+
+        if (type != tds_msg::tabular_result)
+            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+
+        string_view sv = payload;
+
+        while (!sv.empty()) {
+            auto type = (tds_token)sv[0];
+            sv = sv.substr(1);
+
+            // FIXME - parse unknowns according to numeric value of type
+
+            switch (type) {
+                case tds_token::DONE:
+                case tds_token::DONEINPROC:
+                case tds_token::DONEPROC:
+                    if (sv.length() < sizeof(tds_done_msg))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+
+                    sv = sv.substr(sizeof(tds_done_msg));
+
+                    break;
+
+                case tds_token::INFO:
+                case tds_token::ERROR:
+                case tds_token::ENVCHANGE:
+                {
+                    if (sv.length() < sizeof(uint16_t))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+
+                    auto len = *(uint16_t*)&sv[0];
+
+                    sv = sv.substr(sizeof(uint16_t));
+
+                    if (sv.length() < len)
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+
+                    if (type == tds_token::INFO) {
+                        if (message_handler)
+                            handle_info_msg(sv.substr(0, len), false);
+                    } else if (type == tds_token::ERROR) {
+                        if (message_handler)
+                            handle_info_msg(sv.substr(0, len), true);
+
+                        throw formatted_error(FMT_STRING("BCP failed."));
+                    }
+
+                    sv = sv.substr(len);
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("Unhandled token type {} in BCP response."), type);
+            }
+        }
     }
 
     vector<uint8_t> tds::bcp_colmetadata(const vector<column>& cols) {
