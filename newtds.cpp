@@ -3177,16 +3177,23 @@ namespace tds {
 
                 case sql_type::VARCHAR:
                 case sql_type::CHAR:
-                    // FIXME - VARCHAR(MAX)
-
                     bufsize += sizeof(uint16_t);
 
+                    if (cols[i].max_length == 0xffff) // MAX
+                        bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
+
                     if (!v[i].is_null) {
-                        if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR)
+                        if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
                             bufsize += v[i].val.length();
-                        else {
+
+                            if (cols[i].max_length == 0xffff && !v[i].val.empty())
+                                bufsize += sizeof(uint32_t);
+                        } else {
                             auto s = (string)v[i];
                             bufsize += s.length();
+
+                            if (cols[i].max_length == 0xffff && !s.empty())
+                                bufsize += sizeof(uint32_t);
                         }
                     }
                 break;
@@ -3252,28 +3259,60 @@ namespace tds {
 
                 case sql_type::VARCHAR:
                 case sql_type::CHAR:
-                    // FIXME - VARCHAR(MAX)
+                    if (cols[i].max_length == 0xffff) {
+                        if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
+                            *(uint64_t*)ptr = 0xfffffffffffffffe;
+                            ptr += sizeof(uint64_t);
 
-                    if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
-                        if (v[i].val.length() > cols[i].max_length)
-                            throw formatted_error(FMT_STRING("String \"{}\" too long for column (maximum length {})."), v[i].val, cols[i].max_length);
+                            if (!v[i].val.empty()) {
+                                *(uint32_t*)ptr = (uint32_t)v[i].val.length();
+                                ptr += sizeof(uint32_t);
 
-                        *(uint16_t*)ptr = (uint16_t)v[i].val.length();
-                        ptr += sizeof(uint16_t);
+                                memcpy(ptr, v[i].val.data(), v[i].val.length());
+                                ptr += v[i].val.length();
+                            }
 
-                        memcpy(ptr, v[i].val.data(), v[i].val.length());
-                        ptr += v[i].val.length();
+                            *(uint32_t*)ptr = 0;
+                            ptr += sizeof(uint32_t);
+                        } else {
+                            auto s = (string)v[i];
+
+                            *(uint64_t*)ptr = 0xfffffffffffffffe;
+                            ptr += sizeof(uint64_t);
+
+                            if (!s.empty()) {
+                                *(uint32_t*)ptr = (uint32_t)s.length();
+                                ptr += sizeof(uint32_t);
+
+                                memcpy(ptr, s.data(), s.length());
+                                ptr += s.length();
+                            }
+
+                            *(uint32_t*)ptr = 0;
+                            ptr += sizeof(uint32_t);
+                        }
                     } else {
-                        auto s = (string)v[i];
+                        if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
+                            if (v[i].val.length() > cols[i].max_length)
+                                throw formatted_error(FMT_STRING("String \"{}\" too long for column (maximum length {})."), v[i].val, cols[i].max_length);
 
-                        if (s.length() > cols[i].max_length)
-                            throw formatted_error(FMT_STRING("String \"{}\" too long for column (maximum length {})."), s, cols[i].max_length);
+                            *(uint16_t*)ptr = (uint16_t)v[i].val.length();
+                            ptr += sizeof(uint16_t);
 
-                        *(uint16_t*)ptr = (uint16_t)s.length();
-                        ptr += sizeof(uint16_t);
+                            memcpy(ptr, v[i].val.data(), v[i].val.length());
+                            ptr += v[i].val.length();
+                        } else {
+                            auto s = (string)v[i];
 
-                        memcpy(ptr, s.data(), s.length());
-                        ptr += s.length();
+                            if (s.length() > cols[i].max_length)
+                                throw formatted_error(FMT_STRING("String \"{}\" too long for column (maximum length {})."), s, cols[i].max_length);
+
+                            *(uint16_t*)ptr = (uint16_t)s.length();
+                            ptr += sizeof(uint16_t);
+
+                            memcpy(ptr, s.data(), s.length());
+                            ptr += s.length();
+                        }
                     }
                 break;
 
