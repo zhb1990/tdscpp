@@ -3303,7 +3303,10 @@ namespace tds {
                 break;
 
                 case sql_type::FLTN:
-                    bufsize += sizeof(uint8_t) + cols[i].max_length;
+                    bufsize++;
+
+                    if (!v[i].is_null)
+                        bufsize += cols[i].max_length;
                 break;
 
                 case sql_type::BITN:
@@ -3690,31 +3693,34 @@ namespace tds {
                     }
                 break;
 
-                case sql_type::FLTN: {
-                    auto d = (double)v[i];
+                case sql_type::FLTN:
+                    if (v[i].is_null) {
+                        *(uint8_t*)ptr = 0;
+                        ptr++;
+                    } else {
+                        auto d = (double)v[i];
 
-                    *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
-                    ptr++;
+                        *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                        ptr++;
 
-                    switch (cols[i].max_length) {
-                        case sizeof(float): {
-                            auto f = (float)d;
-                            memcpy(ptr, &f, sizeof(float));
-                            ptr += sizeof(float);
+                        switch (cols[i].max_length) {
+                            case sizeof(float): {
+                                auto f = (float)d;
+                                memcpy(ptr, &f, sizeof(float));
+                                ptr += sizeof(float);
+                                break;
+                            }
+
+                            case sizeof(double):
+                                memcpy(ptr, &d, sizeof(double));
+                                ptr += sizeof(double);
                             break;
+
+                            default:
+                                throw formatted_error(FMT_STRING("FLTN has invalid length {}."), cols[i].max_length);
                         }
-
-                        case sizeof(double):
-                            memcpy(ptr, &d, sizeof(double));
-                            ptr += sizeof(double);
-                        break;
-
-                        default:
-                            throw formatted_error(FMT_STRING("FLTN has invalid length {}."), cols[i].max_length);
                     }
-
-                    break;
-                }
+                break;
 
                 case sql_type::BITN: {
                     auto n = (int64_t)v[i];
