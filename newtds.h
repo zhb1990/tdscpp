@@ -188,6 +188,7 @@ namespace tds {
     class column : public value {
     public:
         std::string name;
+        bool nullable;
 
         operator std::string() const {
             return (std::string)static_cast<value>(*this);

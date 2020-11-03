@@ -2702,6 +2702,8 @@ namespace tds {
 
                         auto& col = cols.back();
 
+                        col.nullable = c.flags & 1;
+
                         col.type = c.type;
 
                         switch (c.type) {
