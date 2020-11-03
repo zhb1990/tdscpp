@@ -2999,6 +2999,18 @@ namespace tds {
 
     u16string type_to_string(enum sql_type type, size_t length) {
         switch (type) {
+            case sql_type::TINYINT:
+                return u"TINYINT";
+
+            case sql_type::SMALLINT:
+                return u"SMALLINT";
+
+            case sql_type::INT:
+                return u"INT";
+
+            case sql_type::BIGINT:
+                return u"BIGINT";
+
             case sql_type::INTN:
                 switch (length) {
                     case sizeof(uint8_t):
@@ -3325,6 +3337,22 @@ namespace tds {
 
                     if (!v[i].is_null)
                         bufsize += sizeof(uint8_t);
+                break;
+
+                case sql_type::TINYINT:
+                    bufsize += sizeof(uint8_t);
+                break;
+
+                case sql_type::SMALLINT:
+                    bufsize += sizeof(int16_t);
+                break;
+
+                case sql_type::INT:
+                    bufsize += sizeof(int32_t);
+                break;
+
+                case sql_type::BIGINT:
+                    bufsize += sizeof(int64_t);
                 break;
 
                 default:
@@ -3761,6 +3789,51 @@ namespace tds {
                         ptr++;
                     }
                 break;
+
+                case sql_type::TINYINT: {
+                    auto n = (int64_t)v[i];
+
+                    if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
+                        throw formatted_error(FMT_STRING("Value {} is out of bounds for TINYINT."), n);
+
+                    *(uint8_t*)ptr = (uint8_t)n;
+                    ptr += sizeof(uint8_t);
+
+                    break;
+                }
+
+                case sql_type::SMALLINT: {
+                    auto n = (int64_t)v[i];
+
+                    if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
+                        throw formatted_error(FMT_STRING("Value {} is out of bounds for SMALLINT."), n);
+
+                    *(int32_t*)ptr = (int16_t)n;
+                    ptr += sizeof(int16_t);
+
+                    break;
+                }
+
+                case sql_type::INT: {
+                    auto n = (int64_t)v[i];
+
+                    if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
+                        throw formatted_error(FMT_STRING("Value {} is out of bounds for INT."), n);
+
+                    *(int32_t*)ptr = (int32_t)n;
+                    ptr += sizeof(int32_t);
+
+                    break;
+                }
+
+                case sql_type::BIGINT: {
+                    auto n = (int64_t)v[i];
+
+                    *(int64_t*)ptr = n;
+                    ptr += sizeof(int64_t);
+
+                    break;
+                }
 
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
