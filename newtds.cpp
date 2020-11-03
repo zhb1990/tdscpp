@@ -3092,6 +3092,9 @@ namespace tds {
             case sql_type::REAL:
                 return u"REAL";
 
+            case sql_type::BIT:
+                return u"BIT";
+
             default:
                 throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
         }
@@ -3367,6 +3370,10 @@ namespace tds {
 
                 case sql_type::REAL:
                     bufsize += sizeof(float);
+                break;
+
+                case sql_type::BIT:
+                    bufsize += sizeof(uint8_t);
                 break;
 
                 default:
@@ -3794,6 +3801,11 @@ namespace tds {
                     if (v[i].is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
+                    } else if (v[i].type == sql_type::BIT || v[i].type == sql_type::BITN) {
+                        *(uint8_t*)ptr = sizeof(uint8_t);
+                        ptr++;
+                        *(uint8_t*)ptr = v[i].val[0];
+                        ptr += sizeof(uint8_t);
                     } else {
                         auto n = (int64_t)v[i];
 
@@ -3863,6 +3875,20 @@ namespace tds {
 
                     *(float*)ptr = (float)n;
                     ptr += sizeof(float);
+
+                    break;
+                }
+
+                case sql_type::BIT: {
+                    if (v[i].type == sql_type::BIT || v[i].type == sql_type::BITN) {
+                        *(uint8_t*)ptr = v[i].val[0];
+                        ptr += sizeof(uint8_t);
+                    } else {
+                        auto n = (int64_t)v[i];
+
+                        *(uint8_t*)ptr = n != 0 ? 1 : 0;
+                        ptr += sizeof(uint8_t);
+                    }
 
                     break;
                 }
