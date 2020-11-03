@@ -3210,6 +3210,9 @@ namespace tds {
         size_t bufsize = sizeof(uint8_t);
 
         for (unsigned int i = 0; i < v.size(); i++) {
+            if (v[i].is_null && !cols[i].nullable)
+                throw formatted_error(FMT_STRING("Cannot insert NULL into column {} marked NOT NULL."), cols[i].name);
+
             switch (cols[i].type) {
                 case sql_type::INTN:
                     bufsize++;
