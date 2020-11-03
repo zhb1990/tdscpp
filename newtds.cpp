@@ -3310,7 +3310,10 @@ namespace tds {
                 break;
 
                 case sql_type::BITN:
-                    bufsize += sizeof(uint8_t) + sizeof(uint8_t);
+                    bufsize++;
+
+                    if (!v[i].is_null)
+                        bufsize += sizeof(uint8_t);
                 break;
 
                 default:
@@ -3722,16 +3725,19 @@ namespace tds {
                     }
                 break;
 
-                case sql_type::BITN: {
-                    auto n = (int64_t)v[i];
+                case sql_type::BITN:
+                    if (v[i].is_null) {
+                        *(uint8_t*)ptr = 0;
+                        ptr++;
+                    } else {
+                        auto n = (int64_t)v[i];
 
-                    *(uint8_t*)ptr = sizeof(uint8_t);
-                    ptr++;
-                    *(uint8_t*)ptr = n != 0 ? 1 : 0;
-                    ptr++;
-
-                    break;
-                }
+                        *(uint8_t*)ptr = sizeof(uint8_t);
+                        ptr++;
+                        *(uint8_t*)ptr = n != 0 ? 1 : 0;
+                        ptr++;
+                    }
+                break;
 
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
