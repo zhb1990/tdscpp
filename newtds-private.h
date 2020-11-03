@@ -290,4 +290,85 @@ struct tds_colmetadata_col {
 
 static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong size");
 
+enum class tds_tm_type : uint16_t {
+    TM_GET_DTC_ADDRESS = 0,
+    TM_PROPAGATE_XACT = 1,
+    TM_BEGIN_XACT = 5,
+    TM_PROMOTE_XACT = 6,
+    TM_COMMIT_XACT = 7,
+    TM_ROLLBACK_XACT = 8,
+    TM_SAVE_XACT = 9
+};
+
+struct tds_tm_msg {
+    tds_all_headers all_headers;
+    enum tds_tm_type type;
+};
+
+static_assert(sizeof(tds_tm_msg) == 24, "tds_tm_msg has wrong size");
+
+struct tds_tm_begin {
+    tds_tm_msg header;
+    uint8_t isolation_level;
+    uint8_t name_len;
+};
+
+static_assert(sizeof(tds_tm_begin) == 26, "tds_tm_begin has wrong size");
+
+struct tds_tm_rollback {
+    tds_tm_msg header;
+    uint8_t name_len;
+    uint8_t flags;
+};
+
+static_assert(sizeof(tds_tm_rollback) == 26, "tds_tm_rollback has wrong size");
+
+enum class tds_envchange_type : uint8_t {
+    database = 1,
+    language,
+    charset,
+    packet_size,
+    unicode_data_sort_local_id,
+    unicode_data_sort_comparison_flags,
+    collation,
+    begin_trans,
+    commit_trans,
+    rollback_trans,
+    enlist_dist_trans,
+    defect_trans,
+    log_shipping,
+    promote_trans = 15,
+    trans_man_address,
+    trans_ended,
+    reset_completion_acknowledgement,
+    user_instance_started,
+    routing
+};
+
+struct tds_envchange {
+    enum tds_token token;
+    uint16_t length;
+    enum tds_envchange_type type;
+};
+
+static_assert(sizeof(tds_envchange) == 4, "tds_envchange has wrong size");
+
+struct tds_envchange_begin_trans {
+    struct tds_envchange header;
+    uint8_t new_len;
+    uint64_t trans_id;
+    uint8_t old_len;
+};
+
+static_assert(sizeof(tds_envchange_begin_trans) == 14, "tds_envchange_begin_trans has wrong size");
+
+struct tds_envchange_rollback_trans {
+    struct tds_envchange header;
+    uint8_t new_len;
+    uint8_t old_len;
+    uint64_t trans_id;
+};
+
+static_assert(sizeof(tds_envchange_rollback_trans) == 14, "tds_envchange_rollback_trans has wrong size");
+
 #pragma pack(pop)

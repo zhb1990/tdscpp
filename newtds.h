@@ -68,6 +68,7 @@ namespace tds {
         void send_msg(enum tds_msg type, const std::span<uint8_t>& msg);
         void wait_for_msg(enum tds_msg& type, std::string& payload);
         void handle_info_msg(const std::string_view& sv, bool error);
+        void handle_envchange_msg(const std::string_view& sv);
 
         template<typename... Args>
         void run(const std::string_view& s, Args&&... args);
@@ -75,6 +76,8 @@ namespace tds {
         void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp);
 
         msg_handler message_handler;
+        uint64_t trans_id = 0;
+        unsigned int trans_depth = 0;
 
     private:
         void connect(const std::string& server, uint16_t port);
@@ -343,6 +346,15 @@ namespace tds {
     private:
         bool finished = false;
         std::list<std::vector<value>> rows;
+    };
+
+    class trans {
+    public:
+        trans(tds& conn);
+        ~trans();
+
+    private:
+        tds& conn;
     };
 };
 
