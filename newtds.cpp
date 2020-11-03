@@ -3272,14 +3272,18 @@ namespace tds {
                 break;
 
                 case sql_type::DATETIMEOFFSET:
-                    bufsize += sizeof(uint8_t) + 5;
+                    bufsize++;
 
-                    if (cols[i].max_length <= 2)
-                        bufsize += 3;
-                    else if (cols[i].max_length <= 4)
-                        bufsize += 4;
-                    else
+                    if (!v[i].is_null) {
                         bufsize += 5;
+
+                        if (cols[i].max_length <= 2)
+                            bufsize += 3;
+                        else if (cols[i].max_length <= 4)
+                            bufsize += 4;
+                        else
+                            bufsize += 5;
+                    }
                 break;
 
                 case sql_type::DATETIME:
@@ -3566,45 +3570,48 @@ namespace tds {
                     }
                 break;
 
-                case sql_type::DATETIMEOFFSET: {
-                    auto dto = (datetime)v[i];
-                    uint32_t n = dto.d.num + 693595;
-                    uint64_t secs = (dto.t.hour * 3600) + (dto.t.minute * 60) + dto.t.second;
-
-                    for (unsigned int j = 0; j < cols[i].max_length; j++) {
-                        secs *= 10;
-                    }
-
-                    if (cols[i].max_length <= 2) {
-                        *(uint8_t*)ptr = 8;
+                case sql_type::DATETIMEOFFSET:
+                    if (v[i].is_null) {
+                        *(uint8_t*)ptr = 0;
                         ptr++;
-
-                        memcpy(ptr, &secs, 3);
-                        ptr += 3;
-                    } else if (cols[i].max_length <= 4) {
-                        *(uint8_t*)ptr = 9;
-                        ptr++;
-
-                        memcpy(ptr, &secs, 4);
-                        ptr += 4;
                     } else {
-                        *(uint8_t*)ptr = 10;
-                        ptr++;
+                        auto dto = (datetime)v[i];
+                        uint32_t n = dto.d.num + 693595;
+                        uint64_t secs = (dto.t.hour * 3600) + (dto.t.minute * 60) + dto.t.second;
 
-                        memcpy(ptr, &secs, 5);
-                        ptr += 5;
+                        for (unsigned int j = 0; j < cols[i].max_length; j++) {
+                            secs *= 10;
+                        }
+
+                        if (cols[i].max_length <= 2) {
+                            *(uint8_t*)ptr = 8;
+                            ptr++;
+
+                            memcpy(ptr, &secs, 3);
+                            ptr += 3;
+                        } else if (cols[i].max_length <= 4) {
+                            *(uint8_t*)ptr = 9;
+                            ptr++;
+
+                            memcpy(ptr, &secs, 4);
+                            ptr += 4;
+                        } else {
+                            *(uint8_t*)ptr = 10;
+                            ptr++;
+
+                            memcpy(ptr, &secs, 5);
+                            ptr += 5;
+                        }
+
+                        memcpy(ptr, &n, 3);
+                        ptr += 3;
+
+                        // FIXME - get offset
+
+                        *(int16_t*)ptr = 0;
+                        ptr += sizeof(int16_t);
                     }
-
-                    memcpy(ptr, &n, 3);
-                    ptr += 3;
-
-                    // FIXME - get offset
-
-                    *(int16_t*)ptr = 0;
-                    ptr += sizeof(int16_t);
-
-                    break;
-                }
+                break;
 
                 case sql_type::DATETIME: {
                     auto dt = (datetime)v[i];
