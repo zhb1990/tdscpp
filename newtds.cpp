@@ -2314,6 +2314,11 @@ namespace tds {
 
                     sv = sv.substr(sizeof(uint16_t));
 
+                    if (len == 0xffff) {
+                        col.is_null = true;
+                        return;
+                    }
+
                     col.val.resize(len);
                     col.is_null = false;
 
