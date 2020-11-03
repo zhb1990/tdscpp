@@ -77,7 +77,6 @@ namespace tds {
 
         msg_handler message_handler;
         uint64_t trans_id = 0;
-        unsigned int trans_depth = 0;
 
     private:
         void connect(const std::string& server, uint16_t port);
@@ -352,9 +351,11 @@ namespace tds {
     public:
         trans(tds& conn);
         ~trans();
+        void commit();
 
     private:
         tds& conn;
+        bool committed = false;
     };
 };
 

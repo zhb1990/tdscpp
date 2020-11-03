@@ -323,6 +323,14 @@ struct tds_tm_rollback {
 
 static_assert(sizeof(tds_tm_rollback) == 26, "tds_tm_rollback has wrong size");
 
+struct tds_tm_commit {
+    tds_tm_msg header;
+    uint8_t name_len;
+    uint8_t flags;
+};
+
+static_assert(sizeof(tds_tm_commit) == 26, "tds_tm_commit has wrong size");
+
 enum class tds_envchange_type : uint8_t {
     database = 1,
     language,
@@ -370,5 +378,14 @@ struct tds_envchange_rollback_trans {
 };
 
 static_assert(sizeof(tds_envchange_rollback_trans) == 14, "tds_envchange_rollback_trans has wrong size");
+
+struct tds_envchange_commit_trans {
+    struct tds_envchange header;
+    uint8_t new_len;
+    uint8_t old_len;
+    uint64_t trans_id;
+};
+
+static_assert(sizeof(tds_envchange_commit_trans) == 14, "tds_envchange_commit_trans has wrong size");
 
 #pragma pack(pop)

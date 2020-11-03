@@ -4469,7 +4469,6 @@ namespace tds {
                     throw formatted_error(FMT_STRING("Unexpected transaction ID length ({} bytes, expected 8)."), tebt->new_len);
 
                 trans_id = tebt->trans_id;
-                trans_depth = 1;
 
                 break;
             }
@@ -4484,7 +4483,20 @@ namespace tds {
                     throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), tert->header.length);
 
                 trans_id = 0;
-                trans_depth = 0;
+
+                break;
+            }
+
+            case tds_envchange_type::commit_trans: {
+                if (sv.length() < sizeof(tds_envchange_commit_trans) - offsetof(tds_envchange_begin_trans, header.type))
+                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), sv.length());
+
+                auto tect = (tds_envchange_commit_trans*)ec;
+
+                if (tect->header.length < offsetof(tds_envchange_begin_trans, new_len))
+                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), tect->header.length);
+
+                trans_id = 0;
 
                 break;
             }
@@ -4661,6 +4673,81 @@ namespace tds {
             }
         } catch (...) {
             // can't throw in destructor
+        }
+    }
+
+    void trans::commit() {
+        tds_tm_commit msg;
+
+        msg.header.all_headers.total_size = sizeof(tds_all_headers);
+        msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
+        msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
+        msg.header.all_headers.trans_desc.descriptor = conn.trans_id;
+        msg.header.all_headers.trans_desc.outstanding = 1;
+        msg.header.type = tds_tm_type::TM_COMMIT_XACT;
+        msg.name_len = 0;
+        msg.flags = 0;
+
+        conn.send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
+
+        enum tds_msg type;
+        string payload;
+
+        // FIXME - timeout
+        conn.wait_for_msg(type, payload);
+
+        if (type != tds_msg::tabular_result)
+            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+
+        string_view sv = payload;
+
+        while (!sv.empty()) {
+            auto type = (tds_token)sv[0];
+            sv = sv.substr(1);
+
+            switch (type) {
+                case tds_token::DONE:
+                case tds_token::DONEINPROC:
+                case tds_token::DONEPROC:
+                    if (sv.length() < sizeof(tds_done_msg))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+
+                    sv = sv.substr(sizeof(tds_done_msg));
+                break;
+
+                case tds_token::INFO:
+                case tds_token::ERROR:
+                case tds_token::ENVCHANGE:
+                {
+                    if (sv.length() < sizeof(uint16_t))
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+
+                    auto len = *(uint16_t*)&sv[0];
+
+                    sv = sv.substr(sizeof(uint16_t));
+
+                    if (sv.length() < len)
+                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+
+                    if (type == tds_token::INFO) {
+                        if (conn.message_handler)
+                            conn.handle_info_msg(sv.substr(0, len), false);
+                    } else if (type == tds_token::ERROR) {
+                        if (conn.message_handler)
+                            conn.handle_info_msg(sv.substr(0, len), true);
+
+                        throw runtime_error("TM_BEGIN_XACT request failed.");
+                    } else if (type == tds_token::ENVCHANGE)
+                        conn.handle_envchange_msg(sv.substr(0, len));
+
+                    sv = sv.substr(len);
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error(FMT_STRING("Unhandled token type {} in transaction manager response."), type);
+            }
         }
     }
 };
