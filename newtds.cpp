@@ -3239,7 +3239,10 @@ namespace tds {
                 break;
 
                 case sql_type::DATE:
-                    bufsize += sizeof(uint8_t) + 3;
+                    bufsize++;
+
+                    if (!v[i].is_null)
+                        bufsize += 3;
                 break;
 
                 case sql_type::TIME:
@@ -3474,18 +3477,21 @@ namespace tds {
                     }
                 break;
 
-                case sql_type::DATE: {
-                    auto d = (date)v[i];
-                    uint32_t n = d.num + 693595;
+                case sql_type::DATE:
+                    if (v[i].is_null) {
+                        *(uint8_t*)ptr = 0;
+                        ptr++;
+                    } else {
+                        auto d = (date)v[i];
+                        uint32_t n = d.num + 693595;
 
-                    *(uint8_t*)ptr = 3;
-                    ptr++;
+                        *(uint8_t*)ptr = 3;
+                        ptr++;
 
-                    memcpy(ptr, &n, 3);
-                    ptr += 3;
-
-                    break;
-                }
+                        memcpy(ptr, &n, 3);
+                        ptr += 3;
+                    }
+                break;
 
                 case sql_type::TIME: {
                     auto t = (time)v[i];
