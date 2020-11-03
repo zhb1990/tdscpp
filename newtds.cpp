@@ -4401,6 +4401,22 @@ namespace tds {
                     break;
                 }
 
+                case tds_token::ORDER:
+                {
+                    if (sv.length() < sizeof(uint16_t))
+                        throw formatted_error(FMT_STRING("Short ORDER message ({} bytes, expected at least {})."), sv.length(), sizeof(uint16_t));
+
+                    auto len = *(uint16_t*)sv.data();
+                    sv = sv.substr(sizeof(uint16_t));
+
+                    if (sv.length() < len)
+                        throw formatted_error(FMT_STRING("Short ORDER message ({} bytes, expected {})."), sv.length(), len);
+
+                    sv = sv.substr(len);
+
+                    break;
+                }
+
                 default:
                     throw formatted_error(FMT_STRING("Unhandled token type {} while executing SQL batch."), type);
             }
