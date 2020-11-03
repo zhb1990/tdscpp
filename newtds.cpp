@@ -3181,8 +3181,6 @@ namespace tds {
     vector<uint8_t> tds::bcp_row(const vector<value>& v, const vector<column>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
-        // FIXME - if VARCHAR etc. is NULL, will need to send NBC_ROW instead of ROW
-
         for (unsigned int i = 0; i < v.size(); i++) {
             switch (cols[i].type) {
                 case sql_type::INTN:
@@ -3196,10 +3194,13 @@ namespace tds {
                 case sql_type::CHAR:
                     bufsize += sizeof(uint16_t);
 
-                    if (cols[i].max_length == 0xffff) // MAX
-                        bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
+                    if (v[i].is_null) {
+                        if (cols[i].max_length == 0xffff) // MAX
+                            bufsize += sizeof(uint64_t) - sizeof(uint16_t);
+                    } else {
+                        if (cols[i].max_length == 0xffff) // MAX
+                            bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
-                    if (!v[i].is_null) {
                         if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
                             bufsize += v[i].val.length();
 
@@ -3378,7 +3379,10 @@ namespace tds {
                 case sql_type::VARCHAR:
                 case sql_type::CHAR:
                     if (cols[i].max_length == 0xffff) {
-                        if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
+                        if (v[i].is_null) {
+                            *(uint64_t*)ptr = 0xffffffffffffffff;
+                            ptr += sizeof(uint64_t);
+                        } else if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
 
@@ -3410,7 +3414,10 @@ namespace tds {
                             ptr += sizeof(uint32_t);
                         }
                     } else {
-                        if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
+                        if (v[i].is_null) {
+                            *(uint16_t*)ptr = 0xffff;
+                            ptr += sizeof(uint16_t);
+                        } else if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
                             if (v[i].val.length() > cols[i].max_length)
                                 throw formatted_error(FMT_STRING("String \"{}\" too long for column (maximum length {})."), v[i].val, cols[i].max_length);
 
