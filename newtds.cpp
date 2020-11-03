@@ -3246,14 +3246,16 @@ namespace tds {
                 break;
 
                 case sql_type::TIME:
-                    bufsize += sizeof(uint8_t);
+                    bufsize++;
 
-                    if (cols[i].max_length <= 2)
-                        bufsize += 3;
-                    else if (cols[i].max_length <= 4)
-                        bufsize += 4;
-                    else
-                        bufsize += 5;
+                    if (!v[i].is_null) {
+                        if (cols[i].max_length <= 2)
+                            bufsize += 3;
+                        else if (cols[i].max_length <= 4)
+                            bufsize += 4;
+                        else
+                            bufsize += 5;
+                    }
                 break;
 
                 case sql_type::DATETIME2:
@@ -3507,36 +3509,39 @@ namespace tds {
                     }
                 break;
 
-                case sql_type::TIME: {
-                    auto t = (time)v[i];
-                    uint64_t secs = (t.hour * 3600) + (t.minute * 60) + t.second;
-
-                    for (unsigned int j = 0; j < cols[i].max_length; j++) {
-                        secs *= 10;
-                    }
-
-                    if (cols[i].max_length <= 2) {
-                        *(uint8_t*)ptr = 3;
+                case sql_type::TIME:
+                    if (v[i].is_null) {
+                        *(uint8_t*)ptr = 0;
                         ptr++;
-
-                        memcpy(ptr, &secs, 3);
-                        ptr += 3;
-                    } else if (cols[i].max_length <= 4) {
-                        *(uint8_t*)ptr = 4;
-                        ptr++;
-
-                        memcpy(ptr, &secs, 4);
-                        ptr += 4;
                     } else {
-                        *(uint8_t*)ptr = 5;
-                        ptr++;
+                        auto t = (time)v[i];
+                        uint64_t secs = (t.hour * 3600) + (t.minute * 60) + t.second;
 
-                        memcpy(ptr, &secs, 5);
-                        ptr += 5;
+                        for (unsigned int j = 0; j < cols[i].max_length; j++) {
+                            secs *= 10;
+                        }
+
+                        if (cols[i].max_length <= 2) {
+                            *(uint8_t*)ptr = 3;
+                            ptr++;
+
+                            memcpy(ptr, &secs, 3);
+                            ptr += 3;
+                        } else if (cols[i].max_length <= 4) {
+                            *(uint8_t*)ptr = 4;
+                            ptr++;
+
+                            memcpy(ptr, &secs, 4);
+                            ptr += 4;
+                        } else {
+                            *(uint8_t*)ptr = 5;
+                            ptr++;
+
+                            memcpy(ptr, &secs, 5);
+                            ptr += 5;
+                        }
                     }
-
-                    break;
-                }
+                break;
 
                 case sql_type::DATETIME2:
                     if (v[i].is_null) {
