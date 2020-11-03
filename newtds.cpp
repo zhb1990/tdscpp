@@ -3900,7 +3900,11 @@ namespace tds {
             auto c = (tds_colmetadata_col*)ptr;
 
             c->user_type = 0;
-            c->flags = 9; // nullable, read/write
+            c->flags = 8; // read/write
+
+            if (col.nullable)
+                c->flags |= 1;
+
             c->type = col.type;
 
             ptr += sizeof(tds_colmetadata_col);
