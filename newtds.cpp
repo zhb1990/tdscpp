@@ -3225,10 +3225,13 @@ namespace tds {
                 case sql_type::NCHAR:
                     bufsize += sizeof(uint16_t);
 
-                    if (cols[i].max_length == 0xffff) // MAX
-                        bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
+                    if (v[i].is_null) {
+                        if (cols[i].max_length == 0xffff) // MAX
+                            bufsize += sizeof(uint64_t) - sizeof(uint16_t);
+                    } else {
+                        if (cols[i].max_length == 0xffff) // MAX
+                            bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
-                    if (!v[i].is_null) {
                         if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
                             bufsize += v[i].val.length();
 
@@ -3449,7 +3452,10 @@ namespace tds {
                 case sql_type::NVARCHAR:
                 case sql_type::NCHAR:
                     if (cols[i].max_length == 0xffff) {
-                        if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
+                        if (v[i].is_null) {
+                            *(uint64_t*)ptr = 0xffffffffffffffff;
+                            ptr += sizeof(uint64_t);
+                        } else if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
 
@@ -3481,7 +3487,10 @@ namespace tds {
                             ptr += sizeof(uint32_t);
                         }
                     } else {
-                        if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
+                        if (v[i].is_null) {
+                            *(uint16_t*)ptr = 0xffff;
+                            ptr += sizeof(uint16_t);
+                        } else if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
                             if (v[i].val.length() > cols[i].max_length) {
                                 throw formatted_error(FMT_STRING("String \"{}\" too long for column (maximum length {})."),
                                                       utf16_to_utf8(u16string_view((char16_t*)v[i].val.data(), v[i].val.length() / sizeof(char16_t))),
