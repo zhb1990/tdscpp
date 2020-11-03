@@ -3086,6 +3086,12 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), length);
                 }
 
+            case sql_type::FLOAT:
+                return u"FLOAT";
+
+            case sql_type::REAL:
+                return u"REAL";
+
             default:
                 throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
         }
@@ -3353,6 +3359,14 @@ namespace tds {
 
                 case sql_type::BIGINT:
                     bufsize += sizeof(int64_t);
+                break;
+
+                case sql_type::FLOAT:
+                    bufsize += sizeof(double);
+                break;
+
+                case sql_type::REAL:
+                    bufsize += sizeof(float);
                 break;
 
                 default:
@@ -3831,6 +3845,24 @@ namespace tds {
 
                     *(int64_t*)ptr = n;
                     ptr += sizeof(int64_t);
+
+                    break;
+                }
+
+                case sql_type::FLOAT: {
+                    auto n = (double)v[i];
+
+                    *(double*)ptr = n;
+                    ptr += sizeof(double);
+
+                    break;
+                }
+
+                case sql_type::REAL: {
+                    auto n = (double)v[i];
+
+                    *(float*)ptr = (float)n;
+                    ptr += sizeof(float);
 
                     break;
                 }
