@@ -3287,11 +3287,17 @@ namespace tds {
                 break;
 
                 case sql_type::DATETIME:
-                    bufsize += sizeof(uint8_t) + sizeof(int32_t) + sizeof(uint32_t);
+                    bufsize++;
+
+                    if (!v[i].is_null)
+                        bufsize += sizeof(int32_t) + sizeof(uint32_t);
                 break;
 
                 case sql_type::DATETIMN:
-                    bufsize += sizeof(uint8_t) + cols[i].max_length;
+                    bufsize++;
+
+                    if (!v[i].is_null)
+                        bufsize += cols[i].max_length;
                 break;
 
                 case sql_type::FLTN:
@@ -3613,62 +3619,71 @@ namespace tds {
                     }
                 break;
 
-                case sql_type::DATETIME: {
-                    auto dt = (datetime)v[i];
-                    uint32_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
+                case sql_type::DATETIME:
+                    if (v[i].is_null) {
+                        *(uint8_t*)ptr = 0;
+                        ptr++;
+                    } else {
+                        auto dt = (datetime)v[i];
+                        uint32_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
-                    *(int32_t*)ptr = dt.d.num;
-                    ptr += sizeof(int32_t);
+                        *(uint8_t*)ptr = sizeof(int32_t) + sizeof(uint32_t);
+                        ptr++;
 
-                    *(uint32_t*)ptr = (uint32_t)(secs * 300);
-                    ptr += sizeof(uint32_t);
+                        *(int32_t*)ptr = dt.d.num;
+                        ptr += sizeof(int32_t);
 
-                    break;
-                }
-
-                case sql_type::DATETIMN: {
-                    auto dt = (datetime)v[i];
-
-                    switch (cols[i].max_length) {
-                        case 4: {
-                            if (dt.d.num < 0)
-                                throw formatted_error(FMT_STRING("Datetime \"{}\" too early for SMALLDATETIME."), dt);
-                            else if (dt.d.num > numeric_limits<uint16_t>::max())
-                                throw formatted_error(FMT_STRING("Datetime \"{}\" too late for SMALLDATETIME."), dt);
-
-                            *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
-                            ptr++;
-
-                            *(uint16_t*)ptr = (uint16_t)dt.d.num;
-                            ptr += sizeof(uint16_t);
-
-                            *(uint16_t*)ptr = (uint16_t)((dt.t.hour * 60) + dt.t.minute);
-                            ptr += sizeof(uint16_t);
-
-                            break;
-                        }
-
-                        case 8: {
-                            uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
-
-                            *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
-                            ptr++;
-
-                            *(int32_t*)ptr = dt.d.num;
-                            ptr += sizeof(int32_t);
-
-                            *(uint32_t*)ptr = (uint32_t)(secs * 300);
-                            ptr += sizeof(uint32_t);
-
-                            break;
-                        }
-
-                        default:
-                            throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].max_length);
+                        *(uint32_t*)ptr = (uint32_t)(secs * 300);
+                        ptr += sizeof(uint32_t);
                     }
+                break;
 
-                    break;
-                }
+                case sql_type::DATETIMN:
+                    if (v[i].is_null) {
+                        *(uint8_t*)ptr = 0;
+                        ptr++;
+                    } else {
+                        auto dt = (datetime)v[i];
+
+                        switch (cols[i].max_length) {
+                            case 4: {
+                                if (dt.d.num < 0)
+                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too early for SMALLDATETIME."), dt);
+                                else if (dt.d.num > numeric_limits<uint16_t>::max())
+                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too late for SMALLDATETIME."), dt);
+
+                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                                ptr++;
+
+                                *(uint16_t*)ptr = (uint16_t)dt.d.num;
+                                ptr += sizeof(uint16_t);
+
+                                *(uint16_t*)ptr = (uint16_t)((dt.t.hour * 60) + dt.t.minute);
+                                ptr += sizeof(uint16_t);
+
+                                break;
+                            }
+
+                            case 8: {
+                                uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
+
+                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                                ptr++;
+
+                                *(int32_t*)ptr = dt.d.num;
+                                ptr += sizeof(int32_t);
+
+                                *(uint32_t*)ptr = (uint32_t)(secs * 300);
+                                ptr += sizeof(uint32_t);
+
+                                break;
+                            }
+
+                            default:
+                                throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].max_length);
+                        }
+                    }
+                break;
 
                 case sql_type::FLTN: {
                     auto d = (double)v[i];
