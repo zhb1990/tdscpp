@@ -139,6 +139,7 @@ namespace tds {
         value(T*) = delete;
 
         value();
+        value(std::nullptr_t);
         value(int32_t i);
         value(const std::optional<int32_t>& i);
         value(const std::u16string_view& sv);

@@ -735,7 +735,12 @@ namespace tds {
     }
 
     value::value() {
+        type = (sql_type)0;
+    }
+
+    value::value(nullptr_t) {
         type = sql_type::SQL_NULL;
+        is_null = true;
     }
 
     value::value(int32_t i) {
