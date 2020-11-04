@@ -131,8 +131,7 @@ struct tds_login_msg {
     uint16_t attach_db_length;
     uint16_t new_password_offset;
     uint16_t new_password_length;
-    uint16_t sspi_long_offset;
-    uint16_t sspi_long_length;
+    uint32_t sspi_long;
 };
 
 #pragma pack(pop)

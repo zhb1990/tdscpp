@@ -307,7 +307,7 @@ namespace tds {
 
         send_login_msg2(0x74000004, 4096, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
                         u"beren", user_u16, password_u16, u"test program", u"luthien", u"", u"us_english",
-                        u"", u"", u"");
+                        u"", "", u"", u"");
 
         wait_for_msg(type, payload);
         // FIXME - timeout
@@ -379,8 +379,8 @@ namespace tds {
                             uint8_t option_flags3, uint32_t collation, const u16string_view& client_name,
                             const u16string_view& username, const u16string_view& password, const u16string_view& app_name,
                             const u16string_view& server_name, const u16string_view& interface_library,
-                            const u16string_view& locale, const u16string_view& database, const u16string_view& attach_db,
-                            const u16string_view& new_password) {
+                            const u16string_view& locale, const u16string_view& database, const string& sspi,
+                            const u16string_view& attach_db, const u16string_view& new_password) {
         uint32_t length;
         uint16_t off;
 
@@ -395,6 +395,7 @@ namespace tds {
         length += (uint32_t)(interface_library.length() * sizeof(char16_t));
         length += (uint32_t)(locale.length() * sizeof(char16_t));
         length += (uint32_t)(database.length() * sizeof(char16_t));
+        length += (uint32_t)sspi.length();
 
         string payload;
 
@@ -524,11 +525,6 @@ namespace tds {
         // FIXME - set MAC address properly?
         memset(msg->mac_address, 0, 6);
 
-        // FIXME - SSPI
-
-        msg->sspi_offset = 0;
-        msg->sspi_length = 0;
-
         msg->attach_db_offset = off;
 
         if (!attach_db.empty()) {
@@ -551,8 +547,23 @@ namespace tds {
         } else
             msg->new_password_length = 0;
 
-        msg->sspi_long_offset = 0;
-        msg->sspi_long_length = 0;
+        if (sspi.empty()) {
+            msg->sspi_offset = 0;
+            msg->sspi_length = 0;
+            msg->sspi_long = 0;
+        } else {
+            msg->sspi_offset = off;
+
+            if (sspi.length() >= numeric_limits<uint16_t>::max()) {
+                msg->sspi_length = numeric_limits<uint16_t>::max();
+                msg->sspi_long = (uint32_t)sspi.length();
+            } else {
+                msg->sspi_length = (uint16_t)sspi.length();
+                msg->sspi_long = 0;
+            }
+
+            memcpy((uint8_t*)msg + msg->sspi_offset, sspi.data(), sspi.length());
+        }
 
         send_msg(tds_msg::tds7_login, payload);
     }
