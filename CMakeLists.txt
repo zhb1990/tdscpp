@@ -263,3 +263,7 @@ target_link_libraries(newtds fmt::fmt-header-only)
 if(NOT MSVC)
 	target_compile_options(newtds PUBLIC -Wall -Werror=cast-function-type -Wno-expansion-to-defined -Wunused-parameter -Wtype-limits -Wextra -Wconversion)
 endif()
+
+if(WIN32)
+	target_link_libraries(newtds ws2_32)
+endif()

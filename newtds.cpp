@@ -1,3 +1,7 @@
+#ifdef _WIN32
+#include <ws2tcpip.h>
+#endif
+
 #include "newtds-private.h"
 #include "newtds.h"
 #include <iostream>
@@ -10,9 +14,13 @@
 #include <regex>
 #include <fmt/format.h>
 #include <sys/types.h>
+
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#endif
+
 #include <unistd.h>
 
 #define DEBUG_SHOW_MSGS
@@ -59,7 +67,7 @@ struct fmt::formatter<enum tds_token> {
             case tds_token::ORDER:
                 return format_to(ctx.out(), "ORDER");
 
-            case tds_token::ERROR:
+            case tds_token::TDS_ERROR:
                 return format_to(ctx.out(), "ERROR");
 
             case tds_token::INFO:
@@ -335,7 +343,7 @@ namespace tds {
 
                 case tds_token::LOGINACK:
                 case tds_token::INFO:
-                case tds_token::ERROR:
+                case tds_token::TDS_ERROR:
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
@@ -354,7 +362,7 @@ namespace tds {
                     } else if (type == tds_token::INFO) {
                         if (message_handler)
                             handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::ERROR) {
+                    } else if (type == tds_token::TDS_ERROR) {
                         if (message_handler)
                             handle_info_msg(sv.substr(0, len), true);
                     } else if (type == tds_token::ENVCHANGE)
@@ -601,7 +609,7 @@ namespace tds {
     void tds::wait_for_msg(enum tds_msg& type, string& payload) {
         tds_header h;
 
-        auto ret = recv(sock, &h, sizeof(tds_header), MSG_WAITALL);
+        auto ret = recv(sock, (char*)&h, sizeof(tds_header), MSG_WAITALL);
 
         if (ret < 0)
             throw formatted_error(FMT_STRING("recv failed (error {})"), errno);
@@ -639,7 +647,7 @@ namespace tds {
     }
 
     void tds::handle_loginack_msg(string_view sv) {
-        uint8_t interface, server_name_len;
+        uint8_t interf, server_name_len;
         uint32_t tds_version, server_version;
         u16string_view server_name;
 
@@ -651,20 +659,20 @@ namespace tds {
         if (sv.length() < 10 + (server_name_len * sizeof(char16_t)))
             throw runtime_error("Short LOGINACK message.");
 
-        interface = (uint8_t)sv[0];
+        interf = (uint8_t)sv[0];
         tds_version = *(uint32_t*)&sv[1];
         server_name = u16string_view((char16_t*)&sv[6], server_name_len);
         server_version = *(uint32_t*)&sv[6 + (server_name_len * sizeof(char16_t))];
 
-    #ifdef DEBUG_SHOW_MSGS
+#ifdef DEBUG_SHOW_MSGS
         while (!server_name.empty() && server_name.back() == 0) {
             server_name = server_name.substr(0, server_name.length() - 1);
         }
 
         fmt::print("LOGINACK: interface = {}, TDS version = {:x}, server = {}, server version = {}.{}.{}\n",
-                    interface, tds_version, utf16_to_utf8(server_name), server_version & 0xff, (server_version & 0xff00) >> 8,
+                   interf, tds_version, utf16_to_utf8(server_name), server_version & 0xff, (server_version & 0xff00) >> 8,
                     ((server_version & 0xff0000) >> 8) | (server_version >> 24));
-    #endif
+#endif
 
         if (tds_version != tds_74_version)
             throw formatted_error(FMT_STRING("Server not using TDS 7.4. Version was {:x}, expected {:x}."), tds_version, tds_74_version);
@@ -1024,7 +1032,7 @@ namespace tds {
         }
     }
 
-    value::value(const span<byte>& bin) {
+    value::value(const span<std::byte>& bin) {
         // FIXME - std::optional version of this too
 
         type = sql_type::VARBINARY;
@@ -2641,7 +2649,7 @@ namespace tds {
                     break;
 
                 case tds_token::INFO:
-                case tds_token::ERROR:
+                case tds_token::TDS_ERROR:
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
@@ -2657,7 +2665,7 @@ namespace tds {
                     if (type == tds_token::INFO) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::ERROR) {
+                    } else if (type == tds_token::TDS_ERROR) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), true);
 
@@ -3965,7 +3973,7 @@ namespace tds {
                     break;
 
                 case tds_token::INFO:
-                case tds_token::ERROR:
+                case tds_token::TDS_ERROR:
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
@@ -3981,7 +3989,7 @@ namespace tds {
                     if (type == tds_token::INFO) {
                         if (message_handler)
                             handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::ERROR) {
+                    } else if (type == tds_token::TDS_ERROR) {
                         if (message_handler)
                             handle_info_msg(sv.substr(0, len), true);
 
@@ -4207,7 +4215,7 @@ namespace tds {
                     break;
 
                 case tds_token::INFO:
-                case tds_token::ERROR:
+                case tds_token::TDS_ERROR:
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
@@ -4223,7 +4231,7 @@ namespace tds {
                     if (type == tds_token::INFO) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::ERROR) {
+                    } else if (type == tds_token::TDS_ERROR) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), true);
 
@@ -4559,7 +4567,7 @@ namespace tds {
                 break;
 
                 case tds_token::INFO:
-                case tds_token::ERROR:
+                case tds_token::TDS_ERROR:
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
@@ -4575,7 +4583,7 @@ namespace tds {
                     if (type == tds_token::INFO) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::ERROR) {
+                    } else if (type == tds_token::TDS_ERROR) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), true);
 
@@ -4640,7 +4648,7 @@ namespace tds {
                         break;
 
                     case tds_token::INFO:
-                    case tds_token::ERROR:
+                    case tds_token::TDS_ERROR:
                     case tds_token::ENVCHANGE:
                     {
                         if (sv.length() < sizeof(uint16_t))
@@ -4661,7 +4669,7 @@ namespace tds {
                                 }
                             }
 
-                        } else if (type == tds_token::ERROR) {
+                        } else if (type == tds_token::TDS_ERROR) {
                             if (conn.message_handler) {
                                 try {
                                     conn.handle_info_msg(sv.substr(0, len), true);
@@ -4727,7 +4735,7 @@ namespace tds {
                 break;
 
                 case tds_token::INFO:
-                case tds_token::ERROR:
+                case tds_token::TDS_ERROR:
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
@@ -4743,7 +4751,7 @@ namespace tds {
                     if (type == tds_token::INFO) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::ERROR) {
+                    } else if (type == tds_token::TDS_ERROR) {
                         if (conn.message_handler)
                             conn.handle_info_msg(sv.substr(0, len), true);
 

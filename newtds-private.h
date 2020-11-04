@@ -147,7 +147,7 @@ enum class tds_token : uint8_t {
     TABNAME = 0xa4,
     COLINFO = 0xa5,
     ORDER = 0xa9,
-    ERROR = 0xaa,
+    TDS_ERROR = 0xaa,
     INFO = 0xab,
     RETURNVALUE = 0xac,
     LOGINACK = 0xad,
