@@ -94,7 +94,11 @@ namespace tds {
         std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<column>& cols);
         void bcp_sendmsg(const std::string_view& msg);
 
+#ifdef _WIN32
+        SOCKET sock = INVALID_SOCKET;
+#else
         int sock = 0;
+#endif
     };
 
     class date {

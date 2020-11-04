@@ -154,6 +154,13 @@ namespace tds {
 
     tds::tds(const string& server, uint16_t port, const string_view& user, const string_view& password,
             const msg_handler& message_handler) : message_handler(message_handler) {
+#ifdef _WIN32
+        WSADATA wsa_data;
+
+        if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
+            throw runtime_error("WSAStartup failed.");
+#endif
+
         connect(server, port);
 
         send_prelogin_msg();
@@ -162,8 +169,13 @@ namespace tds {
     }
 
     tds::~tds() {
+#ifdef _WIN32
+        if (sock != INVALID_SOCKET)
+            closesocket(sock);
+#else
         if (sock != 0)
             close(sock);
+#endif
     }
 
     void tds::connect(const string& server, uint16_t port) {
@@ -185,27 +197,46 @@ namespace tds {
             throw formatted_error(FMT_STRING("getaddrinfo returned {}"), ret);
 
         orig_res = res;
+#ifdef _WIN32
+        sock = INVALID_SOCKET;
+#else
         sock = 0;
+#endif
 
         do {
             sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
+#ifdef _WIN32
+            if (sock == INVALID_SOCKET)
+                continue;
+#else
             if (sock < 0)
                 continue;
+#endif
 
             if (res->ai_family == AF_INET)
                 ((struct sockaddr_in*)res->ai_addr)->sin_port = htons(port);
             else if (res->ai_family == AF_INET6)
                 ((struct sockaddr_in6*)res->ai_addr)->sin6_port = htons(port);
             else {
+#ifdef _WIN32
+                closesocket(sock);
+                sock = INVALID_SOCKET;
+#else
                 close(sock);
                 sock = 0;
+#endif
                 continue;
             }
 
-            if (::connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
+            if (::connect(sock, res->ai_addr, (int)res->ai_addrlen) != 0) {
+#ifdef _WIN32
+                closesocket(sock);
+                sock = INVALID_SOCKET;
+#else
                 close(sock);
                 sock = 0;
+#endif
                 continue;
             }
 
@@ -214,8 +245,13 @@ namespace tds {
 
         freeaddrinfo(orig_res);
 
+#ifdef _WIN32
+        if (sock == INVALID_SOCKET)
+            throw formatted_error(FMT_STRING("Could not connect to {}:{}."), server, port);
+#else
         if (sock <= 0)
             throw formatted_error(FMT_STRING("Could not connect to {}:{}."), server, port);
+#endif
     }
 
     void tds::send_prelogin_msg() {
@@ -593,7 +629,7 @@ namespace tds {
         if (!msg.empty())
             memcpy(payload.data() + sizeof(tds_header), msg.data(), msg.size());
 
-        auto ret = send(sock, payload.data(), payload.length(), 0);
+        auto ret = send(sock, payload.data(), (int)payload.length(), 0);
 
         if (ret < 0)
             throw formatted_error(FMT_STRING("send failed (error {})"), errno);
@@ -632,7 +668,7 @@ namespace tds {
 
             payload.resize(len);
 
-            ret = recv(sock, payload.data(), len, MSG_WAITALL);
+            ret = recv(sock, payload.data(), (int)len, MSG_WAITALL);
 
             if (ret < 0)
                 throw formatted_error(FMT_STRING("recv failed (error {})"), errno);
