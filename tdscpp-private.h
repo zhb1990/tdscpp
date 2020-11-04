@@ -58,7 +58,7 @@ namespace tds {
 		void add_param2(unsigned int i, const std::string_view& param);
 		void add_param2(unsigned int i, const binary_string& param);
 		void add_param2(unsigned int i, int64_t v);
-		void add_param2(unsigned int i, nullptr_t);
+		void add_param2(unsigned int i, std::nullptr_t);
 		void add_param2(unsigned int i, double d);
 		void end_query(const std::string& q);
 		bool fetch_row(bool call_callbacks);
