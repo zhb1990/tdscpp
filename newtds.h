@@ -79,7 +79,7 @@ namespace tds {
         uint64_t trans_id = 0;
 
     private:
-        void connect(const std::string& server, uint16_t port);
+        void connect(const std::string& server, uint16_t port, bool get_fqdn);
         void send_prelogin_msg();
         void send_login_msg(const std::string_view& user, const std::string_view& password);
         void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
@@ -99,6 +99,7 @@ namespace tds {
 #else
         int sock = 0;
 #endif
+        std::string fqdn;
     };
 
     class date {

@@ -194,7 +194,7 @@ namespace tds {
             throw runtime_error("WSAStartup failed.");
 #endif
 
-        connect(server, port);
+        connect(server, port, user.empty());
 
         send_prelogin_msg();
 
@@ -211,7 +211,7 @@ namespace tds {
 #endif
     }
 
-    void tds::connect(const string& server, uint16_t port) {
+    void tds::connect(const string& server, uint16_t port, bool get_fqdn) {
         struct addrinfo hints;
         struct addrinfo* res;
         struct addrinfo* orig_res;
@@ -237,6 +237,8 @@ namespace tds {
 #endif
 
         do {
+            char hostname[NI_MAXHOST];
+
             sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 #ifdef _WIN32
@@ -271,6 +273,11 @@ namespace tds {
                 sock = 0;
 #endif
                 continue;
+            }
+
+            if (get_fqdn) {
+                if (getnameinfo(res->ai_addr, res->ai_addrlen, hostname, sizeof(hostname), nullptr, 0, 0) == 0)
+                    fqdn = hostname;
             }
 
             break;
@@ -379,15 +386,16 @@ namespace tds {
             gss_name_t gss_name;
             gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 
+            if (fqdn.empty())
+                throw runtime_error("Could not do SSPI authentication as could not find server FQDN.");
+
             if (cred_handle != 0) {
-                major_status = gss_acquire_cred(&minor_status, GSS_C_NO_NAME/*FIXME?*/, GSS_C_INDEFINITE, GSS_C_NO_OID_SET,
+                major_status = gss_acquire_cred(&minor_status, GSS_C_NO_NAME, GSS_C_INDEFINITE, GSS_C_NO_OID_SET,
                                                 GSS_C_INITIATE, &cred_handle, nullptr, nullptr);
 
                 if (major_status != GSS_S_COMPLETE)
                     throw gss_error("gss_acquire_cred", major_status, minor_status);
             }
-
-            string fqdn = "mssql.harmstone.com"; // FIXME
 
             string spn = "MSSQLSvc/" + fqdn;
 
