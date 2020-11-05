@@ -2,7 +2,6 @@
 
 using namespace std;
 
-static const string db_server = "luthien", db_user = "sa", db_password = "Password1$";
 static const uint16_t db_port = 1433;
 
 static void show_msg(const string_view&, const string_view& message, const string_view&, int32_t msgno, int32_t, int16_t,
@@ -15,9 +14,20 @@ static void show_msg(const string_view&, const string_view& message, const strin
         fmt::print(FMT_STRING("{}: {}\n"), msgno, message);
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: tdscpp-test <server> [username] [password]\n");
+        return 1;
+    }
+
     try {
-        tds::tds n(db_server, db_port, db_user, db_password, show_msg);
+        string server = argv[1];
+        string username = argc >= 3 ? argv[2] : "";
+        string password = argc >= 4 ? argv[3] : "";
+
+        // FIXME - prompt for password if username set but password isn't
+
+        tds::tds n(server, db_port, username, password, show_msg);
 
 #if 0
         fmt::print("{}\n", (tds::datetime)tds::value("2020-10-29T01:23:45.0-03:00"));
@@ -56,9 +66,37 @@ int main() {
             }
         }
 
+        {
+            {
+                tds::trans t(n);
+                tds::trans t2(n);
+
+                n.run("DROP TABLE IF EXISTS dbo.test2; CREATE TABLE dbo.test2(b VARCHAR(10));");
+
+                t2.commit();
+                t.commit();
+            }
+
+            tds::batch b(n, u"SELECT SYSTEM_USER AS [user], 42 AS answer, @@TRANCOUNT AS tc ORDER BY 1");
+
+            for (const auto& c : b.cols) {
+                fmt::print(FMT_STRING("{}\t"), c.name);
+            }
+            fmt::print("\n");
+
+            while (b.fetch_row()) {
+                for (const auto& c : b.cols) {
+                    fmt::print(FMT_STRING("{}\t"), c);
+                }
+                fmt::print(FMT_STRING("\n"));
+            }
+        }
+
         n.run("RAISERROR('Hello, world!', 0, 1)");
 
-        n.bcp(u"dbo.test", {u"a"}, {{"229"}, {"171"}});
+        n.run("DROP TABLE IF EXISTS dbo.test;");
+        n.run("CREATE TABLE dbo.test(a VARCHAR(10));");
+        n.bcp(u"dbo.test", {u"a"}, {{"1"}, {true}, {nullptr}});
     } catch (const exception& e) {
         fmt::print(stderr, FMT_STRING("Exception: {}\n"), e.what());
         return 1;
