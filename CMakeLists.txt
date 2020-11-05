@@ -257,6 +257,10 @@ set(NEW_SRC_FILES newtds.cpp
 
 add_executable(newtds ${NEW_SRC_FILES})
 
+if(WIN32)
+	add_definitions(-DNOMINMAX)
+endif()
+
 find_package(fmt REQUIRED)
 target_link_libraries(newtds fmt::fmt-header-only)
 
