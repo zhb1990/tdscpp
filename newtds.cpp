@@ -1724,15 +1724,15 @@ namespace tds {
         static const regex r4("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]$");
         static const regex r5("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]$");
 
-        if (regex_match(t.begin(), t.end(), rm, r1)) { // hh:mm:ss.s
+        if (regex_match(&t[0], &t[t.length()], rm, r1)) { // hh:mm:ss.s
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
-        } else if (regex_match(t.begin(), t.end(), rm, r2)) { // hh:mm
+        } else if (regex_match(&t[0], &t[t.length()], rm, r2)) { // hh:mm
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             s = 0;
-        } else if (regex_match(t.begin(), t.end(), rm, r3)) { // hh am
+        } else if (regex_match(&t[0], &t[t.length()], rm, r3)) { // hh am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             m = 0;
             s = 0;
@@ -1741,7 +1741,7 @@ namespace tds {
 
             if (ap == 'P' || ap == 'p')
                 h += 12;
-        } else if (regex_match(t.begin(), t.end(), rm, r4)) { // hh:mm:ss.s am
+        } else if (regex_match(&t[0], &t[t.length()], rm, r4)) { // hh:mm:ss.s am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
@@ -1750,7 +1750,7 @@ namespace tds {
 
             if (ap == 'P' || ap == 'p')
                 h += 12;
-        } else if (regex_match(t.begin(), t.end(), rm, r5)) { // hh:mm am
+        } else if (regex_match(&t[0], &t[t.length()], rm, r5)) { // hh:mm am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             s = 0;
@@ -1770,7 +1770,7 @@ namespace tds {
             cmatch rm;
             static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
 
-            if (regex_match(t.begin(), t.end(), rm, iso_date)) {
+            if (regex_match(&t[0], &t[t.length()], rm, iso_date)) {
                 from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
                 from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
                 from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
