@@ -155,10 +155,12 @@ namespace tds {
         value(const std::string& sv);
         value(const char* sv);
         value(const std::optional<std::string_view>& sv);
+#ifdef __cpp_char8_t
         value(const std::u8string_view& sv);
         value(const std::u8string& sv);
         value(const char8_t* sv);
         value(const std::optional<std::u8string_view>& sv);
+#endif
         value(float f);
         value(const std::optional<float>& f);
         value(double d);

@@ -984,6 +984,7 @@ namespace tds {
         }
     }
 
+#ifdef __cpp_char8_t
     value::value(const u8string_view& sv) {
         auto s = utf8_to_utf16(string_view((char*)sv.data(), sv.length()));
 
@@ -1010,6 +1011,7 @@ namespace tds {
             memcpy(val.data(), s.data(), s.length());
         }
     }
+#endif
 
     value::value(float f) {
         type = sql_type::FLTN;
