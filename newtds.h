@@ -2,7 +2,6 @@
 
 #include <fmt/format.h>
 #include <string>
-#include <span>
 #include <list>
 #include <functional>
 #include <optional>
@@ -65,7 +64,6 @@ namespace tds {
             const msg_handler& message_handler = nullptr);
         ~tds();
         void send_msg(enum tds_msg type, const std::string_view& msg);
-        void send_msg(enum tds_msg type, const std::span<uint8_t>& msg);
         void wait_for_msg(enum tds_msg& type, std::string& payload);
         void handle_info_msg(const std::string_view& sv, bool error);
         void handle_envchange_msg(const std::string_view& sv);
@@ -173,7 +171,7 @@ namespace tds {
         value(const std::optional<datetime>& t);
         value(const datetimeoffset& dt);
         value(const std::optional<datetimeoffset>& t);
-        value(const std::span<std::byte>& bin);
+        value(const std::vector<std::byte>& bin);
         value(bool b);
         value(const std::optional<bool>& b);
 

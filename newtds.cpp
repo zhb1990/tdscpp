@@ -8,7 +8,6 @@
 #include <string>
 #include <codecvt>
 #include <list>
-#include <span>
 #include <map>
 #include <charconv>
 #include <regex>
@@ -765,10 +764,6 @@ namespace tds {
             throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
     }
 
-    void tds::send_msg(enum tds_msg type, const span<uint8_t>& msg) {
-        send_msg(type, string_view{(const char*)msg.data(), (const char*)msg.data() + msg.size()});
-    }
-
     void tds::wait_for_msg(enum tds_msg& type, string& payload) {
         tds_header h;
 
@@ -1195,7 +1190,7 @@ namespace tds {
         }
     }
 
-    value::value(const span<std::byte>& bin) {
+    value::value(const vector<std::byte>& bin) {
         // FIXME - std::optional version of this too
 
         type = sql_type::VARBINARY;
@@ -2775,7 +2770,7 @@ namespace tds {
             }
         }
 
-        conn.send_msg(tds_msg::rpc, buf);
+        conn.send_msg(tds_msg::rpc, string_view((char*)buf.data(), buf.size()));
 
         enum tds_msg type;
         string payload;
@@ -4341,7 +4336,7 @@ namespace tds {
 
         memcpy(ptr, q.data(), q.length() * sizeof(char16_t));
 
-        conn.send_msg(tds_msg::sql_batch, buf);
+        conn.send_msg(tds_msg::sql_batch, string_view((char*)buf.data(), buf.size()));
 
         enum tds_msg type;
         string payload;
