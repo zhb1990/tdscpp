@@ -438,7 +438,6 @@ namespace tds {
             CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1}; // FIXME - move to class
             SECURITY_STATUS sec_status;
             TimeStamp timestamp;
-            char outstr[1024];
             SecBuffer outbuf;
             SecBufferDesc out;
             CtxtHandle ctx_handle;
@@ -451,26 +450,31 @@ namespace tds {
                     throw formatted_error(FMT_STRING("AcquireCredentialsHandle returned {:08x}"), (uint32_t)sec_status);
             }
 
-            outbuf.cbBuffer = sizeof(outstr);
+            outbuf.cbBuffer = 0;
             outbuf.BufferType = SECBUFFER_TOKEN;
-            outbuf.pvBuffer = outstr;
+            outbuf.pvBuffer = nullptr;
 
             out.ulVersion = SECBUFFER_VERSION;
             out.cBuffers = 1;
             out.pBuffers = &outbuf;
 
             sec_status = InitializeSecurityContextW(&cred_handle, /*ctx_handle_set ? &ctx_handle : */nullptr,
-                                                    (SEC_WCHAR*)utf8_to_utf16(spn).c_str(), 0, 0,
+                                                    (SEC_WCHAR*)utf8_to_utf16(spn).c_str(), ISC_REQ_ALLOCATE_MEMORY, 0,
                                                     SECURITY_NATIVE_DREP, /*auth_msg.empty() ? */nullptr/* : &in*/, 0,
                                                     &ctx_handle, &out, &context_attr, &timestamp);
             if (FAILED(sec_status))
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned {:08x}"), (uint32_t)sec_status);
 
+            // FIXME - free ctx_handle eventually
+
 //             ctx_handle_set = true;
 
-            if (sec_status == SEC_I_CONTINUE_NEEDED || sec_status == SEC_I_COMPLETE_AND_CONTINUE || sec_status == SEC_E_OK)
-                sspi = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
-            else
+            sspi = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+
+            if (outbuf.pvBuffer)
+                FreeContextBuffer(outbuf.pvBuffer);
+
+            if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE && sec_status != SEC_E_OK)
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {:08x}"), (uint32_t)sec_status);
 #else
             gss_cred_id_t cred_handle = 0; // FIXME - move to class
