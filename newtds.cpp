@@ -1661,15 +1661,15 @@ namespace tds {
 
         // FIXME - allow option for American-style dates?
 
-        if (regex_search(s.begin(), s.end(), rm, r1)) { // ISO style
+        if (regex_search(&s[0], &s[s.length()], rm, r1)) { // ISO style
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), d);
-        } else if (regex_search(s.begin(), s.end(), rm, r2)) { // dd/mm/yyyy
+        } else if (regex_search(&s[0], &s[s.length()], rm, r2)) { // dd/mm/yyyy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-        } else if (regex_search(s.begin(), s.end(), rm, r3)) { // dd/mm/yy
+        } else if (regex_search(&s[0], &s[s.length()], rm, r3)) { // dd/mm/yy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
@@ -1678,11 +1678,11 @@ namespace tds {
                 y += 1900;
             else
                 y += 2000;
-        } else if (regex_search(s.begin(), s.end(), rm, r4)) { // dd/mon/yyyy
+        } else if (regex_search(&s[0], &s[s.length()], rm, r4)) { // dd/mon/yyyy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             m = parse_month_name(rm[3].str());
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-        } else if (regex_search(s.begin(), s.end(), rm, r5)) { // dd/mon/yy
+        } else if (regex_search(&s[0], &s[s.length()], rm, r5)) { // dd/mon/yy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             m = parse_month_name(rm[3].str());
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
@@ -1691,11 +1691,11 @@ namespace tds {
                 y += 1900;
             else
                 y += 2000;
-        } else if (regex_search(s.begin(), s.end(), rm, r6)) { // mon dd, yyyy
+        } else if (regex_search(&s[0], &s[s.length()], rm, r6)) { // mon dd, yyyy
             from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
             m = parse_month_name(rm[1].str());
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-        } else if (regex_search(s.begin(), s.end(), rm, r7)) { // mon dd, yy
+        } else if (regex_search(&s[0], &s[s.length()], rm, r7)) { // mon dd, yy
             from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
             m = parse_month_name(rm[1].str());
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
@@ -1704,7 +1704,7 @@ namespace tds {
                 y += 1900;
             else
                 y += 2000;
-        } else if (regex_search(s.begin(), s.end(), rm, r8)) { // mon yyyy
+        } else if (regex_search(&s[0], &s[s.length()], rm, r8)) { // mon yyyy
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
             m = parse_month_name(rm[1].str());
             d = 1;
