@@ -20,6 +20,9 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <gssapi/gssapi.h>
+#else
+#define SECURITY_WIN32
+#include <sspi.h>
 #endif
 
 #include <unistd.h>
@@ -131,6 +134,7 @@ static string utf16_to_utf8(const u16string_view& sv) {
     return convert.to_bytes(sv.data(), sv.data() + sv.length());
 }
 
+#ifndef _WIN32
 class gss_error : public exception {
 public:
     gss_error(const string& func, OM_uint32 major, OM_uint32 minor) {
@@ -162,6 +166,7 @@ public:
 private:
     string msg;
 };
+#endif
 
 namespace tds {
     static bool is_byte_len_type(enum sql_type type) {
@@ -276,7 +281,7 @@ namespace tds {
             }
 
             if (get_fqdn) {
-                if (getnameinfo(res->ai_addr, res->ai_addrlen, hostname, sizeof(hostname), nullptr, 0, 0) == 0)
+                if (getnameinfo(res->ai_addr, (socklen_t)res->ai_addrlen, hostname, sizeof(hostname), nullptr, 0, 0) == 0)
                     fqdn = hostname;
             }
 
@@ -380,14 +385,55 @@ namespace tds {
         auto password_u16 = utf8_to_utf16(password);
 
         if (user.empty()) {
-            gss_cred_id_t cred_handle = 0;
+            if (fqdn.empty())
+                throw runtime_error("Could not do SSPI authentication as could not find server FQDN.");
+
+            string spn = "MSSQLSvc/" + fqdn;
+
+#ifdef _WIN32
+            CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1}; // FIXME - move to class
+            SECURITY_STATUS sec_status;
+            TimeStamp timestamp;
+            char outstr[1024];
+            SecBuffer outbuf;
+            SecBufferDesc out;
+            CtxtHandle ctx_handle;
+            unsigned long context_attr;
+
+            if (!SecIsValidHandle(&cred_handle)) {
+                sec_status = AcquireCredentialsHandleW(nullptr, (SEC_WCHAR*)L"Negotiate", SECPKG_CRED_OUTBOUND, nullptr,
+                                                       nullptr, nullptr, nullptr, &cred_handle, &timestamp);
+                if (FAILED(sec_status))
+                    throw formatted_error(FMT_STRING("AcquireCredentialsHandle returned {:08x}"), (uint32_t)sec_status);
+            }
+
+            outbuf.cbBuffer = sizeof(outstr);
+            outbuf.BufferType = SECBUFFER_TOKEN;
+            outbuf.pvBuffer = outstr;
+
+            out.ulVersion = SECBUFFER_VERSION;
+            out.cBuffers = 1;
+            out.pBuffers = &outbuf;
+
+            sec_status = InitializeSecurityContextW(&cred_handle, /*ctx_handle_set ? &ctx_handle : */nullptr,
+                                                    (SEC_WCHAR*)utf8_to_utf16(spn).c_str(), 0, 0,
+                                                    SECURITY_NATIVE_DREP, /*auth_msg.empty() ? */nullptr/* : &in*/, 0,
+                                                    &ctx_handle, &out, &context_attr, &timestamp);
+            if (FAILED(sec_status))
+                throw formatted_error(FMT_STRING("InitializeSecurityContext returned {:08x}"), (uint32_t)sec_status);
+
+//             ctx_handle_set = true;
+
+            if (sec_status == SEC_I_CONTINUE_NEEDED || sec_status == SEC_I_COMPLETE_AND_CONTINUE || sec_status == SEC_E_OK)
+                sspi = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+            else
+                throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {:08x}"), (uint32_t)sec_status);
+#else
+            gss_cred_id_t cred_handle = 0; // FIXME - move to class
             OM_uint32 major_status, minor_status;
             gss_buffer_desc recv_tok, send_tok, name_buf;
             gss_name_t gss_name;
             gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
-
-            if (fqdn.empty())
-                throw runtime_error("Could not do SSPI authentication as could not find server FQDN.");
 
             if (cred_handle != 0) {
                 major_status = gss_acquire_cred(&minor_status, GSS_C_NO_NAME, GSS_C_INDEFINITE, GSS_C_NO_OID_SET,
@@ -396,8 +442,6 @@ namespace tds {
                 if (major_status != GSS_S_COMPLETE)
                     throw gss_error("gss_acquire_cred", major_status, minor_status);
             }
-
-            string spn = "MSSQLSvc/" + fqdn;
 
             name_buf.length = spn.length();
             name_buf.value = (void*)spn.data();
@@ -421,6 +465,7 @@ namespace tds {
 
                 gss_release_buffer(&minor_status, &send_tok);
             }
+#endif
         }
 
         // FIXME - client PID
