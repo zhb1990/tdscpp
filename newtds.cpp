@@ -19,12 +19,11 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <gssapi/gssapi.h>
+#include <unistd.h>
 #else
 #define SECURITY_WIN32
 #include <sspi.h>
 #endif
-
-#include <unistd.h>
 
 #define DEBUG_SHOW_MSGS
 
