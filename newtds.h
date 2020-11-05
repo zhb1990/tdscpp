@@ -8,6 +8,11 @@
 #include <vector>
 #include <map>
 
+#ifdef _WIN32
+#define SECURITY_WIN32
+#include <sspi.h> // FIXME - rm when pimpl
+#endif
+
 enum class tds_msg : uint8_t; // FIXME
 
 namespace tds {
@@ -91,6 +96,9 @@ namespace tds {
         std::vector<uint8_t> bcp_colmetadata(const std::vector<column>& cols);
         std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<column>& cols);
         void bcp_sendmsg(const std::string_view& msg);
+#ifdef _WIN32
+        void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, const std::string_view& sspi);
+#endif
 
 #ifdef _WIN32
         SOCKET sock = INVALID_SOCKET;

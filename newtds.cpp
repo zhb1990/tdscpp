@@ -424,6 +424,14 @@ namespace tds {
     void tds::send_login_msg(const string_view& user, const string_view& password) {
         enum tds_msg type;
         string payload, sspi;
+        u16string spn;
+#ifdef _WIN32
+        CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1};
+        CtxtHandle ctx_handle;
+#else
+        gss_cred_id_t cred_handle = 0;
+        gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
+#endif
 
         auto user_u16 = utf8_to_utf16(user);
         auto password_u16 = utf8_to_utf16(password);
@@ -432,15 +440,13 @@ namespace tds {
             if (fqdn.empty())
                 throw runtime_error("Could not do SSPI authentication as could not find server FQDN.");
 
-            string spn = "MSSQLSvc/" + fqdn;
+            spn = u"MSSQLSvc/" + utf8_to_utf16(fqdn);
 
 #ifdef _WIN32
-            CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1}; // FIXME - move to class
             SECURITY_STATUS sec_status;
             TimeStamp timestamp;
             SecBuffer outbuf;
             SecBufferDesc out;
-            CtxtHandle ctx_handle;
             unsigned long context_attr;
 
             if (!SecIsValidHandle(&cred_handle)) {
@@ -458,9 +464,8 @@ namespace tds {
             out.cBuffers = 1;
             out.pBuffers = &outbuf;
 
-            sec_status = InitializeSecurityContextW(&cred_handle, /*ctx_handle_set ? &ctx_handle : */nullptr,
-                                                    (SEC_WCHAR*)utf8_to_utf16(spn).c_str(), ISC_REQ_ALLOCATE_MEMORY, 0,
-                                                    SECURITY_NATIVE_DREP, /*auth_msg.empty() ? */nullptr/* : &in*/, 0,
+            sec_status = InitializeSecurityContextW(&cred_handle, nullptr, (SEC_WCHAR*)spn.c_str(),
+                                                    ISC_REQ_ALLOCATE_MEMORY, 0, SECURITY_NATIVE_DREP, nullptr, 0,
                                                     &ctx_handle, &out, &context_attr, &timestamp);
             if (FAILED(sec_status))
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned {:08x}"), (uint32_t)sec_status);
@@ -477,11 +482,9 @@ namespace tds {
             if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE && sec_status != SEC_E_OK)
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {:08x}"), (uint32_t)sec_status);
 #else
-            gss_cred_id_t cred_handle = 0; // FIXME - move to class
             OM_uint32 major_status, minor_status;
             gss_buffer_desc recv_tok, send_tok, name_buf;
             gss_name_t gss_name;
-            gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 
             if (cred_handle != 0) {
                 major_status = gss_acquire_cred(&minor_status, GSS_C_NO_NAME, GSS_C_INDEFINITE, GSS_C_NO_OID_SET,
@@ -528,70 +531,143 @@ namespace tds {
                         u"beren"/*FIXME*/, user_u16, password_u16, u"test program"/*FIXME*/, u"luthien"/*FIXME*/, u"", u"us_english",
                         u"", sspi, u"", u"");
 
-        wait_for_msg(type, payload);
-        // FIXME - timeout
+        bool received_loginack, go_again;
 
-        if (type != tds_msg::tabular_result)
-            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+        do {
+            wait_for_msg(type, payload);
+            // FIXME - timeout
 
-        string_view sv = payload;
-        bool received_loginack = false;
+            if (type != tds_msg::tabular_result)
+                throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
 
-        while (!sv.empty()) {
-            auto type = (tds_token)sv[0];
-            sv = sv.substr(1);
+            string_view sv = payload;
 
-            switch (type) {
-                case tds_token::DONE:
-                case tds_token::DONEINPROC:
-                case tds_token::DONEPROC:
-                    if (sv.length() < sizeof(tds_done_msg))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+            received_loginack = false;
+            go_again = false;
 
-                    sv = sv.substr(sizeof(tds_done_msg));
+            while (!sv.empty()) {
+                auto type = (tds_token)sv[0];
+                sv = sv.substr(1);
 
-                    break;
+                switch (type) {
+                    case tds_token::DONE:
+                    case tds_token::DONEINPROC:
+                    case tds_token::DONEPROC:
+                        if (sv.length() < sizeof(tds_done_msg))
+                            throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
 
-                case tds_token::LOGINACK:
-                case tds_token::INFO:
-                case tds_token::TDS_ERROR:
-                case tds_token::ENVCHANGE:
-                {
-                    if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                        sv = sv.substr(sizeof(tds_done_msg));
 
-                    auto len = *(uint16_t*)&sv[0];
+                        break;
 
-                    sv = sv.substr(sizeof(uint16_t));
+                    case tds_token::LOGINACK:
+                    case tds_token::INFO:
+                    case tds_token::TDS_ERROR:
+                    case tds_token::ENVCHANGE:
+                    {
+                        if (sv.length() < sizeof(uint16_t))
+                            throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
 
-                    if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                        auto len = *(uint16_t*)&sv[0];
 
-                    if (type == tds_token::LOGINACK) {
-                        handle_loginack_msg(sv.substr(0, len));
-                        received_loginack = true;
-                    } else if (type == tds_token::INFO) {
-                        if (message_handler)
-                            handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::TDS_ERROR) {
-                        if (message_handler)
-                            handle_info_msg(sv.substr(0, len), true);
-                    } else if (type == tds_token::ENVCHANGE)
-                        handle_envchange_msg(sv.substr(0, len));
+                        sv = sv.substr(sizeof(uint16_t));
 
-                    sv = sv.substr(len);
+                        if (sv.length() < len)
+                            throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
 
-                    break;
+                        if (type == tds_token::LOGINACK) {
+                            handle_loginack_msg(sv.substr(0, len));
+                            received_loginack = true;
+                        } else if (type == tds_token::INFO) {
+                            if (message_handler)
+                                handle_info_msg(sv.substr(0, len), false);
+                        } else if (type == tds_token::TDS_ERROR) {
+                            if (message_handler)
+                                handle_info_msg(sv.substr(0, len), true);
+                        } else if (type == tds_token::ENVCHANGE)
+                            handle_envchange_msg(sv.substr(0, len));
+
+                        sv = sv.substr(len);
+
+                        break;
+                    }
+
+#ifdef _WIN32
+                    case tds_token::SSPI: // FIXME - handle doing this with GSSAPI
+                    {
+                        if (sv.length() < sizeof(uint16_t))
+                            throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+
+                        auto len = *(uint16_t*)&sv[0];
+
+                        sv = sv.substr(sizeof(uint16_t));
+
+                        if (sv.length() < len)
+                            throw formatted_error(FMT_STRING("Short SSPI token ({} bytes, expected {})."), type, sv.length(), len);
+
+                        send_sspi_msg(&cred_handle, &ctx_handle, spn, sv.substr(0, len));
+
+                        sv = sv.substr(len);
+
+                        go_again = true;
+
+                        break;
+                    }
+#endif
+
+                    default:
+                        throw formatted_error(FMT_STRING("Unhandled token type {} while logging in."), type);
                 }
-
-                default:
-                    throw formatted_error(FMT_STRING("Unhandled token type {} while logging in."), type);
             }
-        }
+        } while (go_again);
 
         if (!received_loginack)
             throw formatted_error(FMT_STRING("Did not receive LOGINACK message from server."));
     }
+
+#ifdef _WIN32
+    void tds::send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const u16string& spn, const string_view& sspi) {
+        SECURITY_STATUS sec_status;
+        TimeStamp timestamp;
+        SecBuffer inbufs[2], outbuf;
+        SecBufferDesc in, out;
+        unsigned long context_attr;
+        string ret;
+
+        inbufs[0].cbBuffer = (uint32_t)sspi.length();
+        inbufs[0].BufferType = SECBUFFER_TOKEN;
+        inbufs[0].pvBuffer = (void*)sspi.data();
+
+        inbufs[1].cbBuffer = 0;
+        inbufs[1].BufferType = SECBUFFER_EMPTY;
+        inbufs[1].pvBuffer = nullptr;
+
+        in.ulVersion = SECBUFFER_VERSION;
+        in.cBuffers = 2;
+        in.pBuffers = inbufs;
+
+        outbuf.cbBuffer = 0;
+        outbuf.BufferType = SECBUFFER_TOKEN;
+        outbuf.pvBuffer = nullptr;
+
+        out.ulVersion = SECBUFFER_VERSION;
+        out.cBuffers = 1;
+        out.pBuffers = &outbuf;
+
+        sec_status = InitializeSecurityContextW(cred_handle, ctx_handle, (SEC_WCHAR*)spn.c_str(),
+                                                ISC_REQ_ALLOCATE_MEMORY, 0, SECURITY_NATIVE_DREP,
+                                                &in, 0, ctx_handle, &out, &context_attr, &timestamp);
+        if (FAILED(sec_status))
+            throw formatted_error(FMT_STRING("InitializeSecurityContext returned {:08x}"), (uint32_t)sec_status);
+
+        ret = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+
+        if (outbuf.pvBuffer)
+            FreeContextBuffer(outbuf.pvBuffer);
+
+        send_msg(tds_msg::sspi, ret);
+    }
+#endif
 
     void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
                             uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
