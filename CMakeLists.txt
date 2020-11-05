@@ -266,4 +266,6 @@ endif()
 
 if(WIN32)
 	target_link_libraries(newtds ws2_32)
+else()
+	target_link_libraries(newtds gssapi_krb5)
 endif()

@@ -19,6 +19,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <gssapi/gssapi.h>
 #endif
 
 #include <unistd.h>
@@ -129,6 +130,38 @@ static string utf16_to_utf8(const u16string_view& sv) {
 
     return convert.to_bytes(sv.data(), sv.data() + sv.length());
 }
+
+class gss_error : public exception {
+public:
+    gss_error(const string& func, OM_uint32 major, OM_uint32 minor) {
+        OM_uint32 message_context = 0;
+        OM_uint32 min_status;
+        gss_buffer_desc status_string;
+        bool first = true;
+
+        msg = fmt::format(FMT_STRING("{} failed (minor {}): "), func, minor);
+
+        do {
+            gss_display_status(&min_status, major, GSS_C_GSS_CODE, GSS_C_NO_OID,
+                               &message_context, &status_string);
+
+            if (!first)
+                msg += "; ";
+
+            msg += string((char*)status_string.value, status_string.length);
+
+            gss_release_buffer(&min_status, &status_string);
+            first = false;
+        } while (message_context != 0);
+    }
+
+    const char* what() const noexcept {
+        return msg.c_str();
+    }
+
+private:
+    string msg;
+};
 
 namespace tds {
     static bool is_byte_len_type(enum sql_type type) {
@@ -334,12 +367,53 @@ namespace tds {
 
     void tds::send_login_msg(const string_view& user, const string_view& password) {
         enum tds_msg type;
-        string payload;
-
-        // FIXME - support SSPI
+        string payload, sspi;
 
         auto user_u16 = utf8_to_utf16(user);
         auto password_u16 = utf8_to_utf16(password);
+
+        if (user.empty()) {
+            gss_cred_id_t cred_handle = 0;
+            OM_uint32 major_status, minor_status;
+            gss_buffer_desc recv_tok, send_tok, name_buf;
+            gss_name_t gss_name;
+            gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
+
+            if (cred_handle != 0) {
+                major_status = gss_acquire_cred(&minor_status, GSS_C_NO_NAME/*FIXME?*/, GSS_C_INDEFINITE, GSS_C_NO_OID_SET,
+                                                GSS_C_INITIATE, &cred_handle, nullptr, nullptr);
+
+                if (major_status != GSS_S_COMPLETE)
+                    throw gss_error("gss_acquire_cred", major_status, minor_status);
+            }
+
+            string fqdn = "mssql.harmstone.com"; // FIXME
+
+            string spn = "MSSQLSvc/" + fqdn;
+
+            name_buf.length = spn.length();
+            name_buf.value = (void*)spn.data();
+
+            major_status = gss_import_name(&minor_status, &name_buf, GSS_C_NO_OID, &gss_name);
+            if (major_status != GSS_S_COMPLETE)
+                throw gss_error("gss_import_name", major_status, minor_status);
+
+            recv_tok.length = 0;
+            recv_tok.value = nullptr;
+
+            major_status = gss_init_sec_context(&minor_status, cred_handle, &ctx_handle, gss_name, GSS_C_NO_OID,
+                                                GSS_C_DELEG_FLAG, GSS_C_INDEFINITE, GSS_C_NO_CHANNEL_BINDINGS,
+                                                &recv_tok, nullptr, &send_tok, nullptr, nullptr);
+
+            if (major_status != GSS_S_CONTINUE_NEEDED && major_status != GSS_S_COMPLETE)
+                throw gss_error("gss_init_sec_context", major_status, minor_status);
+
+            if (send_tok.length != 0) {
+                sspi = string((char*)send_tok.value, send_tok.length);
+
+                gss_release_buffer(&minor_status, &send_tok);
+            }
+        }
 
         // FIXME - client PID
         // FIXME - option flags (1, 2, 3)
@@ -350,8 +424,8 @@ namespace tds {
         // FIXME - locale name?
 
         send_login_msg2(0x74000004, 4096, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
-                        u"beren", user_u16, password_u16, u"test program", u"luthien", u"", u"us_english",
-                        u"", "", u"", u"");
+                        u"beren"/*FIXME*/, user_u16, password_u16, u"test program"/*FIXME*/, u"luthien"/*FIXME*/, u"", u"us_english",
+                        u"", sspi, u"", u"");
 
         wait_for_msg(type, payload);
         // FIXME - timeout
@@ -454,7 +528,7 @@ namespace tds {
         msg->client_pid = client_pid;
         msg->connexion_id = connexion_id;
         msg->option_flags1 = option_flags1;
-        msg->option_flags2 = option_flags2;
+        msg->option_flags2 = option_flags2 | (uint8_t)(!sspi.empty() ? 0x80 : 0);
         msg->sql_type_flags = sql_type_flags;
         msg->option_flags3 = option_flags3;
         msg->timezone = 0;
