@@ -6,7 +6,11 @@
 #include "newtds.h"
 #include <iostream>
 #include <string>
+
+#ifndef _WIN32
 #include <codecvt>
+#endif
+
 #include <list>
 #include <map>
 #include <charconv>
@@ -121,15 +125,59 @@ struct fmt::formatter<enum tds_token> {
 };
 
 static u16string utf8_to_utf16(const string_view& sv) {
+#ifdef _WIN32
+    u16string ret;
+
+    if (sv.empty())
+        return u"";
+
+    auto len = MultiByteToWideChar(CP_UTF8, 0, sv.data(), (int)sv.length(), nullptr, 0);
+
+    if (len == 0)
+        throw runtime_error("MultiByteToWideChar 1 failed.");
+
+    ret.resize(len);
+
+    len = MultiByteToWideChar(CP_UTF8, 0, sv.data(), (int)sv.length(), (wchar_t*)ret.data(), len);
+
+    if (len == 0)
+        throw runtime_error("MultiByteToWideChar 2 failed.");
+
+    return ret;
+#else
     wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
 
     return convert.from_bytes(sv.data(), sv.data() + sv.length());
+#endif
 }
 
 static string utf16_to_utf8(const u16string_view& sv) {
+#ifdef _WIN32
+    string ret;
+
+    if (sv.empty())
+        return "";
+
+    auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), nullptr, 0,
+                                   nullptr, nullptr);
+
+    if (len == 0)
+        throw runtime_error("WideCharToMultiByte 1 failed.");
+
+    ret.resize(len);
+
+    len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), ret.data(), len,
+                              nullptr, nullptr);
+
+    if (len == 0)
+        throw runtime_error("WideCharToMultiByte 2 failed.");
+
+    return ret;
+#else
     wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
 
     return convert.to_bytes(sv.data(), sv.data() + sv.length());
+#endif
 }
 
 #ifndef _WIN32
