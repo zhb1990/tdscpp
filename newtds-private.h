@@ -441,6 +441,7 @@ namespace tds {
     class batch_impl {
     public:
         batch_impl(tds& conn, const std::u16string_view& q);
+        ~batch_impl();
 
         bool fetch_row();
         void wait_for_packet();
