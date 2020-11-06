@@ -204,6 +204,8 @@ namespace tds {
 
     class rpc {
     public:
+        ~rpc();
+
         template<typename... Args>
         rpc(tds& conn, const std::u16string_view& name, Args&&... args) : conn(conn), name(name) {
             params.reserve(sizeof...(args));

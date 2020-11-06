@@ -3294,6 +3294,63 @@ namespace tds {
         }
     }
 
+    rpc::~rpc() {
+        if (finished)
+            return;
+
+        conn.impl->send_msg(tds_msg::attention_signal, string_view());
+
+        while (!finished) {
+            wait_for_packet();
+        }
+
+        // wait for attention acknowledgement
+
+        try {
+            bool ack = false;
+
+            do {
+                enum tds_msg type;
+                string payload;
+
+                conn.impl->wait_for_msg(type, payload);
+                // FIXME - timeout
+
+                if (type != tds_msg::tabular_result)
+                    continue;
+
+                auto sv = string_view(payload);
+                parse_tokens(sv, tokens, buf_columns);
+
+                while (!tokens.empty()) {
+                    auto t = move(tokens.front());
+
+                    tokens.pop_front();
+
+                    auto type = (tds_token)t[0];
+
+                    switch (type) {
+                        case tds_token::DONE:
+                        case tds_token::DONEINPROC:
+                        case tds_token::DONEPROC: {
+                            auto m = (tds_done_msg*)&t[1];
+
+                            if (m->status & 0x20)
+                                ack = true;
+
+                            break;
+                        }
+
+                        default:
+                            break;
+                    }
+                }
+            } while (!ack);
+        } catch (...) {
+            // can't throw in destructor
+        }
+    }
+
     void rpc::wait_for_packet() {
         enum tds_msg type;
         string payload;
@@ -4898,8 +4955,6 @@ namespace tds {
 
                 if (type != tds_msg::tabular_result)
                     continue;
-
-                // FIXME - parse
 
                 auto sv = string_view(payload);
                 parse_tokens(sv, tokens, buf_columns);
