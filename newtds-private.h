@@ -437,4 +437,16 @@ namespace tds {
         msg_handler message_handler;
         uint64_t trans_id = 0;
     };
+
+    class batch_impl {
+    public:
+        batch_impl(tds& conn, const std::u16string_view& q);
+
+        bool fetch_row();
+
+        std::vector<column> cols;
+        bool finished = false;
+        std::list<std::vector<value>> rows;
+        tds& conn;
+    };
 };

@@ -4473,6 +4473,14 @@ namespace tds {
     }
 
     batch::batch(tds& conn, const u16string_view& q) {
+        impl = new batch_impl(conn, q);
+    }
+
+    batch::~batch() {
+        delete impl;
+    }
+
+    batch_impl::batch_impl(tds& conn, const u16string_view& q) : conn(conn) {
         size_t bufsize;
 
         bufsize = sizeof(tds_all_headers) + (q.length() * sizeof(uint16_t));
@@ -4759,8 +4767,7 @@ namespace tds {
         }
     }
 
-
-    bool batch::fetch_row() {
+    bool batch_impl::fetch_row() {
         if (!rows.empty()) {
             auto r = move(rows.front());
 
@@ -4782,6 +4789,18 @@ namespace tds {
         // FIXME - wait for another packet
 
         return false;
+    }
+
+    bool batch::fetch_row() {
+        return impl->fetch_row();
+    }
+
+    uint16_t batch::num_columns() const {
+        return (uint16_t)impl->cols.size();
+    }
+
+    const column& batch::operator[](uint16_t i) const {
+        return impl->cols[i];
     }
 
     void tds_impl::handle_envchange_msg(const string_view& sv) {

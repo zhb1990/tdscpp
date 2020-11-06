@@ -67,26 +67,26 @@ int main(int argc, char* argv[]) {
         }
 
         {
-            {
-                tds::trans t(n);
-                tds::trans t2(n);
+            tds::trans t(n);
+            tds::trans t2(n);
 
-                n.run("DROP TABLE IF EXISTS dbo.test2; CREATE TABLE dbo.test2(b VARCHAR(10));");
+            n.run("DROP TABLE IF EXISTS dbo.test2; CREATE TABLE dbo.test2(b VARCHAR(10));");
 
-                t2.commit();
-                t.commit();
-            }
+            t2.commit();
+            t.commit();
+        }
 
+        {
             tds::batch b(n, u"SELECT SYSTEM_USER AS [user], 42 AS answer, @@TRANCOUNT AS tc ORDER BY 1");
 
-            for (const auto& c : b.cols) {
-                fmt::print(FMT_STRING("{}\t"), c.name);
+            for (uint16_t i = 0; i < b.num_columns(); i++) {
+                fmt::print(FMT_STRING("{}\t"), b[i].name);
             }
             fmt::print("\n");
 
             while (b.fetch_row()) {
-                for (const auto& c : b.cols) {
-                    fmt::print(FMT_STRING("{}\t"), c);
+                for (uint16_t i = 0; i < b.num_columns(); i++) {
+                    fmt::print(FMT_STRING("{}\t"), b[i]);
                 }
                 fmt::print(FMT_STRING("\n"));
             }

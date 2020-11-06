@@ -307,17 +307,19 @@ namespace tds {
         }
     }
 
+    class batch_impl;
+
     class batch {
     public:
         batch(tds& conn, const std::u16string_view& q);
+        ~batch();
 
+        uint16_t num_columns() const;
+        const column& operator[](uint16_t i) const;
         bool fetch_row();
 
-        std::vector<column> cols;
-
     private:
-        bool finished = false;
-        std::list<std::vector<value>> rows;
+        batch_impl* impl;
     };
 
     class trans {
