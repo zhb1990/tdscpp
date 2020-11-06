@@ -401,7 +401,7 @@ namespace tds {
                 const msg_handler& message_handler);
         ~tds_impl();
         void send_msg(enum tds_msg type, const std::string_view& msg);
-        void wait_for_msg(enum tds_msg& type, std::string& payload);
+        void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);
         void handle_info_msg(const std::string_view& sv, bool error);
         void handle_envchange_msg(const std::string_view& sv);
 
@@ -443,10 +443,14 @@ namespace tds {
         batch_impl(tds& conn, const std::u16string_view& q);
 
         bool fetch_row();
+        void wait_for_packet();
 
         std::vector<column> cols;
         bool finished = false;
         std::list<std::vector<value>> rows;
         tds& conn;
+        std::list<std::string> tokens;
+        std::string buf;
+        std::vector<column> buf_columns;
     };
 };
