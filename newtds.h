@@ -8,13 +8,6 @@
 #include <vector>
 #include <map>
 
-#ifdef _WIN32
-#define SECURITY_WIN32
-#include <sspi.h> // FIXME - rm when pimpl
-#endif
-
-enum class tds_msg : uint8_t; // FIXME
-
 namespace tds {
     enum class sql_type : uint8_t {
         SQL_NULL = 0x1F,
@@ -58,54 +51,21 @@ namespace tds {
     using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
 
-    class query;
     class value;
-    class column;
+    class tds_impl;
 
-    // FIXME - use pimpl
     class tds {
     public:
         tds(const std::string& server, uint16_t port, const std::string_view& user, const std::string_view& password,
             const msg_handler& message_handler = nullptr);
         ~tds();
-        void send_msg(enum tds_msg type, const std::string_view& msg);
-        void wait_for_msg(enum tds_msg& type, std::string& payload);
-        void handle_info_msg(const std::string_view& sv, bool error);
-        void handle_envchange_msg(const std::string_view& sv);
 
         template<typename... Args>
         void run(const std::string_view& s, Args&&... args);
 
         void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp);
 
-        msg_handler message_handler;
-        uint64_t trans_id = 0;
-
-    private:
-        void connect(const std::string& server, uint16_t port, bool get_fqdn);
-        void send_prelogin_msg();
-        void send_login_msg(const std::string_view& user, const std::string_view& password);
-        void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
-                             uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
-                             uint8_t option_flags3, uint32_t collation, const std::u16string_view& client_name,
-                             const std::u16string_view& username, const std::u16string_view& password, const std::u16string_view& app_name,
-                             const std::u16string_view& server_name, const std::u16string_view& interface_library,
-                             const std::u16string_view& locale, const std::u16string_view& database, const std::string& sspi,
-                             const std::u16string_view& attach_db, const std::u16string_view& new_password);
-        void handle_loginack_msg(std::string_view sv);
-        std::vector<uint8_t> bcp_colmetadata(const std::vector<column>& cols);
-        std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<column>& cols);
-        void bcp_sendmsg(const std::string_view& msg);
-#ifdef _WIN32
-        void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, const std::string_view& sspi);
-#endif
-
-#ifdef _WIN32
-        SOCKET sock = INVALID_SOCKET;
-#else
-        int sock = 0;
-#endif
-        std::string fqdn;
+        tds_impl* impl;
     };
 
     class date {

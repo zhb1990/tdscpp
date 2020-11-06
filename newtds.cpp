@@ -2,8 +2,8 @@
 #include <ws2tcpip.h>
 #endif
 
-#include "newtds-private.h"
 #include "newtds.h"
+#include "newtds-private.h"
 #include <iostream>
 #include <string>
 
@@ -214,30 +214,39 @@ private:
 };
 #endif
 
-namespace tds {
-    static bool is_byte_len_type(enum sql_type type) {
-        switch (type) {
-            case sql_type::UNIQUEIDENTIFIER:
-            case sql_type::INTN:
-            case sql_type::DECIMAL:
-            case sql_type::NUMERIC:
-            case sql_type::BITN:
-            case sql_type::FLTN:
-            case sql_type::MONEYN:
-            case sql_type::DATETIMN:
-            case sql_type::DATE:
-            case sql_type::TIME:
-            case sql_type::DATETIME2:
-            case sql_type::DATETIMEOFFSET:
-                return true;
+static bool is_byte_len_type(enum tds::sql_type type) {
+    switch (type) {
+        case tds::sql_type::UNIQUEIDENTIFIER:
+        case tds::sql_type::INTN:
+        case tds::sql_type::DECIMAL:
+        case tds::sql_type::NUMERIC:
+        case tds::sql_type::BITN:
+        case tds::sql_type::FLTN:
+        case tds::sql_type::MONEYN:
+        case tds::sql_type::DATETIMN:
+        case tds::sql_type::DATE:
+        case tds::sql_type::TIME:
+        case tds::sql_type::DATETIME2:
+        case tds::sql_type::DATETIMEOFFSET:
+            return true;
 
-            default:
-                return false;
-        }
+        default:
+            return false;
+    }
+}
+
+namespace tds {
+    tds::tds(const string& server, uint16_t port, const string_view& user, const string_view& password,
+             const msg_handler& message_handler) {
+        impl = new tds_impl(server, port, user, password, message_handler);
     }
 
-    tds::tds(const string& server, uint16_t port, const string_view& user, const string_view& password,
-            const msg_handler& message_handler) : message_handler(message_handler) {
+    tds::~tds() {
+        delete impl;
+    }
+
+    tds_impl::tds_impl(const string& server, uint16_t port, const string_view& user, const string_view& password,
+                       const msg_handler& message_handler) : message_handler(message_handler) {
 #ifdef _WIN32
         WSADATA wsa_data;
 
@@ -252,7 +261,7 @@ namespace tds {
         send_login_msg(user, password);
     }
 
-    tds::~tds() {
+    tds_impl::~tds_impl() {
 #ifdef _WIN32
         if (sock != INVALID_SOCKET)
             closesocket(sock);
@@ -262,7 +271,7 @@ namespace tds {
 #endif
     }
 
-    void tds::connect(const string& server, uint16_t port, bool get_fqdn) {
+    void tds_impl::connect(const string& server, uint16_t port, bool get_fqdn) {
         struct addrinfo hints;
         struct addrinfo* res;
         struct addrinfo* orig_res;
@@ -343,7 +352,7 @@ namespace tds {
 #endif
     }
 
-    void tds::send_prelogin_msg() {
+    void tds_impl::send_prelogin_msg() {
         string msg;
         vector<login_opt> opts;
         login_opt_version lov;
@@ -421,7 +430,7 @@ namespace tds {
         }
     }
 
-    void tds::send_login_msg(const string_view& user, const string_view& password) {
+    void tds_impl::send_login_msg(const string_view& user, const string_view& password) {
         enum tds_msg type;
         string payload, sspi;
         u16string spn;
@@ -626,7 +635,7 @@ namespace tds {
     }
 
 #ifdef _WIN32
-    void tds::send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const u16string& spn, const string_view& sspi) {
+    void tds_impl::send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const u16string& spn, const string_view& sspi) {
         SECURITY_STATUS sec_status;
         TimeStamp timestamp;
         SecBuffer inbufs[2], outbuf;
@@ -670,13 +679,13 @@ namespace tds {
     }
 #endif
 
-    void tds::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
-                            uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
-                            uint8_t option_flags3, uint32_t collation, const u16string_view& client_name,
-                            const u16string_view& username, const u16string_view& password, const u16string_view& app_name,
-                            const u16string_view& server_name, const u16string_view& interface_library,
-                            const u16string_view& locale, const u16string_view& database, const string& sspi,
-                            const u16string_view& attach_db, const u16string_view& new_password) {
+    void tds_impl::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
+                                   uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
+                                   uint8_t option_flags3, uint32_t collation, const u16string_view& client_name,
+                                   const u16string_view& username, const u16string_view& password, const u16string_view& app_name,
+                                   const u16string_view& server_name, const u16string_view& interface_library,
+                                   const u16string_view& locale, const u16string_view& database, const string& sspi,
+                                   const u16string_view& attach_db, const u16string_view& new_password) {
         uint32_t length;
         uint16_t off;
 
@@ -864,7 +873,7 @@ namespace tds {
         send_msg(tds_msg::tds7_login, payload);
     }
 
-    void tds::send_msg(enum tds_msg type, const string_view& msg) {
+    void tds_impl::send_msg(enum tds_msg type, const string_view& msg) {
         string payload;
 
         payload.resize(msg.length() + sizeof(tds_header));
@@ -895,7 +904,7 @@ namespace tds {
             throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
     }
 
-    void tds::wait_for_msg(enum tds_msg& type, string& payload) {
+    void tds_impl::wait_for_msg(enum tds_msg& type, string& payload) {
         tds_header h;
 
         auto ret = recv(sock, (char*)&h, sizeof(tds_header), MSG_WAITALL);
@@ -940,7 +949,7 @@ namespace tds {
             payload.clear();
     }
 
-    void tds::handle_loginack_msg(string_view sv) {
+    void tds_impl::handle_loginack_msg(string_view sv) {
         uint8_t interf, server_name_len;
         uint32_t tds_version, server_version;
         u16string_view server_name;
@@ -972,7 +981,7 @@ namespace tds {
             throw formatted_error(FMT_STRING("Server not using TDS 7.4. Version was {:x}, expected {:x}."), tds_version, tds_74_version);
     }
 
-    void tds::handle_info_msg(const string_view& sv, bool error) {
+    void tds_impl::handle_info_msg(const string_view& sv, bool error) {
         uint16_t msg_len;
         uint8_t server_name_len, proc_name_len, state, severity;
         u16string_view msg, server_name, proc_name;
@@ -2721,7 +2730,7 @@ namespace tds {
         all_headers->total_size = sizeof(tds_all_headers);
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
-        all_headers->trans_desc.descriptor = conn.trans_id;
+        all_headers->trans_desc.descriptor = conn.impl->trans_id;
         all_headers->trans_desc.outstanding = 1;
 
         auto ptr = (uint8_t*)&all_headers[1];
@@ -2908,12 +2917,12 @@ namespace tds {
             }
         }
 
-        conn.send_msg(tds_msg::rpc, string_view((char*)buf.data(), buf.size()));
+        conn.impl->send_msg(tds_msg::rpc, string_view((char*)buf.data(), buf.size()));
 
         enum tds_msg type;
         string payload;
 
-        conn.wait_for_msg(type, payload);
+        conn.impl->wait_for_msg(type, payload);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -2959,15 +2968,15 @@ namespace tds {
                         throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), false);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), false);
                     } else if (type == tds_token::TDS_ERROR) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), true);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw formatted_error(FMT_STRING("RPC {} failed."), utf16_to_utf8(name));
                     } else if (type == tds_token::ENVCHANGE)
-                        conn.handle_envchange_msg(sv.substr(0, len));
+                        conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
 
@@ -3524,10 +3533,10 @@ namespace tds {
         // FIXME - handle INT NULLs and VARCHAR NULLs
 
         // send COLMETADATA for rows
-        auto buf = bcp_colmetadata(cols);
+        auto buf = impl->bcp_colmetadata(cols);
 
         for (const auto& v : vp) {
-            auto buf2 = bcp_row(v, cols);
+            auto buf2 = impl->bcp_row(v, cols);
 
             // FIXME - if buf full, send packet (maximum packet size is 4096?)
 
@@ -3536,10 +3545,10 @@ namespace tds {
             memcpy(&buf[oldlen], buf2.data(), buf2.size());
         }
 
-        bcp_sendmsg(string_view((char*)buf.data(), buf.size()));
+        impl->bcp_sendmsg(string_view((char*)buf.data(), buf.size()));
     }
 
-    vector<uint8_t> tds::bcp_row(const vector<value>& v, const vector<column>& cols) {
+    vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<column>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
         for (unsigned int i = 0; i < v.size(); i++) {
@@ -4237,7 +4246,7 @@ namespace tds {
         return buf;
     }
 
-    void tds::bcp_sendmsg(const string_view& data) {
+    void tds_impl::bcp_sendmsg(const string_view& data) {
         send_msg(tds_msg::bulk_load_data, data);
 
         enum tds_msg type;
@@ -4304,7 +4313,7 @@ namespace tds {
         }
     }
 
-    vector<uint8_t> tds::bcp_colmetadata(const vector<column>& cols) {
+    vector<uint8_t> tds_impl::bcp_colmetadata(const vector<column>& cols) {
         size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
 
         for (const auto& col : cols) {
@@ -4467,19 +4476,19 @@ namespace tds {
         all_headers->total_size = sizeof(tds_all_headers);
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
-        all_headers->trans_desc.descriptor = conn.trans_id;
+        all_headers->trans_desc.descriptor = conn.impl->trans_id;
         all_headers->trans_desc.outstanding = 1;
 
         auto ptr = (char16_t*)&all_headers[1];
 
         memcpy(ptr, q.data(), q.length() * sizeof(char16_t));
 
-        conn.send_msg(tds_msg::sql_batch, string_view((char*)buf.data(), buf.size()));
+        conn.impl->send_msg(tds_msg::sql_batch, string_view((char*)buf.data(), buf.size()));
 
         enum tds_msg type;
         string payload;
 
-        conn.wait_for_msg(type, payload);
+        conn.impl->wait_for_msg(type, payload);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -4525,15 +4534,15 @@ namespace tds {
                         throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), false);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), false);
                     } else if (type == tds_token::TDS_ERROR) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), true);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw formatted_error(FMT_STRING("SQL batch failed."));
                     } else if (type == tds_token::ENVCHANGE)
-                        conn.handle_envchange_msg(sv.substr(0, len));
+                        conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
 
@@ -4767,7 +4776,7 @@ namespace tds {
         return false;
     }
 
-    void tds::handle_envchange_msg(const string_view& sv) {
+    void tds_impl::handle_envchange_msg(const string_view& sv) {
         auto ec = (tds_envchange*)(sv.data() - offsetof(tds_envchange, type));
 
         switch (ec->type) {
@@ -4829,19 +4838,19 @@ namespace tds {
         msg.header.all_headers.total_size = sizeof(tds_all_headers);
         msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-        msg.header.all_headers.trans_desc.descriptor = conn.trans_id;
+        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_BEGIN_XACT;
         msg.isolation_level = 0;
         msg.name_len = 0;
 
-        conn.send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
+        conn.impl->send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         string payload;
 
         // FIXME - timeout
-        conn.wait_for_msg(type, payload);
+        conn.impl->wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
             throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
@@ -4877,15 +4886,15 @@ namespace tds {
                         throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), false);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), false);
                     } else if (type == tds_token::TDS_ERROR) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), true);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw runtime_error("TM_BEGIN_XACT request failed.");
                     } else if (type == tds_token::ENVCHANGE)
-                        conn.handle_envchange_msg(sv.substr(0, len));
+                        conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
 
@@ -4901,7 +4910,7 @@ namespace tds {
     trans::~trans() {
         // FIXME - just return if committed already
 
-        if (conn.trans_id == 0)
+        if (conn.impl->trans_id == 0)
             return;
 
         try {
@@ -4910,19 +4919,19 @@ namespace tds {
             msg.header.all_headers.total_size = sizeof(tds_all_headers);
             msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
             msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-            msg.header.all_headers.trans_desc.descriptor = conn.trans_id;
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
             msg.header.all_headers.trans_desc.outstanding = 1;
             msg.header.type = tds_tm_type::TM_ROLLBACK_XACT;
             msg.name_len = 0;
             msg.flags = 0;
 
-            conn.send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
+            conn.impl->send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
 
             enum tds_msg type;
             string payload;
 
             // FIXME - timeout
-            conn.wait_for_msg(type, payload);
+            conn.impl->wait_for_msg(type, payload);
 
             if (type != tds_msg::tabular_result)
                 throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
@@ -4958,24 +4967,24 @@ namespace tds {
                             throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
 
                         if (type == tds_token::INFO) {
-                            if (conn.message_handler) {
+                            if (conn.impl->message_handler) {
                                 try {
-                                    conn.handle_info_msg(sv.substr(0, len), false);
+                                    conn.impl->handle_info_msg(sv.substr(0, len), false);
                                 } catch (...) {
                                 }
                             }
 
                         } else if (type == tds_token::TDS_ERROR) {
-                            if (conn.message_handler) {
+                            if (conn.impl->message_handler) {
                                 try {
-                                    conn.handle_info_msg(sv.substr(0, len), true);
+                                    conn.impl->handle_info_msg(sv.substr(0, len), true);
                                 } catch (...) {
                                 }
                             }
 
                             throw runtime_error("TM_BEGIN_XACT request failed.");
                         } else if (type == tds_token::ENVCHANGE)
-                            conn.handle_envchange_msg(sv.substr(0, len));
+                            conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                         sv = sv.substr(len);
 
@@ -4997,19 +5006,19 @@ namespace tds {
         msg.header.all_headers.total_size = sizeof(tds_all_headers);
         msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-        msg.header.all_headers.trans_desc.descriptor = conn.trans_id;
+        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_COMMIT_XACT;
         msg.name_len = 0;
         msg.flags = 0;
 
-        conn.send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
+        conn.impl->send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         string payload;
 
         // FIXME - timeout
-        conn.wait_for_msg(type, payload);
+        conn.impl->wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
             throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
@@ -5045,15 +5054,15 @@ namespace tds {
                         throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), false);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), false);
                     } else if (type == tds_token::TDS_ERROR) {
-                        if (conn.message_handler)
-                            conn.handle_info_msg(sv.substr(0, len), true);
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw runtime_error("TM_BEGIN_XACT request failed.");
                     } else if (type == tds_token::ENVCHANGE)
-                        conn.handle_envchange_msg(sv.substr(0, len));
+                        conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
 
