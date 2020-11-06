@@ -205,7 +205,7 @@ namespace tds {
     class rpc {
     public:
         template<typename... Args>
-        rpc(tds& conn, const std::u16string_view& name, Args&&... args) {
+        rpc(tds& conn, const std::u16string_view& name, Args&&... args) : conn(conn), name(name) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -213,7 +213,7 @@ namespace tds {
             do_rpc(conn, name);
         }
 
-        rpc(tds& conn, const std::u16string_view& name) {
+        rpc(tds& conn, const std::u16string_view& name) : conn(conn), name(name) {
             do_rpc(conn, name);
         }
 
@@ -250,11 +250,17 @@ namespace tds {
         }
 
         void do_rpc(tds& conn, const std::u16string_view& name);
+        void wait_for_packet();
 
+        tds& conn;
         std::vector<value> params;
         std::map<unsigned int, value*> output_params;
         bool finished = false;
         std::list<std::vector<value>> rows;
+        std::list<std::string> tokens;
+        std::string buf;
+        std::vector<column> buf_columns;
+        std::u16string name;
     };
 
     class query {

@@ -3042,23 +3042,291 @@ namespace tds {
 
         conn.impl->send_msg(tds_msg::rpc, string_view((char*)buf.data(), buf.size()));
 
+        wait_for_packet();
+    }
+
+    static void parse_tokens(string_view& sv, list<string>& tokens, vector<column>& buf_columns) {
+        while (!sv.empty()) {
+            auto type = (tds_token)sv[0];
+
+            if (((uint8_t)type & 0x30) == 0x20 && type != tds_token::RETURNVALUE) { // variable-length token
+                if (sv.length() < 1 + sizeof(uint16_t))
+                    return;
+
+                auto len = *(uint16_t*)&sv[1];
+
+                if (sv.length() < (size_t)(1 + sizeof(uint16_t) + len))
+                    return;
+
+                tokens.emplace_back(sv.substr(0, 1 + sizeof(uint16_t) + len));
+                sv = sv.substr(1 + sizeof(uint16_t) + len);
+            } else {
+                switch (type) {
+                    case tds_token::DONE:
+                    case tds_token::DONEPROC:
+                    case tds_token::DONEINPROC:
+                        if (sv.length() < 1 + sizeof(tds_done_msg))
+                            return;
+
+                        tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_done_msg)));
+                        sv = sv.substr(1 + sizeof(tds_done_msg));
+                    break;
+
+                    case tds_token::COLMETADATA: {
+                        if (sv.length() < 5)
+                            return;
+
+                        auto num_columns = *(uint16_t*)&sv[1];
+
+                        if (num_columns == 0) {
+                            buf_columns.clear();
+                            tokens.emplace_back(sv.substr(0, 5));
+                            sv = sv.substr(5);
+                            continue;
+                        }
+
+                        vector<column> cols;
+
+                        cols.reserve(num_columns);
+
+                        string_view sv2 = sv;
+
+                        sv2 = sv2.substr(1 + sizeof(uint16_t));
+
+                        for (unsigned int i = 0; i < num_columns; i++) {
+                            if (sv2.length() < sizeof(tds_colmetadata_col))
+                                return;
+
+                            cols.emplace_back();
+
+                            auto& col = cols.back();
+
+                            auto& c = *(tds_colmetadata_col*)&sv2[0];
+
+                            col.type = c.type;
+
+                            sv2 = sv2.substr(sizeof(tds_colmetadata_col));
+
+                            switch (c.type) {
+                                case sql_type::SQL_NULL:
+                                case sql_type::TINYINT:
+                                case sql_type::BIT:
+                                case sql_type::SMALLINT:
+                                case sql_type::INT:
+                                case sql_type::DATETIM4:
+                                case sql_type::REAL:
+                                case sql_type::MONEY:
+                                case sql_type::DATETIME:
+                                case sql_type::FLOAT:
+                                case sql_type::SMALLMONEY:
+                                case sql_type::BIGINT:
+                                case sql_type::UNIQUEIDENTIFIER:
+                                case sql_type::DECIMAL:
+                                case sql_type::NUMERIC:
+                                case sql_type::MONEYN:
+                                case sql_type::DATE:
+                                    // nop
+                                break;
+
+                                case sql_type::INTN:
+                                case sql_type::FLTN:
+                                case sql_type::TIME:
+                                case sql_type::DATETIME2:
+                                case sql_type::DATETIMN:
+                                case sql_type::DATETIMEOFFSET:
+                                case sql_type::BITN:
+                                    if (sv2.length() < sizeof(uint8_t))
+                                        return;
+
+                                    col.max_length = *(uint8_t*)sv2.data();
+
+                                    sv2 = sv2.substr(1);
+                                break;
+
+                                case sql_type::VARCHAR:
+                                case sql_type::NVARCHAR:
+                                case sql_type::CHAR:
+                                case sql_type::NCHAR:
+                                    if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
+                                        return;
+
+                                    col.max_length = *(uint16_t*)sv2.data();
+
+                                    sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                                break;
+
+                                case sql_type::VARBINARY:
+                                case sql_type::BINARY:
+                                    if (sv2.length() < sizeof(uint16_t))
+                                        return;
+
+                                    col.max_length = *(uint16_t*)sv2.data();
+
+                                    sv2 = sv2.substr(sizeof(uint16_t));
+                                break;
+
+                                default:
+                                    throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
+                            }
+
+                            if (sv2.length() < 1)
+                                return;
+
+                            auto name_len = *(uint8_t*)&sv2[0];
+
+                            sv2 = sv2.substr(1);
+
+                            if (sv2.length() < name_len * sizeof(char16_t))
+                                return;
+
+                            sv2 = sv2.substr(name_len * sizeof(char16_t));
+                        }
+
+                        auto len = sv2.data() - sv.data();
+
+                        tokens.emplace_back(sv.substr(0, len));
+                        sv = sv.substr(len);
+
+                        buf_columns = cols;
+
+                        break;
+                    }
+
+                    case tds_token::ROW: {
+                        auto sv2 = sv.substr(1);
+
+                        for (unsigned int i = 0; i < buf_columns.size(); i++) {
+                            if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
+                                return;
+                        }
+
+                        auto len = sv2.data() - sv.data();
+
+                        tokens.emplace_back(sv.substr(0, len));
+                        sv = sv.substr(len);
+
+                        break;
+                    }
+
+                    case tds_token::NBCROW:
+                    {
+                        if (buf_columns.empty())
+                            break;
+
+                        auto sv2 = sv.substr(1);
+
+                        auto bitset_length = (buf_columns.size() + 7) / 8;
+
+                        if (sv2.length() < bitset_length)
+                            return;
+
+                        string_view bitset(sv2.data(), bitset_length);
+                        auto bsv = (uint8_t)bitset[0];
+
+                        sv2 = sv2.substr(bitset_length);
+
+                        for (unsigned int i = 0; i < buf_columns.size(); i++) {
+                            if (i != 0) {
+                                if ((i & 7) == 0) {
+                                    bitset = bitset.substr(1);
+                                    bsv = bitset[0];
+                                } else
+                                    bsv >>= 1;
+                            }
+
+                            if (!(bsv & 1)) { // not NULL
+                                if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
+                                    return;
+                            }
+                        }
+
+                        auto len = sv2.data() - sv.data();
+
+                        tokens.emplace_back(sv.substr(0, len));
+                        sv = sv.substr(len);
+
+                        break;
+                    }
+
+                    case tds_token::RETURNSTATUS:
+                    {
+                        if (sv.length() < 1 + sizeof(int32_t))
+                            return;
+
+                        tokens.emplace_back(sv.substr(0, 1 + sizeof(int32_t)));
+                        sv = sv.substr(1 + sizeof(int32_t));
+
+                        break;
+                    }
+
+                    case tds_token::RETURNVALUE:
+                    {
+                        auto h = (tds_return_value*)&sv[1];
+
+                        if (sv.length() < 1 + sizeof(tds_return_value))
+                            return;
+
+                        // FIXME - param name
+
+                        if (is_byte_len_type(h->type)) {
+                            uint8_t len;
+
+                            if (sv.length() < 1 + sizeof(tds_return_value) + 2)
+                                return;
+
+                            len = *((uint8_t*)&sv[1] + sizeof(tds_return_value) + 1);
+
+                            if (sv.length() < 1 + sizeof(tds_return_value) + 2 + len)
+                                return;
+
+                            tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_return_value) + 2 + len));
+                            sv = sv.substr(1 + sizeof(tds_return_value) + 2 + len);
+                        } else
+                            throw formatted_error(FMT_STRING("Unhandled type {} in RETURNVALUE message."), h->type);
+
+                        break;
+                    }
+
+                    default:
+                        throw formatted_error(FMT_STRING("Unhandled token type {} while parsing tokens."), type);
+                }
+            }
+        }
+    }
+
+    void rpc::wait_for_packet() {
         enum tds_msg type;
         string payload;
+        bool last_packet;
 
-        conn.impl->wait_for_msg(type, payload);
+        conn.impl->wait_for_msg(type, payload, &last_packet);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
             throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
 
-        string_view sv = payload;
-        uint16_t num_columns = 0;
+        buf += payload;
 
-        while (!sv.empty()) {
+        {
+            string_view sv = buf;
+
+            parse_tokens(sv, tokens, buf_columns);
+
+            buf = sv;
+        }
+
+        if (last_packet && !buf.empty())
+            throw formatted_error(FMT_STRING("Data remaining in buffer"));
+
+        while (!tokens.empty()) {
+            auto t = move(tokens.front());
+
+            tokens.pop_front();
+
+            string_view sv = t;
+
             auto type = (tds_token)sv[0];
             sv = sv.substr(1);
-
-            // FIXME - parse unknowns according to numeric value of type
 
             switch (type) {
                 case tds_token::DONE:
@@ -3067,14 +3335,8 @@ namespace tds {
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
 
-                    sv = sv.substr(sizeof(tds_done_msg));
-
                     // FIXME - handle RPCs that return multiple row sets?
-
-                    if (type == tds_token::DONEINPROC)
-                        finished = true;
-
-                    break;
+                break;
 
                 case tds_token::INFO:
                 case tds_token::TDS_ERROR:
@@ -3101,8 +3363,6 @@ namespace tds {
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
-                    sv = sv.substr(len);
-
                     break;
                 }
 
@@ -3113,8 +3373,6 @@ namespace tds {
 
                     return_status = *(int32_t*)&sv[0];
 
-                    sv = sv.substr(sizeof(int32_t));
-
                     break;
                 }
 
@@ -3123,12 +3381,10 @@ namespace tds {
                     if (sv.length() < 4)
                         throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes, expected at least 4)."), sv.length());
 
-                    num_columns = *(uint16_t*)&sv[0];
+                    auto num_columns = *(uint16_t*)&sv[0];
 
-                    if (num_columns == 0) {
-                        sv = sv.substr(4);
+                    if (num_columns == 0)
                         break;
-                    }
 
                     cols.clear();
                     cols.reserve(num_columns);
@@ -3237,8 +3493,6 @@ namespace tds {
                         len += name_len * sizeof(char16_t);
                     }
 
-                    sv = sv.substr(len);
-
                     break;
                 }
 
@@ -3276,8 +3530,6 @@ namespace tds {
                                 memcpy(out.val.data(), (uint8_t*)&sv[0] + sizeof(tds_return_value) + 2, len);
                             }
                         }
-
-                        sv = sv.substr(sizeof(tds_return_value) + 2 + len);
                     } else
                         throw formatted_error(FMT_STRING("Unhandled type {} in RETURNVALUE message."), h->type);
 
@@ -3353,8 +3605,6 @@ namespace tds {
                     if (sv.length() < len)
                         throw formatted_error(FMT_STRING("Short ORDER message ({} bytes, expected {})."), sv.length(), len);
 
-                    sv = sv.substr(len);
-
                     break;
                 }
 
@@ -3362,28 +3612,33 @@ namespace tds {
                     throw formatted_error(FMT_STRING("Unhandled token type {} while executing RPC."), type);
             }
         }
+
+        if (last_packet)
+            finished = true;
     }
 
     bool rpc::fetch_row() {
-        if (!rows.empty()) {
-            auto r = move(rows.front());
+        while (!rows.empty() || !finished) {
+            if (!rows.empty()) {
+                auto r = move(rows.front());
 
-            rows.pop_front();
+                rows.pop_front();
 
-            for (unsigned int i = 0; i < r.size(); i++) {
-                cols[i].is_null = r[i].is_null;
+                for (unsigned int i = 0; i < r.size(); i++) {
+                    cols[i].is_null = r[i].is_null;
 
-                if (!cols[i].is_null)
-                    cols[i].val = move(r[i].val);
+                    if (!cols[i].is_null)
+                        cols[i].val = move(r[i].val);
+                }
+
+                return true;
             }
 
-            return true;
+            if (finished)
+                return false;
+
+            wait_for_packet();
         }
-
-        if (finished)
-            return false;
-
-        // FIXME - wait for another packet
 
         return false;
     }
@@ -4617,216 +4872,6 @@ namespace tds {
         conn.impl->send_msg(tds_msg::sql_batch, string_view((char*)buf.data(), buf.size()));
 
         wait_for_packet();
-    }
-
-    static void parse_tokens(string_view& sv, list<string>& tokens, vector<column>& buf_columns) {
-        while (!sv.empty()) {
-            auto type = (tds_token)sv[0];
-
-            if (((uint8_t)type & 0x30) == 0x20) { // variable-length token
-                if (sv.length() < 1 + sizeof(uint16_t))
-                    return;
-
-                auto len = *(uint16_t*)&sv[1];
-
-                if (sv.length() < (size_t)(1 + sizeof(uint16_t) + len))
-                    return;
-
-                tokens.emplace_back(sv.substr(0, 1 + sizeof(uint16_t) + len));
-                sv = sv.substr(1 + sizeof(uint16_t) + len);
-            } else {
-                switch (type) {
-                    case tds_token::DONE:
-                    case tds_token::DONEPROC:
-                    case tds_token::DONEINPROC:
-                        if (sv.length() < 1 + sizeof(tds_done_msg))
-                            return;
-
-                        tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_done_msg)));
-                        sv = sv.substr(1 + sizeof(tds_done_msg));
-                    break;
-
-                    case tds_token::COLMETADATA: {
-                        if (sv.length() < 5)
-                            return;
-
-                        auto num_columns = *(uint16_t*)&sv[1];
-
-                        if (num_columns == 0) {
-                            buf_columns.clear();
-                            tokens.emplace_back(sv.substr(0, 5));
-                            sv = sv.substr(5);
-                            continue;
-                        }
-
-                        vector<column> cols;
-
-                        cols.reserve(num_columns);
-
-                        string_view sv2 = sv;
-
-                        sv2 = sv2.substr(1 + sizeof(uint16_t));
-
-                        for (unsigned int i = 0; i < num_columns; i++) {
-                            if (sv2.length() < sizeof(tds_colmetadata_col))
-                                return;
-
-                            cols.emplace_back();
-
-                            auto& col = cols.back();
-
-                            auto& c = *(tds_colmetadata_col*)&sv2[0];
-
-                            col.type = c.type;
-
-                            sv2 = sv2.substr(sizeof(tds_colmetadata_col));
-
-                            switch (c.type) {
-                                case sql_type::SQL_NULL:
-                                case sql_type::TINYINT:
-                                case sql_type::BIT:
-                                case sql_type::SMALLINT:
-                                case sql_type::INT:
-                                case sql_type::DATETIM4:
-                                case sql_type::REAL:
-                                case sql_type::MONEY:
-                                case sql_type::DATETIME:
-                                case sql_type::FLOAT:
-                                case sql_type::SMALLMONEY:
-                                case sql_type::BIGINT:
-                                case sql_type::UNIQUEIDENTIFIER:
-                                case sql_type::DECIMAL:
-                                case sql_type::NUMERIC:
-                                case sql_type::MONEYN:
-                                case sql_type::DATE:
-                                    // nop
-                                break;
-
-                                case sql_type::INTN:
-                                case sql_type::FLTN:
-                                case sql_type::TIME:
-                                case sql_type::DATETIME2:
-                                case sql_type::DATETIMN:
-                                case sql_type::DATETIMEOFFSET:
-                                case sql_type::BITN:
-                                    if (sv2.length() < sizeof(uint8_t))
-                                        return;
-
-                                    col.max_length = *(uint8_t*)sv2.data();
-
-                                    sv2 = sv2.substr(1);
-                                break;
-
-                                case sql_type::VARCHAR:
-                                case sql_type::NVARCHAR:
-                                case sql_type::CHAR:
-                                case sql_type::NCHAR:
-                                    if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
-                                        return;
-
-                                    col.max_length = *(uint16_t*)sv2.data();
-
-                                    sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
-                                break;
-
-                                case sql_type::VARBINARY:
-                                case sql_type::BINARY:
-                                    if (sv2.length() < sizeof(uint16_t))
-                                        return;
-
-                                    col.max_length = *(uint16_t*)sv2.data();
-
-                                    sv2 = sv2.substr(sizeof(uint16_t));
-                                break;
-
-                                default:
-                                    throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
-                            }
-
-                            if (sv2.length() < 1)
-                                return;
-
-                            auto name_len = *(uint8_t*)&sv2[0];
-
-                            sv2 = sv2.substr(1);
-
-                            if (sv2.length() < name_len * sizeof(char16_t))
-                                return;
-
-                            sv2 = sv2.substr(name_len * sizeof(char16_t));
-                        }
-
-                        auto len = sv2.data() - sv.data();
-
-                        tokens.emplace_back(sv.substr(0, len));
-                        sv = sv.substr(len);
-
-                        buf_columns = cols;
-
-                        break;
-                    }
-
-                    case tds_token::ROW: {
-                        auto sv2 = sv.substr(1);
-
-                        for (unsigned int i = 0; i < buf_columns.size(); i++) {
-                            if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
-                                return;
-                        }
-
-                        auto len = sv2.data() - sv.data();
-
-                        tokens.emplace_back(sv.substr(0, len));
-                        sv = sv.substr(len);
-
-                        break;
-                    }
-
-                    case tds_token::NBCROW:
-                    {
-                        if (buf_columns.empty())
-                            break;
-
-                        auto sv2 = sv.substr(1);
-
-                        auto bitset_length = (buf_columns.size() + 7) / 8;
-
-                        if (sv2.length() < bitset_length)
-                            return;
-
-                        string_view bitset(sv2.data(), bitset_length);
-                        auto bsv = (uint8_t)bitset[0];
-
-                        sv2 = sv2.substr(bitset_length);
-
-                        for (unsigned int i = 0; i < buf_columns.size(); i++) {
-                            if (i != 0) {
-                                if ((i & 7) == 0) {
-                                    bitset = bitset.substr(1);
-                                    bsv = bitset[0];
-                                } else
-                                    bsv >>= 1;
-                            }
-
-                            if (!(bsv & 1)) { // not NULL
-                                if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
-                                    return;
-                            }
-                        }
-
-                        auto len = sv2.data() - sv.data();
-
-                        tokens.emplace_back(sv.substr(0, len));
-                        sv = sv.substr(len);
-
-                        break;
-                    }
-
-                    default:
-                        throw formatted_error(FMT_STRING("Unhandled token type {} while parsing tokens."), type);
-                }
-            }
-        }
     }
 
     batch_impl::~batch_impl() {
