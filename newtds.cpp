@@ -29,7 +29,7 @@
 #include <sspi.h>
 #endif
 
-#define DEBUG_SHOW_MSGS
+// #define DEBUG_SHOW_MSGS
 
 using namespace std;
 
@@ -950,8 +950,12 @@ namespace tds {
     }
 
     void tds_impl::handle_loginack_msg(string_view sv) {
-        uint8_t interf, server_name_len;
-        uint32_t tds_version, server_version;
+        uint8_t server_name_len;
+        uint32_t tds_version;
+#ifdef DEBUG_SHOW_MSGS
+        uint8_t interf;
+        uint32_t server_version;
+#endif
         u16string_view server_name;
 
         if (sv.length() < 10)
@@ -962,10 +966,14 @@ namespace tds {
         if (sv.length() < 10 + (server_name_len * sizeof(char16_t)))
             throw runtime_error("Short LOGINACK message.");
 
+#ifdef DEBUG_SHOW_MSGS
         interf = (uint8_t)sv[0];
+#endif
         tds_version = *(uint32_t*)&sv[1];
         server_name = u16string_view((char16_t*)&sv[6], server_name_len);
+#ifdef DEBUG_SHOW_MSGS
         server_version = *(uint32_t*)&sv[6 + (server_name_len * sizeof(char16_t))];
+#endif
 
 #ifdef DEBUG_SHOW_MSGS
         while (!server_name.empty() && server_name.back() == 0) {
