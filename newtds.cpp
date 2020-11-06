@@ -4782,6 +4782,46 @@ namespace tds {
                         break;
                     }
 
+                    case tds_token::NBCROW:
+                    {
+                        if (buf_columns.empty())
+                            break;
+
+                        auto sv2 = sv.substr(1);
+
+                        auto bitset_length = (buf_columns.size() + 7) / 8;
+
+                        if (sv2.length() < bitset_length)
+                            return;
+
+                        string_view bitset(sv2.data(), bitset_length);
+                        auto bsv = (uint8_t)bitset[0];
+
+                        sv2 = sv2.substr(bitset_length);
+
+                        for (unsigned int i = 0; i < buf_columns.size(); i++) {
+                            if (i != 0) {
+                                if ((i & 7) == 0) {
+                                    bitset = bitset.substr(1);
+                                    bsv = bitset[0];
+                                } else
+                                    bsv >>= 1;
+                            }
+
+                            if (!(bsv & 1)) { // not NULL
+                                if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
+                                    return;
+                            }
+                        }
+
+                        auto len = sv2.data() - sv.data();
+
+                        tokens.emplace_back(sv.substr(0, len));
+                        sv = sv.substr(len);
+
+                        break;
+                    }
+
                     default:
                         throw formatted_error(FMT_STRING("Unhandled token type {} while parsing tokens."), type);
                 }
