@@ -882,8 +882,13 @@ namespace tds {
 
         auto ret = send(sock, payload.data(), (int)payload.length(), 0);
 
+#ifdef _WIN32
+        if (ret < 0)
+            throw formatted_error(FMT_STRING("send failed (error {})"), WSAGetLastError());
+#else
         if (ret < 0)
             throw formatted_error(FMT_STRING("send failed (error {})"), errno);
+#endif
 
         if ((size_t)ret < payload.length())
             throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
