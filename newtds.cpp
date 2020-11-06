@@ -894,8 +894,13 @@ namespace tds {
 
         auto ret = recv(sock, (char*)&h, sizeof(tds_header), MSG_WAITALL);
 
+#ifdef _WIN32
+        if (ret < 0)
+            throw formatted_error(FMT_STRING("recv failed (error {})"), WSAGetLastError());
+#else
         if (ret < 0)
             throw formatted_error(FMT_STRING("recv failed (error {})"), errno);
+#endif
 
         if (ret == 0)
             throw formatted_error(FMT_STRING("Disconnected."));
