@@ -665,7 +665,8 @@ namespace tds {
         if (outbuf.pvBuffer)
             FreeContextBuffer(outbuf.pvBuffer);
 
-        send_msg(tds_msg::sspi, ret);
+        if (!ret.empty())
+            send_msg(tds_msg::sspi, ret);
     }
 #endif
 
