@@ -535,16 +535,30 @@ namespace tds {
 #endif
         }
 
+        u16string client_name;
+
+        {
+            char s[255];
+
+            if (gethostname(s, sizeof(s)) != 0) {
+#ifdef _WIN32
+                throw formatted_error(FMT_STRING("gethostname failed (error {})"), WSAGetLastError());
+#else
+                throw formatted_error(FMT_STRING("gethostname failed (error {})"), errno);
+#endif
+            }
+
+            client_name = utf8_to_utf16(s);
+        }
+
         // FIXME - client PID
         // FIXME - option flags (1, 2, 3)
         // FIXME - collation
-        // FIXME - client name
         // FIXME - app name
-        // FIXME - server name
         // FIXME - locale name?
 
         send_login_msg2(0x74000004, packet_size, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
-                        u"beren"/*FIXME*/, user_u16, password_u16, u"test program"/*FIXME*/, utf8_to_utf16(server), u"", u"us_english",
+                        client_name, user_u16, password_u16, u"test program"/*FIXME*/, utf8_to_utf16(server), u"", u"us_english",
                         u"", sspi, u"", u"");
 
         bool received_loginack, go_again;
