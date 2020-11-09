@@ -192,7 +192,7 @@ namespace tds {
 
     class TDSCPP column : public value {
     public:
-        std::string name;
+        std::u16string name;
         bool nullable;
 
         operator std::string() const {
