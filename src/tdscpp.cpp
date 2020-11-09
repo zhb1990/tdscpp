@@ -4387,11 +4387,11 @@ namespace tds {
                                                       utf16_to_utf8(cols[i].name), cols[i].max_length / sizeof(char16_t));
                             }
 
-                            *(uint16_t*)ptr = (uint16_t)(v[i].val.length() * sizeof(char16_t));
+                            *(uint16_t*)ptr = (uint16_t)v[i].val.length();
                             ptr += sizeof(uint16_t);
 
-                            memcpy(ptr, v[i].val.data(), v[i].val.length() * sizeof(char16_t));
-                            ptr += v[i].val.length() * sizeof(char16_t);
+                            memcpy(ptr, v[i].val.data(), v[i].val.length());
+                            ptr += v[i].val.length();
                         } else {
                             auto s = (u16string)v[i];
 
