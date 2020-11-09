@@ -8,6 +8,11 @@
 #include <vector>
 #include <map>
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4251)
+#endif
+
 #ifdef _WIN32
 
 #ifdef TDSCPP_EXPORT
@@ -642,3 +647,7 @@ struct fmt::formatter<tds::column> {
         return format_to(ctx.out(), "{}", static_cast<tds::value>(c));
     }
 };
+
+#ifdef _MSC_VER
+#define pragma warning(pop)
+#endif
