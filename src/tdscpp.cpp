@@ -263,7 +263,7 @@ namespace tds {
 
         send_prelogin_msg();
 
-        send_login_msg(user, password);
+        send_login_msg(user, password, server);
     }
 
     tds_impl::~tds_impl() {
@@ -435,7 +435,7 @@ namespace tds {
         }
     }
 
-    void tds_impl::send_login_msg(const string_view& user, const string_view& password) {
+    void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server) {
         enum tds_msg type;
         string payload, sspi;
         u16string spn;
@@ -543,8 +543,8 @@ namespace tds {
         // FIXME - server name
         // FIXME - locale name?
 
-        send_login_msg2(0x74000004, 4096, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
-                        u"beren"/*FIXME*/, user_u16, password_u16, u"test program"/*FIXME*/, u"luthien"/*FIXME*/, u"", u"us_english",
+        send_login_msg2(0x74000004, packet_size, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
+                        u"beren"/*FIXME*/, user_u16, password_u16, u"test program"/*FIXME*/, utf8_to_utf16(server), u"", u"us_english",
                         u"", sspi, u"", u"");
 
         bool received_loginack, go_again;
@@ -5377,7 +5377,7 @@ namespace tds {
                 }
 
                 u16string_view s((char16_t*)&teps[1], teps->new_len);
-                size_t v = 0;
+                uint32_t v = 0;
 
                 for (auto c : s) {
                     if (c >= '0' && c <= '9') {

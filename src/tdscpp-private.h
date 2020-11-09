@@ -419,7 +419,7 @@ namespace tds {
 
         void connect(const std::string& server, uint16_t port, bool get_fqdn);
         void send_prelogin_msg();
-        void send_login_msg(const std::string_view& user, const std::string_view& password);
+        void send_login_msg(const std::string_view& user, const std::string_view& password, const std::string_view& server);
         void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
                             uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
                             uint8_t option_flags3, uint32_t collation, const std::u16string_view& client_name,
@@ -443,7 +443,7 @@ namespace tds {
         std::string fqdn;
         msg_handler message_handler;
         uint64_t trans_id = 0;
-        size_t packet_size = 4096;
+        uint32_t packet_size = 4096;
     };
 
     class batch_impl {
