@@ -875,14 +875,14 @@ namespace tds {
 
     void tds_impl::send_msg(enum tds_msg type, const string_view& msg) {
         string payload;
-        const size_t packet_size = 4096 - sizeof(tds_header); // FIXME
+        const size_t size = packet_size - sizeof(tds_header);
         string_view sv = msg;
 
         while (true) {
             string_view sv2;
 
-            if (sv.length() > packet_size)
-                sv2 = sv.substr(0, packet_size);
+            if (sv.length() > size)
+                sv2 = sv.substr(0, size);
             else
                 sv2 = sv;
 
@@ -916,7 +916,7 @@ namespace tds {
             if (sv2.length() == sv.length())
                 return;
 
-            sv = sv.substr(packet_size);
+            sv = sv.substr(size);
         }
     }
 
@@ -5354,6 +5354,33 @@ namespace tds {
                     throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), tect->header.length);
 
                 trans_id = 0;
+
+                break;
+            }
+
+            case tds_envchange_type::packet_size: {
+                if (sv.length() < sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type))
+                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected at least 2)."), sv.length());
+
+                auto teps = (tds_envchange_packet_size*)ec;
+
+                if (teps->header.length < sizeof(tds_envchange_packet_size) + (teps->new_len * sizeof(char16_t))) {
+                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected at least {})."),
+                                          teps->header.length, sizeof(tds_envchange_packet_size) + (teps->new_len * sizeof(char16_t)));
+                }
+
+                u16string_view s((char16_t*)&teps[1], teps->new_len);
+                size_t v = 0;
+
+                for (auto c : s) {
+                    if (c >= '0' && c <= '9') {
+                        v *= 10;
+                        v += c - '0';
+                    } else
+                        throw formatted_error(FMT_STRING("Server returned invalid packet size \"{}\"."), utf16_to_utf8(s));
+                }
+
+                packet_size = v;
 
                 break;
             }

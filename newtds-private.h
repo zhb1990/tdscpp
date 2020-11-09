@@ -392,6 +392,13 @@ struct tds_envchange_commit_trans {
 
 static_assert(sizeof(tds_envchange_commit_trans) == 14, "tds_envchange_commit_trans has wrong size");
 
+struct tds_envchange_packet_size {
+    struct tds_envchange header;
+    uint8_t new_len;
+};
+
+static_assert(sizeof(tds_envchange_packet_size) == 5, "tds_envchange_packet_size has wrong size");
+
 #pragma pack(pop)
 
 namespace tds {
@@ -436,6 +443,7 @@ namespace tds {
         std::string fqdn;
         msg_handler message_handler;
         uint64_t trans_id = 0;
+        size_t packet_size = 4096;
     };
 
     class batch_impl {
