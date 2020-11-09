@@ -1,4 +1,4 @@
-#include "newtds.h"
+#include "tdscpp.h"
 
 using namespace std;
 

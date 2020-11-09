@@ -2,8 +2,8 @@
 #include <ws2tcpip.h>
 #endif
 
-#include "newtds.h"
-#include "newtds-private.h"
+#include "tdscpp.h"
+#include "tdscpp-private.h"
 #include <iostream>
 #include <string>
 
