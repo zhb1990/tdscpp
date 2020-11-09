@@ -875,33 +875,49 @@ namespace tds {
 
     void tds_impl::send_msg(enum tds_msg type, const string_view& msg) {
         string payload;
+        const size_t packet_size = 4096 - sizeof(tds_header); // FIXME
+        string_view sv = msg;
 
-        payload.resize(msg.length() + sizeof(tds_header));
+        while (true) {
+            string_view sv2;
 
-        auto h = (tds_header*)payload.data();
+            if (sv.length() > packet_size)
+                sv2 = sv.substr(0, packet_size);
+            else
+                sv2 = sv;
 
-        h->type = type;
-        h->status = 1; // last message
-        h->length = htons((uint16_t)(msg.length() + sizeof(tds_header)));
-        h->spid = 0;
-        h->packet_id = 0; // FIXME?
-        h->window = 0;
+            payload.resize(sv2.length() + sizeof(tds_header));
 
-        if (!msg.empty())
-            memcpy(payload.data() + sizeof(tds_header), msg.data(), msg.size());
+            auto h = (tds_header*)payload.data();
 
-        auto ret = send(sock, payload.data(), (int)payload.length(), 0);
+            h->type = type;
+            h->status = sv2.length() == sv.length() ? 1 : 0; // 1 == last message
+            h->length = htons((uint16_t)(sv2.length() + sizeof(tds_header)));
+            h->spid = 0;
+            h->packet_id = 0; // FIXME? "Currently ignored" according to spec
+            h->window = 0;
+
+            if (!sv2.empty())
+                memcpy(payload.data() + sizeof(tds_header), sv2.data(), sv2.size());
+
+            auto ret = send(sock, payload.data(), (int)payload.length(), 0);
 
 #ifdef _WIN32
-        if (ret < 0)
-            throw formatted_error(FMT_STRING("send failed (error {})"), WSAGetLastError());
+            if (ret < 0)
+                throw formatted_error(FMT_STRING("send failed (error {})"), WSAGetLastError());
 #else
-        if (ret < 0)
-            throw formatted_error(FMT_STRING("send failed (error {})"), errno);
+            if (ret < 0)
+                throw formatted_error(FMT_STRING("send failed (error {})"), errno);
 #endif
 
-        if ((size_t)ret < payload.length())
-            throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
+            if ((size_t)ret < payload.length())
+                throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
+
+            if (sv2.length() == sv.length())
+                return;
+
+            sv = sv.substr(packet_size);
+        }
     }
 
     void tds_impl::wait_for_msg(enum tds_msg& type, string& payload, bool* last_packet) {
