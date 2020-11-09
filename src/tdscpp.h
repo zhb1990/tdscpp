@@ -85,6 +85,9 @@ namespace tds {
         template<typename... Args>
         void run(const std::string_view& s, Args&&... args);
 
+        template<typename... Args>
+        void run(const std::u16string_view& s, Args&&... args);
+
         void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp);
 
         tds_impl* impl;
@@ -293,8 +296,21 @@ namespace tds {
             do_query(conn, q);
         }
 
+        query(tds& conn, const std::u16string_view& q) {
+            do_query(conn, q);
+        }
+
         template<typename... Args>
         query(tds& conn, const std::string_view& q, Args&&... args) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_query(conn, q);
+        }
+
+        template<typename... Args>
+        query(tds& conn, const std::u16string_view& q, Args&&... args) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -310,6 +326,7 @@ namespace tds {
 
     private:
         void do_query(tds& conn, const std::string_view& q);
+        void do_query(tds& conn, const std::u16string_view& q);
 
         template<typename T, typename... Args>
         void add_param(T&& t, Args&&... args) {
@@ -333,7 +350,15 @@ namespace tds {
     void tds::run(const std::string_view& s, Args&&... args) {
         query q(*this, s, args...);
 
-        while (q.fetch_row()) {
+        while (q.fetch_row()) { // FIXME - do we need this?
+        }
+    }
+
+    template<typename... Args>
+    void tds::run(const std::u16string_view& s, Args&&... args) {
+        query q(*this, s, args...);
+
+        while (q.fetch_row()) { // FIXME - do we need this?
         }
     }
 
