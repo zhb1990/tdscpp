@@ -2,8 +2,6 @@
 
 using namespace std;
 
-static const uint16_t db_port = 1433;
-
 static void show_msg(const string_view&, const string_view& message, const string_view&, int32_t msgno, int32_t, int16_t,
                      uint8_t severity, bool) {
     if (severity > 10)
@@ -27,7 +25,7 @@ int main(int argc, char* argv[]) {
 
         // FIXME - prompt for password if username set but password isn't
 
-        tds::tds n(server, db_port, username, password, "test program", show_msg);
+        tds::tds n(server, username, password, "test program", show_msg);
 
 #if 0
         fmt::print("{}\n", (tds::datetime)tds::value("2020-10-29T01:23:45.0-03:00"));

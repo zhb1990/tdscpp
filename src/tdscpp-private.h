@@ -404,8 +404,8 @@ static_assert(sizeof(tds_envchange_packet_size) == 5, "tds_envchange_packet_size
 namespace tds {
     class tds_impl {
     public:
-        tds_impl(const std::string& server, uint16_t port, const std::string_view& user, const std::string_view& password,
-                 const std::string_view& app_name, const msg_handler& message_handler);
+        tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
+                 const std::string_view& app_name, const msg_handler& message_handler, uint16_t port);
         ~tds_impl();
         void send_msg(enum tds_msg type, const std::string_view& msg);
         void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);

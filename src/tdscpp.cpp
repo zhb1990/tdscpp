@@ -241,17 +241,17 @@ static bool is_byte_len_type(enum tds::sql_type type) {
 }
 
 namespace tds {
-    tds::tds(const string& server, uint16_t port, const string_view& user, const string_view& password,
-             const string_view& app_name, const msg_handler& message_handler) {
-        impl = new tds_impl(server, port, user, password, app_name, message_handler);
+    tds::tds(const string& server, const string_view& user, const string_view& password,
+             const string_view& app_name, const msg_handler& message_handler, uint16_t port) {
+        impl = new tds_impl(server, user, password, app_name, message_handler, port);
     }
 
     tds::~tds() {
         delete impl;
     }
 
-    tds_impl::tds_impl(const string& server, uint16_t port, const string_view& user, const string_view& password,
-                       const string_view& app_name, const msg_handler& message_handler) : message_handler(message_handler) {
+    tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
+                       const string_view& app_name, const msg_handler& message_handler, uint16_t port) : message_handler(message_handler) {
 #ifdef _WIN32
         WSADATA wsa_data;
 

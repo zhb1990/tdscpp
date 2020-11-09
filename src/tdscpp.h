@@ -78,8 +78,8 @@ namespace tds {
 
     class TDSCPP tds {
     public:
-        tds(const std::string& server, uint16_t port, const std::string_view& user, const std::string_view& password,
-            const std::string_view& app_name = "tdscpp", const msg_handler& message_handler = nullptr);
+        tds(const std::string& server, const std::string_view& user, const std::string_view& password,
+            const std::string_view& app_name = "tdscpp", const msg_handler& message_handler = nullptr, uint16_t port = 1433);
         ~tds();
 
         template<typename... Args>
