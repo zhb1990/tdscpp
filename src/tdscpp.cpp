@@ -4,6 +4,7 @@
 
 #include "tdscpp.h"
 #include "tdscpp-private.h"
+#include "config.h"
 #include <iostream>
 #include <string>
 
@@ -22,7 +23,11 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+
+#ifdef HAVE_GSSAPI
 #include <gssapi/gssapi.h>
+#endif
+
 #include <unistd.h>
 #else
 #define SECURITY_WIN32
@@ -180,7 +185,7 @@ static string utf16_to_utf8(const u16string_view& sv) {
 #endif
 }
 
-#ifndef _WIN32
+#ifdef HAVE_GSSAPI
 class gss_error : public exception {
 public:
     gss_error(const string& func, OM_uint32 major, OM_uint32 minor) {
@@ -437,7 +442,7 @@ namespace tds {
 #ifdef _WIN32
         CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1};
         CtxtHandle ctx_handle;
-#else
+#elif defined(HAVE_GSSAPI)
         gss_cred_id_t cred_handle = 0;
         gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 #endif
@@ -490,7 +495,7 @@ namespace tds {
 
             if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE && sec_status != SEC_E_OK)
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {:08x}"), (uint32_t)sec_status);
-#else
+#elif defined(HAVE_GSSAPI)
             OM_uint32 major_status, minor_status;
             gss_buffer_desc recv_tok, send_tok, name_buf;
             gss_name_t gss_name;
@@ -525,6 +530,8 @@ namespace tds {
 
                 gss_release_buffer(&minor_status, &send_tok);
             }
+#else
+            throw runtime_error("No username given and Kerberos support not compiled in.");
 #endif
         }
 

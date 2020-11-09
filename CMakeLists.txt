@@ -8,8 +8,16 @@ project(tdscpp VERSION 1.0)
 option(WITH_JSON           "Include JSON support" ON)
 option(BUILD_SAMPLE        "Build sample program" ON)
 
+if(NOT WIN32)
+option(ENABLE_KRB5         "Enable Kerberos support" ON)
+endif()
+
 if(WITH_JSON)
 find_package(nlohmann_json REQUIRED)
+endif()
+
+if(ENABLE_KRB5)
+set(HAVE_GSSAPI 1)
 endif()
 
 find_package(fmt REQUIRED)
@@ -21,6 +29,9 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 add_definitions(-DTDSCPP_EXPORT)
 
 # ----------------------------------------
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(SRC_FILES src/tdscpp.cpp)
 
@@ -50,7 +61,7 @@ endif()
 
 if(WIN32)
 	target_link_libraries(tdscpp ws2_32 secur32)
-else()
+elseif(ENABLE_KRB5)
 	target_link_libraries(tdscpp gssapi_krb5)
 endif()
 
