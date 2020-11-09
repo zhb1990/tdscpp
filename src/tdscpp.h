@@ -79,7 +79,7 @@ namespace tds {
     class TDSCPP tds {
     public:
         tds(const std::string& server, uint16_t port, const std::string_view& user, const std::string_view& password,
-            const msg_handler& message_handler = nullptr);
+            const std::string_view& app_name = "tdscpp", const msg_handler& message_handler = nullptr);
         ~tds();
 
         template<typename... Args>

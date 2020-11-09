@@ -242,8 +242,8 @@ static bool is_byte_len_type(enum tds::sql_type type) {
 
 namespace tds {
     tds::tds(const string& server, uint16_t port, const string_view& user, const string_view& password,
-             const msg_handler& message_handler) {
-        impl = new tds_impl(server, port, user, password, message_handler);
+             const string_view& app_name, const msg_handler& message_handler) {
+        impl = new tds_impl(server, port, user, password, app_name, message_handler);
     }
 
     tds::~tds() {
@@ -251,7 +251,7 @@ namespace tds {
     }
 
     tds_impl::tds_impl(const string& server, uint16_t port, const string_view& user, const string_view& password,
-                       const msg_handler& message_handler) : message_handler(message_handler) {
+                       const string_view& app_name, const msg_handler& message_handler) : message_handler(message_handler) {
 #ifdef _WIN32
         WSADATA wsa_data;
 
@@ -263,7 +263,7 @@ namespace tds {
 
         send_prelogin_msg();
 
-        send_login_msg(user, password, server);
+        send_login_msg(user, password, server, app_name);
     }
 
     tds_impl::~tds_impl() {
@@ -435,7 +435,8 @@ namespace tds {
         }
     }
 
-    void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server) {
+    void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server,
+                                  const string_view& app_name) {
         enum tds_msg type;
         string payload, sspi;
         u16string spn;
@@ -558,7 +559,7 @@ namespace tds {
         // FIXME - locale name?
 
         send_login_msg2(0x74000004, packet_size, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
-                        client_name, user_u16, password_u16, u"test program"/*FIXME*/, utf8_to_utf16(server), u"", u"us_english",
+                        client_name, user_u16, password_u16, utf8_to_utf16(app_name), utf8_to_utf16(server), u"", u"us_english",
                         u"", sspi, u"", u"");
 
         bool received_loginack, go_again;
