@@ -1858,15 +1858,15 @@ namespace tds {
 
         // FIXME - allow option for American-style dates?
 
-        if (regex_search(&s[0], &s[s.length()], rm, r1)) { // ISO style
+        if (regex_search(&s[0], s.data() + s.length(), rm, r1)) { // ISO style
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), d);
-        } else if (regex_search(&s[0], &s[s.length()], rm, r2)) { // dd/mm/yyyy
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r2)) { // dd/mm/yyyy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-        } else if (regex_search(&s[0], &s[s.length()], rm, r3)) { // dd/mm/yy
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r3)) { // dd/mm/yy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
@@ -1875,11 +1875,11 @@ namespace tds {
                 y += 1900;
             else
                 y += 2000;
-        } else if (regex_search(&s[0], &s[s.length()], rm, r4)) { // dd/mon/yyyy
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r4)) { // dd/mon/yyyy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             m = parse_month_name(rm[3].str());
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-        } else if (regex_search(&s[0], &s[s.length()], rm, r5)) { // dd/mon/yy
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r5)) { // dd/mon/yy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             m = parse_month_name(rm[3].str());
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
@@ -1888,11 +1888,11 @@ namespace tds {
                 y += 1900;
             else
                 y += 2000;
-        } else if (regex_search(&s[0], &s[s.length()], rm, r6)) { // mon dd, yyyy
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r6)) { // mon dd, yyyy
             from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
             m = parse_month_name(rm[1].str());
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-        } else if (regex_search(&s[0], &s[s.length()], rm, r7)) { // mon dd, yy
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r7)) { // mon dd, yy
             from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
             m = parse_month_name(rm[1].str());
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
@@ -1901,7 +1901,7 @@ namespace tds {
                 y += 1900;
             else
                 y += 2000;
-        } else if (regex_search(&s[0], &s[s.length()], rm, r8)) { // mon yyyy
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r8)) { // mon yyyy
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
             m = parse_month_name(rm[1].str());
             d = 1;
@@ -1921,15 +1921,15 @@ namespace tds {
         static const regex r4("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]$");
         static const regex r5("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]$");
 
-        if (regex_match(&t[0], &t[t.length()], rm, r1)) { // hh:mm:ss.s
+        if (regex_match(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
-        } else if (regex_match(&t[0], &t[t.length()], rm, r2)) { // hh:mm
+        } else if (regex_match(&t[0], t.data() + t.length(), rm, r2)) { // hh:mm
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             s = 0;
-        } else if (regex_match(&t[0], &t[t.length()], rm, r3)) { // hh am
+        } else if (regex_match(&t[0], t.data() + t.length(), rm, r3)) { // hh am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             m = 0;
             s = 0;
@@ -1938,7 +1938,7 @@ namespace tds {
 
             if (ap == 'P' || ap == 'p')
                 h += 12;
-        } else if (regex_match(&t[0], &t[t.length()], rm, r4)) { // hh:mm:ss.s am
+        } else if (regex_match(&t[0], t.data() + t.length(), rm, r4)) { // hh:mm:ss.s am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
@@ -1947,7 +1947,7 @@ namespace tds {
 
             if (ap == 'P' || ap == 'p')
                 h += 12;
-        } else if (regex_match(&t[0], &t[t.length()], rm, r5)) { // hh:mm am
+        } else if (regex_match(&t[0], t.data() + t.length(), rm, r5)) { // hh:mm am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             s = 0;
@@ -1967,7 +1967,7 @@ namespace tds {
             cmatch rm;
             static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
 
-            if (regex_match(&t[0], &t[t.length()], rm, iso_date)) {
+            if (regex_match(&t[0], t.data() + t.length(), rm, iso_date)) {
                 from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
                 from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
                 from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
