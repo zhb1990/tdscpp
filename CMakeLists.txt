@@ -252,8 +252,8 @@ endif()
 
 # ----------------------------------------
 
-set(NEW_SRC_FILES newtds.cpp
-	newtds-test.cpp)
+set(NEW_SRC_FILES src/newtds.cpp
+	src/newtds-test.cpp)
 
 add_executable(newtds ${NEW_SRC_FILES})
 
