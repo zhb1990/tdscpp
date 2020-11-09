@@ -8,6 +8,28 @@
 #include <vector>
 #include <map>
 
+#ifdef _WIN32
+
+#ifdef TDSCPP_EXPORT
+#define TDSCPP __declspec(dllexport)
+#elif !defined(TDSCPP_STATIC)
+#define TDSCPP __declspec(dllimport)
+#else
+#define TDSCPP
+#endif
+
+#else
+
+#ifdef TDSCPP_EXPORT
+#define TDSCPP __attribute__ ((visibility ("default")))
+#elif !defined(TDSCPP_STATIC)
+#define TDSCPP __attribute__ ((dllimport))
+#else
+#define TDSCPP
+#endif
+
+#endif
+
 namespace tds {
     enum class sql_type : uint8_t {
         SQL_NULL = 0x1F,
@@ -54,7 +76,7 @@ namespace tds {
     class value;
     class tds_impl;
 
-    class tds {
+    class TDSCPP tds {
     public:
         tds(const std::string& server, uint16_t port, const std::string_view& user, const std::string_view& password,
             const msg_handler& message_handler = nullptr);
@@ -68,7 +90,7 @@ namespace tds {
         tds_impl* impl;
     };
 
-    class date {
+    class TDSCPP date {
     public:
         date(int32_t num);
         date(uint16_t year, uint8_t month, uint8_t day);
@@ -78,7 +100,7 @@ namespace tds {
         uint8_t month, day;
     };
 
-    class time {
+    class TDSCPP time {
     public:
         time(uint8_t hour, uint8_t minute, uint8_t second) : hour(hour), minute(minute), second(second) { }
         time(uint32_t secs) : hour((uint8_t)(secs / 3600)), minute((uint8_t)((secs / 60) % 60)), second((uint8_t)(secs % 60)) { }
@@ -86,7 +108,7 @@ namespace tds {
         uint8_t hour, minute, second;
     };
 
-    class datetime {
+    class TDSCPP datetime {
     public:
         datetime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second) :
             d(year, month, day), t(hour, minute, second) { }
@@ -96,7 +118,7 @@ namespace tds {
         time t;
     };
 
-    class datetimeoffset : public datetime {
+    class TDSCPP datetimeoffset : public datetime {
     public:
         datetimeoffset(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
             datetime(year, month, day, hour, minute, second), offset(offset) { }
@@ -105,7 +127,7 @@ namespace tds {
         int16_t offset;
     };
 
-    class value {
+    class TDSCPP value {
     public:
         // make sure pointers don't get interpreted as bools
         template<typename T>
@@ -160,7 +182,7 @@ namespace tds {
         unsigned int max_length = 0;
     };
 
-    class column : public value {
+    class TDSCPP column : public value {
     public:
         std::string name;
         bool nullable;
@@ -202,7 +224,7 @@ namespace tds {
         }
     };
 
-    class rpc {
+    class TDSCPP rpc {
     public:
         ~rpc();
 
@@ -265,7 +287,7 @@ namespace tds {
         std::u16string name;
     };
 
-    class query {
+    class TDSCPP query {
     public:
         query(tds& conn, const std::string_view& q) {
             do_query(conn, q);
@@ -317,7 +339,7 @@ namespace tds {
 
     class batch_impl;
 
-    class batch {
+    class TDSCPP batch {
     public:
         batch(tds& conn, const std::u16string_view& q);
         ~batch();
@@ -330,7 +352,7 @@ namespace tds {
         batch_impl* impl;
     };
 
-    class trans {
+    class TDSCPP trans {
     public:
         trans(tds& conn);
         ~trans();
