@@ -4088,6 +4088,27 @@ namespace tds {
                     }
                 break;
 
+                case sql_type::VARBINARY:
+                case sql_type::BINARY:
+                    bufsize += sizeof(uint16_t);
+
+                    if (v[i].is_null) {
+                        if (cols[i].max_length == 0xffff) // MAX
+                            bufsize += sizeof(uint64_t) - sizeof(uint16_t);
+                    } else {
+                        if (cols[i].max_length == 0xffff) // MAX
+                            bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
+
+                        if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
+                            bufsize += v[i].val.length();
+
+                            if (cols[i].max_length == 0xffff && !v[i].val.empty())
+                                bufsize += sizeof(uint32_t);
+                        } else
+                            throw formatted_error(FMT_STRING("Could not convert {} to {}."), v[i].type, cols[i].type);
+                    }
+                break;
+
                 case sql_type::DATE:
                     bufsize++;
 
@@ -4386,6 +4407,46 @@ namespace tds {
                             memcpy(ptr, s.data(), s.length() * sizeof(char16_t));
                             ptr += s.length() * sizeof(char16_t);
                         }
+                    }
+                break;
+
+                case sql_type::VARBINARY:
+                case sql_type::BINARY:
+                    if (cols[i].max_length == 0xffff) {
+                        if (v[i].is_null) {
+                            *(uint64_t*)ptr = 0xffffffffffffffff;
+                            ptr += sizeof(uint64_t);
+                        } else if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
+                            *(uint64_t*)ptr = 0xfffffffffffffffe;
+                            ptr += sizeof(uint64_t);
+
+                            if (!v[i].val.empty()) {
+                                *(uint32_t*)ptr = (uint32_t)v[i].val.length();
+                                ptr += sizeof(uint32_t);
+
+                                memcpy(ptr, v[i].val.data(), v[i].val.length());
+                                ptr += v[i].val.length();
+                            }
+
+                            *(uint32_t*)ptr = 0;
+                            ptr += sizeof(uint32_t);
+                        } else
+                            throw formatted_error(FMT_STRING("Could not convert {} to {}."), v[i].type, cols[i].type);
+                    } else {
+                        if (v[i].is_null) {
+                            *(uint16_t*)ptr = 0xffff;
+                            ptr += sizeof(uint16_t);
+                        } else if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
+                            if (v[i].val.length() > cols[i].max_length)
+                                throw formatted_error(FMT_STRING("Binary data too long for column {} ({} bytes, maximum {})."), cols[i].name, v[i].val.length(), cols[i].max_length);
+
+                            *(uint16_t*)ptr = (uint16_t)v[i].val.length();
+                            ptr += sizeof(uint16_t);
+
+                            memcpy(ptr, v[i].val.data(), v[i].val.length());
+                            ptr += v[i].val.length();
+                        } else
+                            throw formatted_error(FMT_STRING("Could not convert {} to {}."), v[i].type, cols[i].type);
                     }
                 break;
 
@@ -4920,7 +4981,7 @@ namespace tds {
                 case sql_type::VARBINARY:
                 case sql_type::BINARY:
                     *(uint16_t*)ptr = (uint16_t)col.max_length;
-                    ptr++;
+                    ptr += sizeof(uint16_t);
                 break;
 
                 default:
