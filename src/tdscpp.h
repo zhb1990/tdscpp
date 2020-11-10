@@ -376,6 +376,13 @@ namespace tds {
             params.emplace_back(t);
         }
 
+        template<typename T>
+        void add_param(std::vector<T>& v) {
+            for (const auto& t : v) {
+                params.emplace_back(t);
+            }
+        }
+
         std::u16string create_params_string();
 
         std::vector<value> params;
