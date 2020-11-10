@@ -317,6 +317,10 @@ namespace tds {
             }
         }
 
+        void add_param(std::vector<std::byte>& v) {
+            params.emplace_back(v);
+        }
+
         void do_rpc(tds& conn, const std::u16string_view& name);
         void wait_for_packet();
 
@@ -385,6 +389,10 @@ namespace tds {
             for (const auto& t : v) {
                 params.emplace_back(t);
             }
+        }
+
+        void add_param(std::vector<std::byte>& v) {
+            params.emplace_back(v);
         }
 
         std::u16string create_params_string();
