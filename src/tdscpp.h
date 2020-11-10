@@ -184,15 +184,19 @@ namespace tds {
         operator const datetime() const;
 
         operator uint32_t() const {
-            return (uint32_t)(int64_t)this;
+            return static_cast<uint32_t>(static_cast<int64_t>(*this));
         }
 
         operator int32_t() const {
-            return (int32_t)(int64_t)this;
+            return static_cast<int32_t>(static_cast<int64_t>(*this));
         }
 
         operator uint64_t() const {
-            return (uint64_t)(int64_t)this;
+            return static_cast<uint64_t>(static_cast<int64_t>(*this));
+        }
+
+        operator float() const {
+            return static_cast<float>(static_cast<double>(*this));
         }
 
         enum sql_type type;
@@ -245,6 +249,10 @@ namespace tds {
 
         operator uint64_t() const {
             return (uint64_t)static_cast<value>(*this);
+        }
+
+        operator float() const {
+            return (float)static_cast<value>(*this);
         }
     };
 
