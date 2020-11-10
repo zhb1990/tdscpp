@@ -1133,6 +1133,24 @@ namespace tds {
             is_null = true;
     }
 
+    value::value(int64_t i) {
+        type = sql_type::INTN;
+
+        val.resize(sizeof(int64_t));
+        *(int64_t*)val.data() = i;
+    }
+
+    value::value(const optional<int64_t>& i) {
+        type = sql_type::INTN;
+
+        val.resize(sizeof(int64_t));
+
+        if (i.has_value())
+            *(int64_t*)val.data() = i.value();
+        else
+            is_null = true;
+    }
+
     value::value(const u16string_view& sv) {
         type = sql_type::NVARCHAR;
         val.resize(sv.length() * sizeof(char16_t));
