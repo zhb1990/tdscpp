@@ -183,6 +183,18 @@ namespace tds {
         operator time() const;
         operator datetime() const;
 
+        operator uint32_t() const {
+            return (uint32_t)(int64_t)this;
+        }
+
+        operator int32_t() const {
+            return (int32_t)(int64_t)this;
+        }
+
+        operator uint64_t() const {
+            return (uint64_t)(int64_t)this;
+        }
+
         enum sql_type type;
         std::string val;
         bool is_null = false;
@@ -221,6 +233,18 @@ namespace tds {
 
         operator datetime() const {
             return (datetime)static_cast<value>(*this);
+        }
+
+        operator uint32_t() const {
+            return (uint32_t)static_cast<value>(*this);
+        }
+
+        operator int32_t() const {
+            return (int32_t)static_cast<value>(*this);
+        }
+
+        operator uint64_t() const {
+            return (uint64_t)static_cast<value>(*this);
         }
     };
 
