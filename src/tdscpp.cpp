@@ -3784,9 +3784,13 @@ namespace tds {
 
             rpc r1(conn, u"sp_prepare", handle, create_params_string(), q2, 1); // 1 means return metadata
 
+            while (r1.fetch_row()) { }
+
             cols = r1.cols;
         } else {
             rpc r1(conn, u"sp_prepare", handle, u"", q, 1); // 1 means return metadata
+
+            while (r1.fetch_row()) { }
 
             cols = r1.cols;
         }
@@ -3977,6 +3981,8 @@ namespace tds {
 
             {
                 rpc r1(*this, u"sp_prepare", handle, u"", q, 1);
+
+                while (r1.fetch_row()) { }
 
                 cols = r1.cols; // get column types
             }
