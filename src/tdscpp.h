@@ -179,9 +179,9 @@ namespace tds {
         operator std::u16string() const;
         operator int64_t() const;
         operator double() const;
-        operator date() const;
-        operator time() const;
-        operator datetime() const;
+        operator const date() const;
+        operator const time() const;
+        operator const datetime() const;
 
         operator uint32_t() const {
             return (uint32_t)(int64_t)this;
@@ -223,15 +223,15 @@ namespace tds {
             return (double)static_cast<value>(*this);
         }
 
-        operator date() const {
+        operator const date() const {
             return (date)static_cast<value>(*this);
         }
 
-        operator time() const {
+        operator const time() const {
             return (time)static_cast<value>(*this);
         }
 
-        operator datetime() const {
+        operator const datetime() const {
             return (datetime)static_cast<value>(*this);
         }
 

@@ -2016,7 +2016,7 @@ namespace tds {
         return true;
     }
 
-    value::operator date() const {
+    value::operator const date() const {
         if (is_null)
             return date{1900, 1, 1};
 
@@ -2135,7 +2135,7 @@ namespace tds {
         }
     }
 
-    value::operator time() const {
+    value::operator const time() const {
         if (is_null)
             return time{0, 0, 0};
 
@@ -2264,7 +2264,7 @@ namespace tds {
         }
     }
 
-    value::operator datetime() const {
+    value::operator const datetime() const {
         if (is_null)
             return datetime{1900, 1, 1, 0, 0, 0};
 
