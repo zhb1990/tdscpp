@@ -2849,7 +2849,7 @@ namespace tds {
                         return true;
 
                     if (sv.length() < len)
-                        break;
+                        return false;
 
                     sv = sv.substr(len);
                 }
