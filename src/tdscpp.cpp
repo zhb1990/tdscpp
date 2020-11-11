@@ -3895,11 +3895,17 @@ namespace tds {
                 else
                     return u"NVARCHAR(" + to_u16string(length == 0 ? 1 : (length / sizeof(char16_t))) + u")";
 
+            case sql_type::NCHAR:
+                return u"NCHAR(" + to_u16string(length == 0 ? 1 : (length / sizeof(char16_t))) + u")";
+
             case sql_type::VARCHAR:
                 if (length > 8000)
                     return u"VARCHAR(MAX)";
                 else
                     return u"VARCHAR(" + to_u16string(length == 0 ? 1 : length) + u")";
+
+            case sql_type::CHAR:
+                return u"CHAR(" + to_u16string(length == 0 ? 1 : length) + u")";
 
             case sql_type::FLTN:
                 switch (length) {
@@ -3930,6 +3936,9 @@ namespace tds {
                     return u"VARBINARY(MAX)";
                 else
                     return u"VARBINARY(" + to_u16string(length == 0 ? 1 : length) + u")";
+
+            case sql_type::BINARY:
+                return u"BINARY(" + to_u16string(length == 0 ? 1 : length) + u")";
 
             case sql_type::BITN:
                 return u"BIT";
