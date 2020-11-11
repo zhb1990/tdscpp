@@ -1629,6 +1629,7 @@ namespace tds {
             }
 
             case sql_type::BITN:
+            case sql_type::BIT:
                 return fmt::format(FMT_STRING("{}"), val[0] != 0);
 
             default:
@@ -1697,6 +1698,7 @@ namespace tds {
                 }
 
             case sql_type::BITN:
+            case sql_type::BIT:
                 return val[0] != 0 ? 1 : 0;
 
             case sql_type::VARCHAR:
@@ -2454,6 +2456,7 @@ namespace tds {
             case sql_type::BIGINT:
             case sql_type::INTN:
             case sql_type::BITN:
+            case sql_type::BIT:
                 return (double)operator int64_t();
 
             case sql_type::REAL:
@@ -2603,8 +2606,10 @@ namespace tds {
             case sql_type::FLOAT:
                 return 8;
 
-            case sql_type::SQL_NULL:
             case sql_type::BIT:
+                return 1;
+
+            case sql_type::SQL_NULL:
                 throw formatted_error(FMT_STRING("FIXME - fixed_len_size for {}"), type); // FIXME
 
             default:
