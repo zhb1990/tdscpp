@@ -3065,7 +3065,7 @@ namespace tds {
                         *(uint32_t*)ptr = 0; // last chunk
                         ptr += sizeof(uint32_t);
                     } else {
-                        h2->length = (uint16_t)(p.is_null ? 0 : p.val.length());
+                        h2->length = (uint16_t)(p.is_null ? 0xffff : p.val.length());
 
                         ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
 
@@ -3101,7 +3101,7 @@ namespace tds {
                         *(uint32_t*)ptr = 0; // last chunk
                         ptr += sizeof(uint32_t);
                     } else {
-                        h2->length = (uint16_t)(p.is_null ? 0 : p.val.length());
+                        h2->length = (uint16_t)(p.is_null ? 0xffff : p.val.length());
 
                         ptr += sizeof(tds_VARBINARY_param) - sizeof(tds_param_header);
 

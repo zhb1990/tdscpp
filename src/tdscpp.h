@@ -321,6 +321,15 @@ namespace tds {
             params.emplace_back(v);
         }
 
+        template<typename T>
+        void add_param(std::optional<T>& v) {
+            if (!v.has_value()) {
+                params.emplace_back("");
+                params.back().is_null = true;
+            } else
+                params.emplace_back(v.value());
+        }
+
         void do_rpc(tds& conn, const std::u16string_view& name);
         void wait_for_packet();
 
@@ -393,6 +402,15 @@ namespace tds {
 
         void add_param(std::vector<std::byte>& v) {
             params.emplace_back(v);
+        }
+
+        template<typename T>
+        void add_param(std::optional<T>& v) {
+            if (!v.has_value()) {
+                params.emplace_back("");
+                params.back().is_null = true;
+            } else
+                params.emplace_back(v.value());
         }
 
         std::u16string create_params_string();
