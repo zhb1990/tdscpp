@@ -3200,8 +3200,6 @@ namespace tds {
                                 case sql_type::SMALLMONEY:
                                 case sql_type::BIGINT:
                                 case sql_type::UNIQUEIDENTIFIER:
-                                case sql_type::DECIMAL:
-                                case sql_type::NUMERIC:
                                 case sql_type::MONEYN:
                                 case sql_type::DATE:
                                     // nop
@@ -3242,6 +3240,21 @@ namespace tds {
                                     col.max_length = *(uint16_t*)sv2.data();
 
                                     sv2 = sv2.substr(sizeof(uint16_t));
+                                break;
+
+                                case sql_type::DECIMAL:
+                                case sql_type::NUMERIC:
+                                    if (sv2.length() < 1)
+                                        return;
+
+                                    col.max_length = *(uint8_t*)sv2.data();
+
+                                    sv2 = sv2.substr(1);
+
+                                    if (sv2.length() < 2)
+                                        return;
+
+                                    sv2 = sv2.substr(2);
                                 break;
 
                                 default:
