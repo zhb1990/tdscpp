@@ -208,6 +208,8 @@ namespace tds {
         bool is_null = false;
         bool is_output = false;
         unsigned int max_length = 0;
+        uint8_t precision;
+        uint8_t scale;
     };
 
     class TDSCPP column : public value {

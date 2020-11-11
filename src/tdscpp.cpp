@@ -3574,8 +3574,6 @@ namespace tds {
                             case sql_type::SMALLMONEY:
                             case sql_type::BIGINT:
                             case sql_type::UNIQUEIDENTIFIER:
-                            case sql_type::DECIMAL:
-                            case sql_type::NUMERIC:
                             case sql_type::MONEYN:
                             case sql_type::DATE:
                                 // nop
@@ -3619,6 +3617,20 @@ namespace tds {
 
                                 len += sizeof(uint16_t);
                                 sv2 = sv2.substr(sizeof(uint16_t));
+                                break;
+
+                            case sql_type::DECIMAL:
+                            case sql_type::NUMERIC:
+                                if (sv2.length() < 3)
+                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 3)."), sv2.length(), 3);
+
+                                col.max_length = (uint8_t)sv2[0];
+                                col.precision = (uint8_t)sv2[1];
+                                col.scale = (uint8_t)sv2[2];
+
+                                len += 3;
+                                sv2 = sv2.substr(3);
+
                                 break;
 
                             default:
