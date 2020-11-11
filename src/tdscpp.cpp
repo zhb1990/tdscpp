@@ -3890,7 +3890,7 @@ namespace tds {
                 }
 
             case sql_type::NVARCHAR:
-                if (length > 4000)
+                if (length > 8000)
                     return u"NVARCHAR(MAX)";
                 else
                     return u"NVARCHAR(" + to_u16string(length == 0 ? 1 : (length / sizeof(char16_t))) + u")";
