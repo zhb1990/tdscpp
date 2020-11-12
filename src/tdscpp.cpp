@@ -5780,7 +5780,8 @@ namespace tds {
     }
 
     trans::~trans() {
-        // FIXME - just return if committed already
+        if (committed)
+            return;
 
         if (conn.impl->trans_id == 0)
             return;
@@ -5945,5 +5946,7 @@ namespace tds {
                     throw formatted_error(FMT_STRING("Unhandled token type {} in transaction manager response."), type);
             }
         }
+
+        committed = true;
     }
 };
