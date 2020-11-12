@@ -5215,6 +5215,10 @@ namespace tds {
         impl = new batch_impl(conn, q);
     }
 
+    batch::batch(tds& conn, const string_view& q) {
+        impl = new batch_impl(conn, utf8_to_utf16(q));
+    }
+
     batch::~batch() {
         delete impl;
     }

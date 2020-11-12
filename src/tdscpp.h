@@ -443,6 +443,7 @@ namespace tds {
     class TDSCPP batch {
     public:
         batch(tds& conn, const std::u16string_view& q);
+        batch(tds& conn, const std::string_view& q);
         ~batch();
 
         uint16_t num_columns() const;
