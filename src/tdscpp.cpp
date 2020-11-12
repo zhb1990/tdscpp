@@ -1870,6 +1870,10 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
                 }
 
+            case sql_type::NUMERIC:
+            case sql_type::DECIMAL:
+                return stoll((string)*this);
+
             // MSSQL doesn't allow conversion to INT for DATE, TIME, DATETIME2, or DATETIMEOFFSET
 
             // Not allowing VARBINARY even though MSSQL does
