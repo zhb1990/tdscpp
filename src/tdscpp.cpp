@@ -1872,7 +1872,36 @@ namespace tds {
 
             case sql_type::NUMERIC:
             case sql_type::DECIMAL:
-                return stoll((string)*this);
+            {
+                if (val.empty())
+                    return 0;
+
+                bool first = true;
+                auto s = (string)*this;
+
+                for (auto c : s) {
+                    if (c == '-') {
+                        if (!first)
+                            throw formatted_error(FMT_STRING("Cannot convert {} to integer."), s);
+                    } else if (c == '.')
+                        break;
+                    else if (c < '0' || c > '9')
+                        throw formatted_error(FMT_STRING("Cannot convert {} to integer."), s);
+
+                    first = false;
+                }
+
+                int64_t res;
+
+                auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
+
+                if (ec == errc::invalid_argument)
+                    throw formatted_error(FMT_STRING("Cannot convert {} to integer."), s);
+                else if (ec == errc::result_out_of_range)
+                    throw formatted_error(FMT_STRING("{} was too large to convert to BIGINT."), s);
+
+                return res;
+            }
 
             // MSSQL doesn't allow conversion to INT for DATE, TIME, DATETIME2, or DATETIMEOFFSET
 
