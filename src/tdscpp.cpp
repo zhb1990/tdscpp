@@ -1446,6 +1446,21 @@ namespace tds {
             is_null = true;
     }
 
+    static void dd_shift(uint8_t* scratch) {
+        bool carry = false;
+
+        for (unsigned int i = 0; i < 38; i++) {
+            bool b = scratch[i] & 0x80;
+
+            scratch[i] <<= 1;
+
+            if (carry)
+                scratch[i] |= 1;
+
+            carry = b;
+        }
+    }
+
     value::operator string() const {
         if (is_null)
             return "";
@@ -1631,6 +1646,79 @@ namespace tds {
             case sql_type::BITN:
             case sql_type::BIT:
                 return fmt::format(FMT_STRING("{}"), val[0] != 0);
+
+            case sql_type::DECIMAL:
+            case sql_type::NUMERIC: {
+                uint8_t scratch[38];
+                char s[80], *p, *dot;
+                unsigned int pos;
+                auto numlen = (unsigned int)(val.length() - 1);
+
+                // double dabble
+
+                memcpy(scratch, val.data() + 1, val.length() - 1);
+                memset(scratch + numlen, 0, sizeof(scratch) - numlen);
+
+                for (unsigned int iter = 0; iter < numlen * 8; iter++) {
+                    for (unsigned int i = numlen; i < 38; i++) {
+                        if (scratch[i] >> 4 >= 5) {
+                            uint8_t v = scratch[i] >> 4;
+
+                            v += 3;
+
+                            scratch[i] = (uint8_t)((scratch[i] & 0xf) | (v << 4));
+                        }
+
+                        if ((scratch[i] & 0xf) >= 5) {
+                            uint8_t v = scratch[i] & 0xf;
+
+                            v += 3;
+
+                            scratch[i] = (uint8_t)((scratch[i] & 0xf0) | v);
+                        }
+                    }
+
+                    dd_shift(scratch);
+                }
+
+                p = s;
+                pos = 0;
+                for (unsigned int i = 37; i >= numlen; i--) {
+                    *p = (char)((scratch[i] >> 4) + '0');
+                    p++;
+                    pos++;
+
+                    if (pos == 77 - (numlen * 2) - scale - 1) {
+                        *p = '.';
+                        dot = p;
+                        p++;
+                    }
+
+                    *p = (char)((scratch[i] & 0xf) + '0');
+                    p++;
+                    pos++;
+
+                    if (pos == 77 - (numlen * 2) - scale - 1) {
+                        *p = '.';
+                        dot = p;
+                        p++;
+                    }
+                }
+                *p = 0;
+
+                // remove leading zeroes
+
+                for (p = s; p < dot - 1; p++) {
+                    if (*p != '0')
+                        break;
+                }
+
+                if (scale == 0) // remove trailing dot
+                    p[strlen(p) - 1] = 0;
+
+                return fmt::format(FMT_STRING("{}{}"), val[0] == 0 ? "-" : "", p);
+            }
+
 
             default:
                 throw formatted_error(FMT_STRING("Cannot convert {} to string."), type);
