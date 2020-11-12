@@ -2576,7 +2576,7 @@ namespace tds {
                     return 0.0;
 
                 // from_chars not implemented for double yet on gcc
-    #if 0
+#if 0
                 double res;
 
                 auto [p, ec] = from_chars(val.data(), val.data() + val.length(), res);
@@ -2587,13 +2587,13 @@ namespace tds {
                     throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), val);
 
                 return res;
-    #else
+#else
                 try {
                     return stod(val);
                 } catch (...) {
                     throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), val);
                 }
-    #endif
+#endif
             }
 
             case sql_type::NVARCHAR:
@@ -2611,8 +2611,8 @@ namespace tds {
                     s += (char)c;
                 }
 
-                // from_chars not implemente for double yet on gcc
-    #if 0
+                // from_chars not implemented for double yet on gcc
+#if 0
                 double res;
 
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
@@ -2623,13 +2623,13 @@ namespace tds {
                     throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), s);
 
                 return res;
-    #else
+#else
                 try {
                     return stod(s);
                 } catch (...) {
                     throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), s);
                 }
-    #endif
+#endif
             }
 
             case sql_type::DATETIME: {
@@ -2658,6 +2658,17 @@ namespace tds {
                     default:
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
                 }
+
+            case sql_type::NUMERIC:
+            case sql_type::DECIMAL: {
+                auto s = (string)*this;
+
+                try {
+                    return stod(s);
+                } catch (...) {
+                    throw formatted_error(FMT_STRING("Cannot convert {} to float."), s);
+                }
+            }
 
             // MSSQL doesn't allow conversion to FLOAT for DATE, TIME, DATETIME2, DATETIMEOFFSET, or VARBINARY
 
