@@ -1461,7 +1461,7 @@ namespace tds {
         }
     }
 
-    value::operator string() const {
+    value::operator const string() const {
         if (is_null)
             return "";
 
@@ -1725,11 +1725,11 @@ namespace tds {
         }
     }
 
-    value::operator u16string() const {
+    value::operator const u16string() const {
         if (type == sql_type::NVARCHAR || type == sql_type::NCHAR)
             return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
         else
-            return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
+            return utf8_to_utf16(operator const string()); // FIXME - VARCHARs might not be valid UTF-8
     }
 
     value::operator int64_t() const {

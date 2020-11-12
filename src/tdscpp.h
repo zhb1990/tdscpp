@@ -179,8 +179,8 @@ namespace tds {
         value(bool b);
         value(const std::optional<bool>& b);
 
-        operator std::string() const;
-        operator std::u16string() const;
+        operator const std::string() const;
+        operator const std::u16string() const;
         operator int64_t() const;
         operator double() const;
         operator const date() const;
@@ -217,11 +217,11 @@ namespace tds {
         std::u16string name;
         bool nullable;
 
-        operator std::string() const {
+        operator const std::string() const {
             return (std::string)static_cast<value>(*this);
         }
 
-        operator std::u16string() const {
+        operator const std::u16string() const {
             return (std::u16string)static_cast<value>(*this);
         }
 
