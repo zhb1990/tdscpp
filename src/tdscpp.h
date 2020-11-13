@@ -103,6 +103,7 @@ namespace tds {
 
     class TDSCPP date {
     public:
+        date() = default;
         date(int32_t num);
         date(uint16_t year, uint8_t month, uint8_t day);
 
@@ -113,6 +114,7 @@ namespace tds {
 
     class TDSCPP time {
     public:
+        time() = default;
         time(uint8_t hour, uint8_t minute, uint8_t second) : hour(hour), minute(minute), second(second) { }
         time(uint32_t secs) : hour((uint8_t)(secs / 3600)), minute((uint8_t)((secs / 60) % 60)), second((uint8_t)(secs % 60)) { }
 
@@ -121,6 +123,7 @@ namespace tds {
 
     class TDSCPP datetime {
     public:
+        datetime() = default;
         datetime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second) :
             d(year, month, day), t(hour, minute, second) { }
         datetime(int32_t num, uint32_t secs) : d(num), t(secs) { }
@@ -131,6 +134,7 @@ namespace tds {
 
     class TDSCPP datetimeoffset : public datetime {
     public:
+        datetimeoffset() = default;
         datetimeoffset(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
             datetime(year, month, day, hour, minute, second), offset(offset) { }
         datetimeoffset(int32_t num, uint32_t secs, int16_t offset) : datetime(num, secs), offset(offset) { }
