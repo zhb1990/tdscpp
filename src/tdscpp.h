@@ -473,7 +473,7 @@ namespace tds {
 
     void TDSCPP to_json(nlohmann::json& j, const value& v);
 
-    static void to_json(nlohmann::json& j, const column& c) {
+    static void __inline to_json(nlohmann::json& j, const column& c) {
         to_json(j, static_cast<const value&>(c));
     }
 };
