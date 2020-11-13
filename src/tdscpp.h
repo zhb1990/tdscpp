@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 #include <map>
+#include <nlohmann/json.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -264,7 +265,6 @@ namespace tds {
         }
     };
 
-
     template<typename T>
     class output_param : public value {
     public:
@@ -466,6 +466,12 @@ namespace tds {
         tds& conn;
         bool committed = false;
     };
+
+    void to_json(nlohmann::json& j, const value& v);
+
+    void to_json(nlohmann::json& j, const column& c) {
+        to_json(j, static_cast<const value&>(c));
+    }
 };
 
 template<>

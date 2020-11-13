@@ -5972,4 +5972,36 @@ namespace tds {
 
         committed = true;
     }
+
+    void TDSCPP to_json(nlohmann::json& j, const value& v) {
+        if (v.is_null) {
+            j = nlohmann::json(nullptr);
+            return;
+        }
+
+        switch (v.type) {
+            case sql_type::INTN:
+            case sql_type::TINYINT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::BIGINT:
+                j = nlohmann::json((int64_t)v);
+                break;
+
+            case sql_type::NUMERIC:
+            case sql_type::DECIMAL:
+            case sql_type::FLOAT:
+            case sql_type::REAL:
+                j = nlohmann::json((double)v);
+                break;
+
+            case sql_type::BITN:
+            case sql_type::BIT:
+                j = nlohmann::json(v.val[0] != 0);
+                break;
+
+            default:
+                j = nlohmann::json((string)v);
+        }
+    }
 };
