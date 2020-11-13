@@ -467,7 +467,7 @@ namespace tds {
         bool committed = false;
     };
 
-    void to_json(nlohmann::json& j, const value& v);
+    void TDSCPP to_json(nlohmann::json& j, const value& v);
 
     void to_json(nlohmann::json& j, const column& c) {
         to_json(j, static_cast<const value&>(c));
