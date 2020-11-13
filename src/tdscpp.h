@@ -77,6 +77,7 @@ namespace tds {
 
     using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
+    using func_count_handler = std::function<void(uint64_t count, uint16_t curcmd)>;
 
     class value;
     class tds_impl;
@@ -84,7 +85,8 @@ namespace tds {
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
-            const std::string_view& app_name = "tdscpp", const msg_handler& message_handler = nullptr, uint16_t port = 1433);
+            const std::string_view& app_name = "tdscpp", const msg_handler& message_handler = nullptr,
+            const func_count_handler& count_handler = nullptr, uint16_t port = 1433);
         ~tds();
 
         template<typename... Args>

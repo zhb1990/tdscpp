@@ -242,8 +242,9 @@ static bool is_byte_len_type(enum tds::sql_type type) {
 
 namespace tds {
     tds::tds(const string& server, const string_view& user, const string_view& password,
-             const string_view& app_name, const msg_handler& message_handler, uint16_t port) {
-        impl = new tds_impl(server, user, password, app_name, message_handler, port);
+             const string_view& app_name, const msg_handler& message_handler,
+             const func_count_handler& count_handler, uint16_t port) {
+        impl = new tds_impl(server, user, password, app_name, message_handler, count_handler, port);
     }
 
     tds::~tds() {
@@ -251,7 +252,8 @@ namespace tds {
     }
 
     tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
-                       const string_view& app_name, const msg_handler& message_handler, uint16_t port) : message_handler(message_handler) {
+                       const string_view& app_name, const msg_handler& message_handler,
+                       const func_count_handler& count_handler, uint16_t port) : message_handler(message_handler), count_handler(count_handler) {
 #ifdef _WIN32
         WSADATA wsa_data;
 
@@ -3616,6 +3618,13 @@ namespace tds {
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
 
+                    if (conn.impl->count_handler) {
+                        auto msg = (tds_done_msg*)sv.data();
+
+                        if (msg->status & 0x10) // row count valid
+                            conn.impl->count_handler(msg->rowcount, msg->curcmd);
+                    }
+
                     // FIXME - handle RPCs that return multiple row sets?
                 break;
 
@@ -5020,6 +5029,13 @@ namespace tds {
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
 
+                    if (count_handler) {
+                        auto msg = (tds_done_msg*)sv.data();
+
+                        if (msg->status & 0x10) // row count valid
+                            count_handler(msg->rowcount, msg->curcmd);
+                    }
+
                     sv = sv.substr(sizeof(tds_done_msg));
 
                     break;
@@ -5342,6 +5358,13 @@ namespace tds {
                 case tds_token::DONE:
                 case tds_token::DONEINPROC:
                 case tds_token::DONEPROC:
+                    if (conn.impl->count_handler) {
+                        auto msg = (tds_done_msg*)sv.data();
+
+                        if (msg->status & 0x10) // row count valid
+                            conn.impl->count_handler(msg->rowcount, msg->curcmd);
+                    }
+
                     break;
 
                 case tds_token::INFO:
