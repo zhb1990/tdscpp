@@ -477,6 +477,40 @@ namespace tds {
     static void __inline to_json(nlohmann::json& j, const column& c) {
         to_json(j, static_cast<const value&>(c));
     }
+
+    static std::string __inline escape(const std::string_view& sv) {
+        std::string s{"["};
+
+        s.reserve(sv.length() + 2);
+
+        for (const auto& c : sv) {
+                if (c == ']')
+                    s += "]]";
+                else
+                    s += c;
+        }
+
+        s += "]";
+
+        return s;
+    }
+
+    static std::u16string __inline escape(const std::u16string_view& sv) {
+        std::u16string s{u"["};
+
+        s.reserve(sv.length() + 2);
+
+        for (const auto& c : sv) {
+            if (c == u']')
+                s += u"]]";
+            else
+                s += c;
+        }
+
+        s += u"]";
+
+        return s;
+    }
 };
 
 template<>
