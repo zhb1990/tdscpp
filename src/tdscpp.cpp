@@ -4243,6 +4243,16 @@ namespace tds {
         impl->bcp_sendmsg(string_view((char*)buf.data(), buf.size()));
     }
 
+    void tds::bcp(const string_view& table, const vector<string>& np, const vector<vector<value>>& vp) {
+        vector<u16string> np2;
+
+        for (const auto& s : np) {
+            np2.emplace_back(utf8_to_utf16(s));
+        }
+
+        bcp(utf8_to_utf16(table), np2, vp);
+    }
+
     vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<column>& cols) {
         size_t bufsize = sizeof(uint8_t);
 

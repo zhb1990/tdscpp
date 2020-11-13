@@ -97,6 +97,7 @@ namespace tds {
         void run(const std::u16string_view& s, Args&&... args);
 
         void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp);
+        void bcp(const std::string_view& table, const std::vector<std::string>& np, const std::vector<std::vector<value>>& vp);
 
         tds_impl* impl;
     };
