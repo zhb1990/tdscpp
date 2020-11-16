@@ -4091,6 +4091,9 @@ namespace tds {
             case sql_type::TIME:
                 return u"TIME";
 
+            case sql_type::DATETIME:
+                return u"DATETIME";
+
             case sql_type::DATETIME2:
                 return u"DATETIME2";
 
