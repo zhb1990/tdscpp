@@ -464,11 +464,11 @@ namespace tds {
         batch_impl* impl;
     };
 
-    void tds::run(const std::string_view& s) {
+    void __inline tds::run(const std::string_view& s) {
         batch b(*this, s);
     }
 
-    void tds::run(const std::u16string_view& s) {
+    void __inline tds::run(const std::u16string_view& s) {
         batch b(*this, s);
     }
 
