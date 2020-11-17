@@ -1649,8 +1649,8 @@ namespace tds {
             case sql_type::BIT:
                 return fmt::format(FMT_STRING("{}"), val[0] != 0);
 
-            case sql_type::DECIMAL:
-            case sql_type::NUMERIC: {
+            case sql_type::NUMERIC:
+            case sql_type::DECIMAL: {
                 uint8_t scratch[38];
                 char s[80], *p, *dot;
                 unsigned int pos;
@@ -4023,7 +4023,7 @@ namespace tds {
         return r2->fetch_row();
     }
 
-    u16string type_to_string(enum sql_type type, size_t length) {
+    u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale) {
         switch (type) {
             case sql_type::TINYINT:
                 return u"TINYINT";
@@ -4133,6 +4133,10 @@ namespace tds {
             case sql_type::BIT:
                 return u"BIT";
 
+            case sql_type::DECIMAL:
+            case sql_type::NUMERIC:
+                return u"NUMERIC(" + to_u16string(precision) + u"," + to_u16string(scale) + u")";
+
             default:
                 throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
         }
@@ -4147,7 +4151,7 @@ namespace tds {
                 s += u", ";
 
             s += u"@P" + to_u16string(num) + u" ";
-            s += type_to_string(p.type, p.val.length());
+            s += type_to_string(p.type, p.val.length(), p.precision, p.scale);
 
             num++;
         }
@@ -4218,7 +4222,7 @@ namespace tds {
                     q += u", ";
 
                 q += sql_escape(np[i]) + u" ";
-                q += type_to_string(cols[i].type, cols[i].max_length);
+                q += type_to_string(cols[i].type, cols[i].max_length, cols[i].precision, cols[i].scale);
 
                 first = false;
             }
@@ -4448,6 +4452,24 @@ namespace tds {
 
                 case sql_type::BIT:
                     bufsize += sizeof(uint8_t);
+                break;
+
+                case sql_type::NUMERIC:
+                case sql_type::DECIMAL:
+                    bufsize += sizeof(uint8_t);
+
+                    if (!v[i].is_null) {
+                        bufsize += sizeof(uint8_t);
+
+                        if (cols[i].precision >= 29)
+                            bufsize += 16;
+                        else if (cols[i].precision >= 20)
+                            bufsize += 12;
+                        else if (cols[i].precision >= 10)
+                            bufsize += 8;
+                        else
+                            bufsize += 4;
+                    }
                 break;
 
                 default:
@@ -5007,6 +5029,53 @@ namespace tds {
                     break;
                 }
 
+                case sql_type::NUMERIC:
+                case sql_type::DECIMAL:
+                    if (v[i].is_null) {
+                        *ptr = 0;
+                        ptr++;
+                    } else {
+                        auto d = (double)v[i];
+
+                        // FIXME - check in bounds, given precision and scale
+
+                        if (cols[i].precision < 10) { // 4 bytes
+                            *ptr = 5;
+                            ptr++;
+
+                            *ptr = d < 0 ? 0 : 1;
+                            ptr++;
+
+                            if (d < 0)
+                                d = -d;
+
+                            for (unsigned int j = 0; j < cols[i].scale; j++) {
+                                d *= 10;
+                            }
+
+                            *(uint32_t*)ptr = (uint32_t)d;
+                            ptr += sizeof(uint32_t);
+                        } else if (cols[i].precision < 20) { // 8 bytes
+                            *ptr = 9;
+                            ptr++;
+
+                            *ptr = d < 0 ? 0 : 1;
+                            ptr++;
+
+                            if (d < 0)
+                                d = -d;
+
+                            for (unsigned int j = 0; j < cols[i].scale; j++) {
+                                d *= 10;
+                            }
+
+                            *(uint64_t*)ptr = (uint64_t)d;
+                            ptr += sizeof(uint64_t);
+                        } else
+                            throw runtime_error("FIXME - support large NUMERICs in BCP");
+                    }
+                break;
+
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
             }
@@ -5107,8 +5176,6 @@ namespace tds {
                 case sql_type::SMALLMONEY:
                 case sql_type::BIGINT:
                 case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::DECIMAL:
-                case sql_type::NUMERIC:
                 case sql_type::MONEYN:
                 case sql_type::DATE:
                     // nop
@@ -5134,6 +5201,11 @@ namespace tds {
                 case sql_type::VARBINARY:
                 case sql_type::BINARY:
                     bufsize += sizeof(uint16_t);
+                    break;
+
+                case sql_type::DECIMAL:
+                case sql_type::NUMERIC:
+                    bufsize += 3;
                     break;
 
                 default:
@@ -5176,8 +5248,6 @@ namespace tds {
                 case sql_type::SMALLMONEY:
                 case sql_type::BIGINT:
                 case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::DECIMAL:
-                case sql_type::NUMERIC:
                 case sql_type::MONEYN:
                 case sql_type::DATE:
                     // nop
@@ -5224,6 +5294,26 @@ namespace tds {
                 case sql_type::BINARY:
                     *(uint16_t*)ptr = (uint16_t)col.max_length;
                     ptr += sizeof(uint16_t);
+                break;
+
+                case sql_type::DECIMAL:
+                case sql_type::NUMERIC:
+                    if (col.precision >= 29)
+                        *(uint8_t*)ptr = 17;
+                    else if (col.precision >= 20)
+                        *(uint8_t*)ptr = 13;
+                    else if (col.precision >= 10)
+                        *(uint8_t*)ptr = 9;
+                    else
+                        *(uint8_t*)ptr = 5;
+
+                    ptr++;
+
+                    *(uint8_t*)ptr = col.precision;
+                    ptr++;
+
+                    *(uint8_t*)ptr = col.scale;
+                    ptr++;
                 break;
 
                 default:
