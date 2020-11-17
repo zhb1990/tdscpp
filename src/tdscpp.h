@@ -90,6 +90,9 @@ namespace tds {
             const func_count_handler& count_handler = nullptr, uint16_t port = 1433);
         ~tds();
 
+        void run(const std::string_view& s);
+        void run(const std::u16string_view& s);
+
         template<typename... Args>
         void run(const std::string_view& s, Args&&... args);
 
@@ -460,6 +463,14 @@ namespace tds {
     private:
         batch_impl* impl;
     };
+
+    void tds::run(const std::string_view& s) {
+        batch b(*this, s);
+    }
+
+    void tds::run(const std::u16string_view& s) {
+        batch b(*this, s);
+    }
 
     class TDSCPP trans {
     public:
