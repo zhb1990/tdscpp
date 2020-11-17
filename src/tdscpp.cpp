@@ -5084,23 +5084,36 @@ namespace tds {
                         *ptr = 0;
                         ptr++;
                     } else {
+                        bool neg = false;
                         auto d = (double)v[i];
 
-                        // FIXME - check in bounds, given precision and scale
+                        if (d < 0) {
+                            neg = true;
+                            d = -d;
+                        }
+
+                        for (unsigned int j = 0; j < cols[i].scale; j++) {
+                            d *= 10;
+                        }
+
+                        // FIXME - avoid doing pow every time?
+
+                        if (d > pow(10, cols[i].precision)) {
+                            if (neg) {
+                                throw formatted_error(FMT_STRING("Value {} is too small for NUMERIC({},{}) column {}."), v[i], cols[i].precision,
+                                                      cols[i].scale, utf16_to_utf8(cols[i].name));
+                            } else {
+                                throw formatted_error(FMT_STRING("Value {} is too large for NUMERIC({},{}) column {}."), v[i], cols[i].precision,
+                                                      cols[i].scale, utf16_to_utf8(cols[i].name));
+                            }
+                        }
 
                         if (cols[i].precision < 10) { // 4 bytes
                             *ptr = 5;
                             ptr++;
 
-                            *ptr = d < 0 ? 0 : 1;
+                            *ptr = neg ? 0 : 1;
                             ptr++;
-
-                            if (d < 0)
-                                d = -d;
-
-                            for (unsigned int j = 0; j < cols[i].scale; j++) {
-                                d *= 10;
-                            }
 
                             *(uint32_t*)ptr = (uint32_t)d;
                             ptr += sizeof(uint32_t);
@@ -5108,15 +5121,8 @@ namespace tds {
                             *ptr = 9;
                             ptr++;
 
-                            *ptr = d < 0 ? 0 : 1;
+                            *ptr = neg ? 0 : 1;
                             ptr++;
-
-                            if (d < 0)
-                                d = -d;
-
-                            for (unsigned int j = 0; j < cols[i].scale; j++) {
-                                d *= 10;
-                            }
 
                             *(uint64_t*)ptr = (uint64_t)d;
                             ptr += sizeof(uint64_t);
@@ -5124,15 +5130,8 @@ namespace tds {
                             *ptr = 13;
                             ptr++;
 
-                            *ptr= d < 0 ? 0 : 1;
+                            *ptr = neg ? 0 : 1;
                             ptr++;
-
-                            if (d < 0)
-                                d = -d;
-
-                            for (unsigned int j = 0; j < cols[i].scale; j++) {
-                                d *= 10;
-                            }
 
                             double_to_int<12>(d, ptr);
                             ptr += 12;
@@ -5140,15 +5139,8 @@ namespace tds {
                             *ptr = 17;
                             ptr++;
 
-                            *ptr= d < 0 ? 0 : 1;
+                            *ptr = neg ? 0 : 1;
                             ptr++;
-
-                            if (d < 0)
-                                d = -d;
-
-                            for (unsigned int j = 0; j < cols[i].scale; j++) {
-                                d *= 10;
-                            }
 
                             double_to_int<16>(d, ptr);
                             ptr += 16;
