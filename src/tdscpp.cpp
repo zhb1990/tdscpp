@@ -1448,16 +1448,33 @@ namespace tds {
             is_null = true;
     }
 
-    static void dd_shift(uint8_t* scratch) {
+    template<unsigned N>
+    static void buf_lshift(uint8_t* scratch) {
         bool carry = false;
 
-        for (unsigned int i = 0; i < 38; i++) {
+        for (unsigned int i = 0; i < N; i++) {
             bool b = scratch[i] & 0x80;
 
             scratch[i] <<= 1;
 
             if (carry)
                 scratch[i] |= 1;
+
+            carry = b;
+        }
+    }
+
+    template<unsigned N>
+    static void buf_rshift(uint8_t* scratch) {
+        bool carry = false;
+
+        for (int i = N - 1; i >= 0; i--) {
+            bool b = scratch[i] & 0x1;
+
+            scratch[i] >>= 1;
+
+            if (carry)
+                scratch[i] |= 0x80;
 
             carry = b;
         }
@@ -1680,7 +1697,7 @@ namespace tds {
                         }
                     }
 
-                    dd_shift(scratch);
+                    buf_lshift<sizeof(scratch)>(scratch);
                 }
 
                 p = s;
@@ -4260,6 +4277,38 @@ namespace tds {
         bcp(utf8_to_utf16(table), np2, vp);
     }
 
+    template<unsigned N>
+    static void double_to_int(double d, uint8_t* scratch) {
+        auto v = *(uint64_t*)&d;
+        uint64_t exp = v >> 52;
+        uint64_t frac = v & 0xfffffffffffff;
+
+        // d is always positive
+
+        frac |= 0x10000000000000; // add implicit leading bit
+
+        // copy frac to buffer
+
+        if constexpr (N < sizeof(uint64_t))
+            memcpy(scratch, &frac, N);
+        else {
+            memcpy(scratch, &frac, sizeof(uint64_t));
+            memset(scratch + sizeof(uint64_t), 0, N - sizeof(uint64_t));
+        }
+
+        // bitshift buffer according to exp
+
+        while (exp > 0x433) {
+            buf_lshift<N>(scratch);
+            exp--;
+        }
+
+        while (exp < 0x433) {
+            buf_rshift<N>(scratch);
+            exp++;
+        }
+    }
+
     vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<column>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
@@ -5071,8 +5120,39 @@ namespace tds {
 
                             *(uint64_t*)ptr = (uint64_t)d;
                             ptr += sizeof(uint64_t);
-                        } else
-                            throw runtime_error("FIXME - support large NUMERICs in BCP");
+                        } else if (cols[i].precision < 29) { // 12 bytes
+                            *ptr = 13;
+                            ptr++;
+
+                            *ptr= d < 0 ? 0 : 1;
+                            ptr++;
+
+                            if (d < 0)
+                                d = -d;
+
+                            for (unsigned int j = 0; j < cols[i].scale; j++) {
+                                d *= 10;
+                            }
+
+                            double_to_int<12>(d, ptr);
+                            ptr += 12;
+                        } else { // 16 bytes
+                            *ptr = 17;
+                            ptr++;
+
+                            *ptr= d < 0 ? 0 : 1;
+                            ptr++;
+
+                            if (d < 0)
+                                d = -d;
+
+                            for (unsigned int j = 0; j < cols[i].scale; j++) {
+                                d *= 10;
+                            }
+
+                            double_to_int<16>(d, ptr);
+                            ptr += 16;
+                        }
                     }
                 break;
 
