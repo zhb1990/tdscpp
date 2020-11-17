@@ -3037,8 +3037,6 @@ namespace tds {
                     break;
 
                 case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::DECIMAL:
-                case sql_type::NUMERIC:
                 case sql_type::MONEYN:
                 case sql_type::DATETIMN:
                 case sql_type::DATE:
@@ -3070,6 +3068,14 @@ namespace tds {
                         bufsize += sizeof(tds_VARBINARY_param) + (p.is_null ? 0 : p.val.length());
 
                     break;
+
+                case sql_type::NUMERIC:
+                case sql_type::DECIMAL:
+                    bufsize += sizeof(tds_param_header) + 4;
+
+                    if (!p.is_null)
+                        bufsize += p.val.length();
+                break;
 
                 default:
                     throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
@@ -3162,8 +3168,6 @@ namespace tds {
                     break;
 
                 case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::DECIMAL:
-                case sql_type::NUMERIC:
                 case sql_type::MONEYN:
                 case sql_type::DATETIMN:
                 case sql_type::DATE:
@@ -3264,6 +3268,24 @@ namespace tds {
 
                     break;
                 }
+
+                case sql_type::NUMERIC:
+                case sql_type::DECIMAL:
+                    *ptr = (uint8_t)p.max_length; ptr++;
+                    *ptr = p.precision; ptr++;
+                    *ptr = p.scale; ptr++;
+
+                    if (p.is_null) {
+                        *ptr = 0;
+                        ptr++;
+                    } else {
+                        *ptr = (uint8_t)p.val.length();
+                        ptr++;
+
+                        memcpy(ptr, p.val.data(), p.val.length());
+                        ptr += p.val.length();
+                    }
+                break;
 
                 default:
                     throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
