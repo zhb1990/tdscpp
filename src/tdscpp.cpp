@@ -4470,10 +4470,7 @@ namespace tds {
                 break;
 
                 case sql_type::DATETIME:
-                    bufsize++;
-
-                    if (!v[i].is_null)
-                        bufsize += sizeof(int32_t) + sizeof(uint32_t);
+                    bufsize += sizeof(int32_t) + sizeof(uint32_t);
                 break;
 
                 case sql_type::DATETIMN:
@@ -4909,24 +4906,18 @@ namespace tds {
                     }
                 break;
 
-                case sql_type::DATETIME:
-                    if (v[i].is_null) {
-                        *(uint8_t*)ptr = 0;
-                        ptr++;
-                    } else {
-                        auto dt = (datetime)v[i];
-                        uint32_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
+                case sql_type::DATETIME: {
+                    auto dt = (datetime)v[i];
+                    uint32_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
-                        *(uint8_t*)ptr = sizeof(int32_t) + sizeof(uint32_t);
-                        ptr++;
+                    *(int32_t*)ptr = dt.d.num;
+                    ptr += sizeof(int32_t);
 
-                        *(int32_t*)ptr = dt.d.num;
-                        ptr += sizeof(int32_t);
+                    *(uint32_t*)ptr = (uint32_t)(secs * 300);
+                    ptr += sizeof(uint32_t);
 
-                        *(uint32_t*)ptr = (uint32_t)(secs * 300);
-                        ptr += sizeof(uint32_t);
-                    }
-                break;
+                    break;
+                }
 
                 case sql_type::DATETIMN:
                     if (v[i].is_null) {
