@@ -5459,15 +5459,15 @@ namespace tds {
         if (finished)
             return;
 
-        conn.impl->send_msg(tds_msg::attention_signal, string_view());
-
-        while (!finished) {
-            wait_for_packet();
-        }
-
-        // wait for attention acknowledgement
-
         try {
+            conn.impl->send_msg(tds_msg::attention_signal, string_view());
+
+            while (!finished) {
+                wait_for_packet();
+            }
+
+            // wait for attention acknowledgement
+
             bool ack = false;
 
             do {
