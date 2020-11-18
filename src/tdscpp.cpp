@@ -5789,6 +5789,14 @@ namespace tds {
                     break;
                 }
 
+                case tds_token::RETURNSTATUS:
+                {
+                    if (sv.length() < sizeof(int32_t))
+                        throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected 4)."), sv.length());
+
+                    break;
+                }
+
                 default:
                     throw formatted_error(FMT_STRING("Unhandled token type {} while executing SQL batch."), type);
             }
