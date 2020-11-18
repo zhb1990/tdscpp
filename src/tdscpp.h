@@ -436,7 +436,7 @@ namespace tds {
     void tds::run(const std::string_view& s, Args&&... args) {
         query q(*this, s, args...);
 
-        while (q.fetch_row()) { // FIXME - do we need this?
+        while (q.fetch_row()) {
         }
     }
 
@@ -444,7 +444,7 @@ namespace tds {
     void tds::run(const std::u16string_view& s, Args&&... args) {
         query q(*this, s, args...);
 
-        while (q.fetch_row()) { // FIXME - do we need this?
+        while (q.fetch_row()) {
         }
     }
 
@@ -466,10 +466,16 @@ namespace tds {
 
     void __inline tds::run(const std::string_view& s) {
         batch b(*this, s);
+
+        while (b.fetch_row()) {
+        }
     }
 
     void __inline tds::run(const std::u16string_view& s) {
         batch b(*this, s);
+
+        while (b.fetch_row()) {
+        }
     }
 
     class TDSCPP trans {
