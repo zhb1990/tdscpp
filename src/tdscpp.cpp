@@ -3616,6 +3616,10 @@ namespace tds {
         }
     }
 
+    static u16string_view extract_message(const string_view& sv) {
+        return u16string_view((char16_t*)&sv[8], *(uint16_t*)&sv[6]);
+    }
+
     void rpc::wait_for_packet() {
         enum tds_msg type;
         string payload;
@@ -3688,7 +3692,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
-                        throw formatted_error(FMT_STRING("RPC {} failed."), utf16_to_utf8(name));
+                        throw formatted_error(FMT_STRING("RPC {} failed: {}"), utf16_to_utf8(name), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -5228,7 +5232,7 @@ namespace tds {
                         if (message_handler)
                             handle_info_msg(sv.substr(0, len), true);
 
-                        throw formatted_error(FMT_STRING("BCP failed."));
+                        throw formatted_error(FMT_STRING("BCP failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         handle_envchange_msg(sv.substr(0, len));
 
@@ -5576,7 +5580,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
-                        throw formatted_error(FMT_STRING("SQL batch failed."));
+                        throw formatted_error(FMT_STRING("SQL batch failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -5975,7 +5979,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
-                        throw runtime_error("TM_BEGIN_XACT request failed.");
+                        throw formatted_error(FMT_STRING("TM_BEGIN_XACT request failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -6066,7 +6070,7 @@ namespace tds {
                                 }
                             }
 
-                            throw runtime_error("TM_BEGIN_XACT request failed.");
+                            throw formatted_error(FMT_STRING("TM_ROLLBACK_XACT request failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
                         } else if (type == tds_token::ENVCHANGE)
                             conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -6144,7 +6148,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
-                        throw runtime_error("TM_BEGIN_XACT request failed.");
+                        throw formatted_error(FMT_STRING("TM_COMMIT_XACT request failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
