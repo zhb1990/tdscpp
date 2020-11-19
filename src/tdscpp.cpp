@@ -2897,6 +2897,32 @@ namespace tds {
 
                 break;
 
+            case sql_type::IMAGE:
+            case sql_type::NTEXT:
+            case sql_type::SQL_VARIANT:
+            case sql_type::TEXT:
+            {
+                if (sv.length() < sizeof(uint32_t))
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
+
+                auto len = *(uint32_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint32_t));
+
+                col.val.resize(len);
+                col.is_null = len == 0xffffffff;
+
+                if (!col.is_null) {
+                    if (sv.length() < len)
+                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+
+                    memcpy(col.val.data(), sv.data(), len);
+                    sv = sv.substr(len);
+                }
+
+                break;
+            }
+
             default:
                 throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), type);
         }
@@ -3006,6 +3032,29 @@ namespace tds {
                 }
 
                 break;
+
+            case sql_type::IMAGE:
+            case sql_type::NTEXT:
+            case sql_type::SQL_VARIANT:
+            case sql_type::TEXT:
+            {
+                if (sv.length() < sizeof(uint32_t))
+                    return false;
+
+                auto len = *(uint32_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint32_t));
+
+                if (len == 0xffffffff)
+                    return true;
+
+                if (sv.length() < len)
+                    return false;
+
+                sv = sv.substr(len);
+
+                break;
+            }
 
             default:
                 throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), type);
@@ -3430,6 +3479,18 @@ namespace tds {
                                     sv2 = sv2.substr(2);
                                 break;
 
+                                case sql_type::IMAGE:
+                                case sql_type::NTEXT:
+                                case sql_type::SQL_VARIANT:
+                                case sql_type::TEXT:
+                                    if (sv2.length() < sizeof(uint32_t))
+                                        return;
+
+                                    col.max_length = *(uint32_t*)sv2.data();
+
+                                    sv2 = sv2.substr(sizeof(uint32_t));
+                                break;
+
                                 default:
                                     throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
                             }
@@ -3815,6 +3876,15 @@ namespace tds {
                                 len += 3;
                                 sv2 = sv2.substr(3);
 
+                                break;
+
+                            case sql_type::SQL_VARIANT:
+                                if (sv2.length() < sizeof(uint32_t))
+                                    return;
+
+                                col.max_length = *(uint32_t*)sv2.data();
+
+                                sv2 = sv2.substr(sizeof(uint32_t));
                                 break;
 
                             default:
