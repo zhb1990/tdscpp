@@ -1945,6 +1945,9 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
                 }
 
+            case sql_type::DATETIM4:
+                return *(uint16_t*)d.data(); // MSSQL adds 1 if after midday
+
             case sql_type::NUMERIC:
             case sql_type::DECIMAL:
             {
