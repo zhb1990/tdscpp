@@ -2662,6 +2662,7 @@ namespace tds {
 
     value::operator double() const {
         auto type2 = type;
+        auto max_length2 = max_length;
         string_view d = val;
 
         if (is_null)
@@ -2674,7 +2675,20 @@ namespace tds {
 
             auto propbytes = (uint8_t)d[0];
 
-            d = d.substr(1 + propbytes);
+            d = d.substr(1);
+
+            switch (type2) {
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMEOFFSET:
+                    max_length2 = d[0];
+                    break;
+
+                default:
+                    break;
+            }
+
+            d = d.substr(propbytes);
         }
 
         switch (type2) {
@@ -2773,6 +2787,21 @@ namespace tds {
                 auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
 
                 return (double)dt + ((double)t / 25920000.0);
+            }
+
+            case sql_type::DATETIME2: {
+                uint32_t n = 0;
+                uint64_t secs = 0;
+
+                memcpy(&n, d.data() + d.length() - 3, 3);
+
+                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 3));
+
+                for (auto n = max_length2; n > 0; n--) {
+                    secs /= 10;
+                }
+
+                return (double)(n - 693595) + ((double)secs / 86400.0);
             }
 
             case sql_type::DATETIMN:
