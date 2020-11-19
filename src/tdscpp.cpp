@@ -1862,7 +1862,7 @@ namespace tds {
 
             case sql_type::BITN:
             case sql_type::BIT:
-                return val[0] != 0 ? 1 : 0;
+                return d[0] != 0 ? 1 : 0;
 
             case sql_type::VARCHAR:
             case sql_type::CHAR:
@@ -1872,12 +1872,12 @@ namespace tds {
 
                 bool first = true;
 
-                for (auto c : val) {
+                for (auto c : d) {
                     if (c == '-') {
                         if (!first)
-                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), val);
+                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), d);
                     } else if (c < '0' || c > '9')
-                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), val);
+                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), d);
 
                     first = false;
                 }
@@ -1887,9 +1887,9 @@ namespace tds {
                 auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), val);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), d);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT."), val);
+                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT."), d);
 
                 return res;
             }
