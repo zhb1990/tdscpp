@@ -1786,56 +1786,69 @@ namespace tds {
     }
 
     value::operator int64_t() const {
+        auto type2 = type;
+        string_view d = val;
+
         if (is_null)
             return 0;
 
-        switch (type) {
+        if (type2 == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)d[0];
+
+            d = d.substr(1);
+
+            auto propbytes = (uint8_t)d[0];
+
+            d = d.substr(1 + propbytes);
+        }
+
+        switch (type2) {
             case sql_type::TINYINT:
-                return *(uint8_t*)val.data();
+                return *(uint8_t*)d.data();
 
             case sql_type::SMALLINT:
-                return *(int16_t*)val.data();
+                return *(int16_t*)d.data();
 
             case sql_type::INT:
-                return *(int32_t*)val.data();
+                return *(int32_t*)d.data();
 
             case sql_type::BIGINT:
-                return *(int64_t*)val.data();
+                return *(int64_t*)d.data();
 
             case sql_type::INTN:
-                switch (val.length()) {
+                switch (d.length()) {
                     case 1:
-                        return *(uint8_t*)val.data();
+                        return *(uint8_t*)d.data();
 
                     case 2:
-                        return *(int16_t*)val.data();
+                        return *(int16_t*)d.data();
 
                     case 4:
-                        return *(int32_t*)val.data();
+                        return *(int32_t*)d.data();
 
                     case 8:
-                        return *(int64_t*)val.data();
+                        return *(int64_t*)d.data();
 
                     default:
-                        throw formatted_error(FMT_STRING("INTN has unexpected length {}."), val.length());
+                        throw formatted_error(FMT_STRING("INTN has unexpected length {}."), d.length());
                 }
 
             case sql_type::REAL:
-                return (int64_t)*(float*)val.data();
+                return (int64_t)*(float*)d.data();
 
             case sql_type::FLOAT:
-                return (int64_t)*(double*)val.data();
+                return (int64_t)*(double*)d.data();
 
             case sql_type::FLTN:
-                switch (val.length()) {
+                switch (d.length()) {
                     case sizeof(float):
-                        return (int64_t)*(float*)val.data();
+                        return (int64_t)*(float*)d.data();
 
                     case sizeof(double):
-                        return (int64_t)*(double*)val.data();
+                        return (int64_t)*(double*)d.data();
 
                     default:
-                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), val.length());
+                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), d.length());
                 }
 
             case sql_type::BITN:
@@ -1845,7 +1858,7 @@ namespace tds {
             case sql_type::VARCHAR:
             case sql_type::CHAR:
             {
-                if (val.empty())
+                if (d.empty())
                     return 0;
 
                 bool first = true;
@@ -1862,7 +1875,7 @@ namespace tds {
 
                 int64_t res;
 
-                auto [p, ec] = from_chars(val.data(), val.data() + val.length(), res);
+                auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
                     throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), val);
@@ -1875,10 +1888,10 @@ namespace tds {
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
             {
-                if (val.empty())
+                if (d.empty())
                     return 0;
 
-                u16string_view v((char16_t*)val.data(), val.length() / sizeof(char16_t));
+                u16string_view v((char16_t*)d.data(), d.length() / sizeof(char16_t));
                 string s;
 
                 s.reserve(v.length());
@@ -1909,24 +1922,24 @@ namespace tds {
             }
 
             case sql_type::DATETIME:
-                return *(int32_t*)val.data(); // MSSQL adds 1 if after midday
+                return *(int32_t*)d.data(); // MSSQL adds 1 if after midday
 
             case sql_type::DATETIMN:
-                switch (val.length()) {
+                switch (d.length()) {
                     case 4:
-                        return *(uint16_t*)val.data(); // MSSQL adds 1 if after midday
+                        return *(uint16_t*)d.data(); // MSSQL adds 1 if after midday
 
                     case 8:
-                        return *(int32_t*)val.data(); // MSSQL adds 1 if after midday
+                        return *(int32_t*)d.data(); // MSSQL adds 1 if after midday
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
                 }
 
             case sql_type::NUMERIC:
             case sql_type::DECIMAL:
             {
-                if (val.empty())
+                if (d.empty())
                     return 0;
 
                 bool first = true;
@@ -1961,7 +1974,7 @@ namespace tds {
             // Not allowing VARBINARY even though MSSQL does
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to integer."), type);
+                throw formatted_error(FMT_STRING("Cannot convert {} to integer."), type2);
         }
     }
 
