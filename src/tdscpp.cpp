@@ -5786,7 +5786,7 @@ namespace tds {
                             case sql_type::DECIMAL:
                             case sql_type::NUMERIC:
                                 if (sv2.length() < 3)
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 3)."), sv2.length(), 3);
+                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 3)."), sv2.length());
 
                                 col.max_length = (uint8_t)sv2[0];
                                 col.precision = (uint8_t)sv2[1];
@@ -5795,6 +5795,18 @@ namespace tds {
                                 len += 3;
                                 sv2 = sv2.substr(3);
 
+                                break;
+
+                            case sql_type::IMAGE:
+                            case sql_type::NTEXT:
+                            case sql_type::SQL_VARIANT:
+                            case sql_type::TEXT:
+                                if (sv2.length() < sizeof(uint32_t))
+                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 4)."), sv2.length());
+
+                                col.max_length = *(uint32_t*)sv2.data();
+
+                                sv2 = sv2.substr(sizeof(uint32_t));
                                 break;
 
                             default:
