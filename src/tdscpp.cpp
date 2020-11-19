@@ -1933,6 +1933,14 @@ namespace tds {
             case sql_type::DATETIME:
                 return *(int32_t*)d.data(); // MSSQL adds 1 if after midday
 
+            case sql_type::DATETIME2: {
+                uint32_t n = 0;
+
+                memcpy(&n, d.data() + d.length() - 3, 3);
+
+                return (int32_t)n - 693595;
+            }
+
             case sql_type::DATETIMN:
                 switch (d.length()) {
                     case 4:
