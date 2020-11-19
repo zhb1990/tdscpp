@@ -2839,6 +2839,13 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
                 }
 
+            case sql_type::DATETIM4: {
+                auto dt = *(uint16_t*)d.data();
+                auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
+
+                return (double)dt + ((double)t / 1440.0);
+            }
+
             case sql_type::NUMERIC:
             case sql_type::DECIMAL: {
                 auto s = (string)*this;
