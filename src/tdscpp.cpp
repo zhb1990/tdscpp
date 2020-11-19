@@ -1941,6 +1941,14 @@ namespace tds {
                 return (int32_t)n - 693595;
             }
 
+            case sql_type::DATETIMEOFFSET: {
+                uint32_t n = 0;
+
+                memcpy(&n, d.data() + d.length() - 5, 3);
+
+                return (int32_t)n - 693595;
+            }
+
             case sql_type::DATETIMN:
                 switch (d.length()) {
                     case 4:
