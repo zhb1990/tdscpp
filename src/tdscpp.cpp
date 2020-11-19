@@ -3691,8 +3691,8 @@ namespace tds {
                     } else if (type == tds_token::TDS_ERROR) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
-
-                        throw formatted_error(FMT_STRING("RPC {} failed: {}"), utf16_to_utf8(name), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                        else
+                            throw formatted_error(FMT_STRING("RPC {} failed: {}"), utf16_to_utf8(name), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -5579,8 +5579,8 @@ namespace tds {
                     } else if (type == tds_token::TDS_ERROR) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
-
-                        throw formatted_error(FMT_STRING("SQL batch failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                        else
+                            throw formatted_error(FMT_STRING("SQL batch failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
