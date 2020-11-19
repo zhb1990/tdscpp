@@ -2564,17 +2564,44 @@ namespace tds {
     }
 
     value::operator const datetime() const {
+        auto type2 = type;
+        unsigned int max_length2 = max_length;
+        string_view d = val;
+
         if (is_null)
             return datetime{1900, 1, 1, 0, 0, 0};
 
-        switch (type) {
+        if (type2 == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)d[0];
+
+            d = d.substr(1);
+
+            auto propbytes = (uint8_t)d[0];
+
+            d = d.substr(1);
+
+            switch (type2) {
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMEOFFSET:
+                    max_length2 = d[0];
+                    break;
+
+                default:
+                    break;
+            }
+
+            d = d.substr(propbytes);
+        }
+
+        switch (type2) {
             case sql_type::VARCHAR:
             case sql_type::CHAR:
             {
                 uint16_t y;
-                uint8_t mon, d, h, min, s;
+                uint8_t mon, day, h, min, s;
 
-                auto t = string_view(val);
+                auto t = d;
 
                 // remove leading whitespace
 
@@ -2591,19 +2618,19 @@ namespace tds {
                 if (t.empty())
                     return datetime{1900, 1, 1, 0, 0, 0};
 
-                if (!parse_datetime(t, y, mon, d, h, min, s))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), val);
+                if (!parse_datetime(t, y, mon, day, h, min, s))
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), d);
 
-                return datetime{y, mon, d, h, min, s};
+                return datetime{y, mon, day, h, min, s};
             }
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
             {
                 uint16_t y;
-                uint8_t mon, d, h, min, s;
+                uint8_t mon, day, h, min, s;
 
-                auto t = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
+                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
 
                 // remove leading whitespace
 
@@ -2628,16 +2655,16 @@ namespace tds {
                     t2 += (char)c;
                 }
 
-                if (!parse_datetime(t2, y, mon, d, h, min, s))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), utf16_to_utf8(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t))));
+                if (!parse_datetime(t2, y, mon, day, h, min, s))
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
-                return datetime{y, mon, d, h, min, s};
+                return datetime{y, mon, day, h, min, s};
             }
 
             case sql_type::DATE: {
                 uint32_t n = 0;
 
-                memcpy(&n, val.data(), 3);
+                memcpy(&n, d.data(), 3);
 
                 return datetime{(int32_t)n - 693595, 0};
             }
@@ -2645,9 +2672,9 @@ namespace tds {
             case sql_type::TIME: {
                 uint64_t secs = 0;
 
-                memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length()));
+                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length()));
 
-                for (auto n = max_length; n > 0; n--) {
+                for (auto n = max_length2; n > 0; n--) {
                     secs /= 10;
                 }
 
@@ -2655,29 +2682,29 @@ namespace tds {
             }
 
             case sql_type::DATETIME:
-                return datetime{*(int32_t*)val.data(), *(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
+                return datetime{*(int32_t*)d.data(), *(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
 
             case sql_type::DATETIMN:
-                switch (val.length()) {
+                switch (d.length()) {
                     case 4:
-                        return datetime{*(uint16_t*)val.data(), (uint32_t)(*(uint16_t*)(val.data() + sizeof(uint16_t)) * 60)};
+                        return datetime{*(uint16_t*)d.data(), (uint32_t)(*(uint16_t*)(d.data() + sizeof(uint16_t)) * 60)};
 
                     case 8:
-                        return datetime{*(int32_t*)val.data(), *(uint32_t*)(val.data() + sizeof(int32_t)) / 300};
+                        return datetime{*(int32_t*)d.data(), *(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
                 }
 
             case sql_type::DATETIME2: {
                 uint32_t n = 0;
                 uint64_t secs = 0;
 
-                memcpy(&n, val.data() + val.length() - 3, 3);
+                memcpy(&n, d.data() + d.length() - 3, 3);
 
-                memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 3));
+                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 3));
 
-                for (auto n = max_length; n > 0; n--) {
+                for (auto n = max_length2; n > 0; n--) {
                     secs /= 10;
                 }
 
@@ -2688,11 +2715,11 @@ namespace tds {
                 uint32_t n = 0;
                 uint64_t secs = 0;
 
-                memcpy(&n, val.data() + val.length() - 5, 3);
+                memcpy(&n, d.data() + d.length() - 5, 3);
 
-                memcpy(&secs, val.data(), min(sizeof(uint64_t), val.length() - 5));
+                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 5));
 
-                for (auto n = max_length; n > 0; n--) {
+                for (auto n = max_length2; n > 0; n--) {
                     secs /= 10;
                 }
 
@@ -2702,7 +2729,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to DATETIME2 for integers, floats, or BIT
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to datetime."), type);
+                throw formatted_error(FMT_STRING("Cannot convert {} to datetime."), type2);
         }
     }
 
