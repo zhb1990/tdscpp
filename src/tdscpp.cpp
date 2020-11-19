@@ -6316,12 +6316,25 @@ namespace tds {
     }
 
     void TDSCPP to_json(nlohmann::json& j, const value& v) {
+        auto type2 = v.type;
+        string_view val = v.val;
+
         if (v.is_null) {
             j = nlohmann::json(nullptr);
             return;
         }
 
-        switch (v.type) {
+        if (type2 == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)val[0];
+
+            val = val.substr(1);
+
+            auto propbytes = (uint8_t)val[0];
+
+            val = val.substr(1 + propbytes);
+        }
+
+        switch (type2) {
             case sql_type::INTN:
             case sql_type::TINYINT:
             case sql_type::SMALLINT:
@@ -6339,7 +6352,7 @@ namespace tds {
 
             case sql_type::BITN:
             case sql_type::BIT:
-                j = nlohmann::json(v.val[0] != 0);
+                j = nlohmann::json(val[0] != 0);
                 break;
 
             default:
