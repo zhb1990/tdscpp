@@ -2696,6 +2696,9 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
                 }
 
+            case sql_type::DATETIM4:
+                return datetime{*(uint16_t*)d.data(), (uint32_t)(*(uint16_t*)(d.data() + sizeof(uint16_t)) * 60)};
+
             case sql_type::DATETIME2: {
                 uint32_t n = 0;
                 uint64_t secs = 0;
