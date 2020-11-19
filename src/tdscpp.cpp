@@ -1666,6 +1666,15 @@ namespace tds {
                         throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
                 }
 
+            case sql_type::DATETIM4: {
+                auto v = *(uint16_t*)d.data();
+                auto mins = *(uint16_t*)(d.data() + sizeof(uint16_t));
+
+                datetime dt(v, mins * 60);
+
+                return fmt::format(FMT_STRING("{}"), dt);
+            }
+
             case sql_type::DATETIMEOFFSET: {
                 uint64_t secs = 0;
                 uint32_t v;
@@ -1774,7 +1783,7 @@ namespace tds {
 
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to string."), type);
+                throw formatted_error(FMT_STRING("Cannot convert {} to string."), type2);
         }
     }
 
