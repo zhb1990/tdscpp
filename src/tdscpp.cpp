@@ -2804,6 +2804,21 @@ namespace tds {
                 return (double)(n - 693595) + ((double)secs / 86400.0);
             }
 
+            case sql_type::DATETIMEOFFSET: {
+                uint32_t n = 0;
+                uint64_t secs = 0;
+
+                memcpy(&n, d.data() + d.length() - 5, 3);
+
+                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 5));
+
+                for (auto n = max_length2; n > 0; n--) {
+                    secs /= 10;
+                }
+
+                return (double)(n - 693595) + ((double)secs / 86400.0);
+            }
+
             case sql_type::DATETIMN:
                 switch (d.length()) {
                     case 4: {
