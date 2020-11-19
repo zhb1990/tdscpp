@@ -2732,16 +2732,16 @@ namespace tds {
                 auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), val);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), d);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), val);
+                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), d);
 
                 return res;
 #else
                 try {
-                    return stod(val);
+                    return stod(string(d));
                 } catch (...) {
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), val);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), d);
                 }
 #endif
             }
