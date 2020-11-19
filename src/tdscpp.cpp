@@ -2633,10 +2633,23 @@ namespace tds {
     }
 
     value::operator double() const {
+        auto type2 = type;
+        string_view d = val;
+
         if (is_null)
             return 0;
 
-        switch (type) {
+        if (type2 == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)d[0];
+
+            d = d.substr(1);
+
+            auto propbytes = (uint8_t)d[0];
+
+            d = d.substr(1 + propbytes);
+        }
+
+        switch (type2) {
             case sql_type::TINYINT:
             case sql_type::SMALLINT:
             case sql_type::INT:
@@ -2647,34 +2660,34 @@ namespace tds {
                 return (double)operator int64_t();
 
             case sql_type::REAL:
-                return *(float*)val.data();
+                return *(float*)d.data();
 
             case sql_type::FLOAT:
-                return *(double*)val.data();
+                return *(double*)d.data();
 
             case sql_type::FLTN:
-                switch (val.length()) {
+                switch (d.length()) {
                     case sizeof(float):
-                        return *(float*)val.data();
+                        return *(float*)d.data();
 
                     case sizeof(double):
-                        return *(double*)val.data();
+                        return *(double*)d.data();
 
                     default:
-                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), val.length());
+                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), d.length());
                 }
 
             case sql_type::VARCHAR:
             case sql_type::CHAR:
             {
-                if (val.empty())
+                if (d.empty())
                     return 0.0;
 
                 // from_chars not implemented for double yet on gcc
 #if 0
                 double res;
 
-                auto [p, ec] = from_chars(val.data(), val.data() + val.length(), res);
+                auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
                     throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), val);
@@ -2694,10 +2707,10 @@ namespace tds {
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
             {
-                if (val.empty())
+                if (d.empty())
                     return 0.0;
 
-                u16string_view v((char16_t*)val.data(), val.length() / sizeof(char16_t));
+                u16string_view v((char16_t*)d.data(), d.length() / sizeof(char16_t));
                 string s;
 
                 s.reserve(v.length());
@@ -2728,30 +2741,30 @@ namespace tds {
             }
 
             case sql_type::DATETIME: {
-                auto d = *(int32_t*)val.data();
-                auto t = *(uint32_t*)(val.data() + sizeof(int32_t));
+                auto dt = *(int32_t*)d.data();
+                auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
 
-                return (double)d + ((double)t / 25920000.0);
+                return (double)dt + ((double)t / 25920000.0);
             }
 
             case sql_type::DATETIMN:
-                switch (val.length()) {
+                switch (d.length()) {
                     case 4: {
-                        auto d = *(uint16_t*)val.data();
-                        auto t = *(uint16_t*)(val.data() + sizeof(uint16_t));
+                        auto dt = *(uint16_t*)d.data();
+                        auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
 
-                        return (double)d + ((double)t / 1440.0);
+                        return (double)dt + ((double)t / 1440.0);
                     }
 
                     case 8: {
-                        auto d = *(int32_t*)val.data();
-                        auto t = *(uint32_t*)(val.data() + sizeof(int32_t));
+                        auto dt = *(int32_t*)d.data();
+                        auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
 
-                        return (double)d + ((double)t / 25920000.0);
+                        return (double)dt + ((double)t / 25920000.0);
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), val.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
                 }
 
             case sql_type::NUMERIC:
@@ -2768,7 +2781,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to FLOAT for DATE, TIME, DATETIME2, DATETIMEOFFSET, or VARBINARY
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to float."), type);
+                throw formatted_error(FMT_STRING("Cannot convert {} to float."), type2);
         }
     }
 
