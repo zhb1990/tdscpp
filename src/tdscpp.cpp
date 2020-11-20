@@ -4649,6 +4649,15 @@ namespace tds {
             case sql_type::NUMERIC:
                 return u"NUMERIC(" + to_u16string(precision) + u"," + to_u16string(scale) + u")";
 
+            case sql_type::TEXT:
+                return u"TEXT";
+
+            case sql_type::NTEXT:
+                return u"NTEXT";
+
+            case sql_type::IMAGE:
+                return u"IMAGE";
+
             default:
                 throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
         }
