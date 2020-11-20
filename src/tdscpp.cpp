@@ -3023,6 +3023,40 @@ namespace tds {
                 }
             }
 
+            case sql_type::MONEYN:
+                switch (d.length()) {
+                    case sizeof(int64_t): {
+                        auto v = *(int64_t*)d.data();
+
+                        v = (v >> 32) | ((v & 0xffffffff) << 32);
+
+                        return (double)v / 10000.0;
+                    }
+
+                    case sizeof(int32_t): {
+                        auto v = *(int32_t*)d.data();
+
+                        return (double)v / 10000.0;
+                    }
+
+                    default:
+                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}."), d.length());
+                }
+
+            case sql_type::MONEY: {
+                auto v = *(int64_t*)d.data();
+
+                v = (v >> 32) | ((v & 0xffffffff) << 32);
+
+                return (double)v / 10000.0;
+            }
+
+            case sql_type::SMALLMONEY:  {
+                auto v = *(int32_t*)d.data();
+
+                return (double)v / 10000.0;
+            }
+
             // MSSQL doesn't allow conversion to FLOAT for DATE, TIME, DATETIME2, DATETIMEOFFSET, or VARBINARY
 
             default:
