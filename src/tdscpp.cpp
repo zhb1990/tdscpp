@@ -3112,10 +3112,7 @@ namespace tds {
 
                 break;
 
-            case sql_type::IMAGE:
-            case sql_type::NTEXT:
             case sql_type::SQL_VARIANT:
-            case sql_type::TEXT:
             {
                 if (sv.length() < sizeof(uint32_t))
                     throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
@@ -3133,6 +3130,58 @@ namespace tds {
 
                     memcpy(col.val.data(), sv.data(), len);
                     sv = sv.substr(len);
+                }
+
+                break;
+            }
+
+            case sql_type::IMAGE:
+            case sql_type::NTEXT:
+            case sql_type::TEXT:
+            {
+                // text pointer
+
+                if (sv.length() < sizeof(uint8_t))
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
+
+                auto textptrlen = (uint8_t)sv[0];
+
+                sv = sv.substr(1);
+
+                if (sv.length() < textptrlen)
+                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), textptrlen);
+
+                sv = sv.substr(textptrlen);
+
+                col.is_null = textptrlen == 0;
+
+                if (!col.is_null) {
+                    // timestamp
+
+                    if (sv.length() < 8)
+                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
+
+                    sv = sv.substr(8);
+
+                    // data
+
+                    if (sv.length() < sizeof(uint32_t))
+                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
+
+                    auto len = *(uint32_t*)sv.data();
+
+                    sv = sv.substr(sizeof(uint32_t));
+
+                    col.val.resize(len);
+                    col.is_null = len == 0xffffffff;
+
+                    if (!col.is_null) {
+                        if (sv.length() < len)
+                            throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+
+                        memcpy(col.val.data(), sv.data(), len);
+                        sv = sv.substr(len);
+                    }
                 }
 
                 break;
@@ -3272,10 +3321,10 @@ namespace tds {
             case sql_type::NTEXT:
             case sql_type::TEXT:
             {
+                // text pointer
+
                 if (sv.length() < sizeof(uint8_t))
                     return false;
-
-                // text pointer
 
                 auto textptrlen = (uint8_t)sv[0];
 
@@ -3286,29 +3335,28 @@ namespace tds {
 
                 sv = sv.substr(textptrlen);
 
-                // timestamp
+                if (textptrlen != 0) {
+                    // timestamp
 
-                if (sv.length() < 8)
-                    return false;
+                    if (sv.length() < 8)
+                        return false;
 
-                sv = sv.substr(8);
+                    sv = sv.substr(8);
 
-                // data
+                    // data
 
-                if (sv.length() < sizeof(uint32_t))
-                    return false;
+                    if (sv.length() < sizeof(uint32_t))
+                        return false;
 
-                auto len = *(uint32_t*)sv.data();
+                    auto len = *(uint32_t*)sv.data();
 
-                sv = sv.substr(sizeof(uint32_t));
+                    sv = sv.substr(sizeof(uint32_t));
 
-//                 if (len == 0xffffffff)
-//                     return true;
+                    if (sv.length() < len)
+                        return false;
 
-                if (sv.length() < len)
-                    return false;
-
-                sv = sv.substr(len);
+                    sv = sv.substr(len);
+                }
 
                 break;
             }
