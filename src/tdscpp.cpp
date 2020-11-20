@@ -4836,6 +4836,24 @@ namespace tds {
             case sql_type::IMAGE:
                 return u"IMAGE";
 
+            case sql_type::MONEYN:
+                switch (length) {
+                    case 4:
+                        return u"SMALLMONEY";
+
+                    case 8:
+                        return u"MONEY";
+
+                    default:
+                        throw formatted_error(FMT_STRING("MONEYN has invalid length {}."), length);
+                }
+
+            case sql_type::MONEY:
+                return u"MONEY";
+
+            case sql_type::SMALLMONEY:
+                return u"SMALLMONEY";
+
             default:
                 throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
         }
