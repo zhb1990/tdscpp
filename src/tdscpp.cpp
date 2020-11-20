@@ -1563,6 +1563,9 @@ namespace tds {
             case sql_type::VARCHAR:
             case sql_type::CHAR:
             case sql_type::TEXT:
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
+            case sql_type::IMAGE:
             {
                 string_view sv(d.data(), d.length());
 
@@ -1693,19 +1696,6 @@ namespace tds {
                 datetimeoffset dto(v - 693595, (uint32_t)secs, *(int16_t*)(d.data() + d.length() - sizeof(int16_t)));
 
                 return fmt::format(FMT_STRING("{}"), dto);
-            }
-
-            case sql_type::VARBINARY:
-            case sql_type::BINARY:
-            case sql_type::IMAGE:
-            {
-                string s = "0x";
-
-                for (auto c : val) {
-                    s += fmt::format(FMT_STRING("{:02x}"), (uint8_t)c);
-                }
-
-                return fmt::format(FMT_STRING("{}"), s);
             }
 
             case sql_type::BITN:

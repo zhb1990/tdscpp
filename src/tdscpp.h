@@ -745,7 +745,15 @@ struct fmt::formatter<tds::value> {
     auto format(const tds::value& p, format_context& ctx) {
         if (p.is_null)
             return format_to(ctx.out(), "NULL");
-        else
+        else if (p.type == tds::sql_type::VARBINARY || p.type == tds::sql_type::BINARY || p.type == tds::sql_type::IMAGE) {
+            std::string s = "0x";
+
+            for (auto c : p.val) {
+                s += fmt::format("{:02x}", (uint8_t)c);
+            }
+
+            return format_to(ctx.out(), "{}", s);
+        } else
             return format_to(ctx.out(), "{}", (std::string)p);
     }
 };
