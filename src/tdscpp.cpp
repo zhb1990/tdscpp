@@ -1552,6 +1552,7 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
+            case sql_type::NTEXT:
             {
                 u16string_view sv((char16_t*)d.data(), d.length() / sizeof(char16_t));
                 auto s = utf16_to_utf8(sv);
@@ -1790,7 +1791,7 @@ namespace tds {
     }
 
     value::operator const u16string() const {
-        if (type == sql_type::NVARCHAR || type == sql_type::NCHAR)
+        if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT)
             return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
         else
             return utf8_to_utf16(operator const string()); // FIXME - VARCHARs might not be valid UTF-8
@@ -1899,6 +1900,7 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
+            case sql_type::NTEXT:
             {
                 if (d.empty())
                     return 0;
@@ -2322,6 +2324,7 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
+            case sql_type::NTEXT:
             {
                 uint16_t y;
                 uint8_t mon, day, h, min, s;
@@ -2472,6 +2475,7 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
+            case sql_type::NTEXT:
             {
                 uint16_t y;
                 uint8_t mon, day, h, min, s;
@@ -2632,6 +2636,7 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
+            case sql_type::NTEXT:
             {
                 uint16_t y;
                 uint8_t mon, day, h, min, s;
@@ -2831,6 +2836,7 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
+            case sql_type::NTEXT:
             {
                 if (d.empty())
                     return 0.0;
