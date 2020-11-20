@@ -1695,6 +1695,7 @@ namespace tds {
 
             case sql_type::VARBINARY:
             case sql_type::BINARY:
+            case sql_type::IMAGE:
             {
                 string s = "0x";
 
