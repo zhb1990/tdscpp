@@ -3444,6 +3444,21 @@ namespace tds {
                         bufsize += p.val.length();
                 break;
 
+                case sql_type::IMAGE:
+                    bufsize += sizeof(tds_param_header) + sizeof(uint32_t) + sizeof(uint32_t);
+
+                    if (!p.is_null)
+                        bufsize += p.val.length();
+                break;
+
+                case sql_type::TEXT:
+                case sql_type::NTEXT:
+                    bufsize += sizeof(tds_param_header) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(tds_collation);
+
+                    if (!p.is_null)
+                        bufsize += p.val.length();
+                break;
+
                 default:
                     throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
             }
@@ -3653,6 +3668,58 @@ namespace tds {
                         ptr += p.val.length();
                     }
                 break;
+
+                case sql_type::IMAGE:
+                    *(uint32_t*)ptr = 0x7fffffff;
+                    ptr += sizeof(uint32_t);
+
+                    if (p.is_null) {
+                        *(uint32_t*)ptr = 0xffffffff;
+                        ptr += sizeof(uint32_t);
+                    } else {
+                        *(uint32_t*)ptr = (uint32_t)p.val.length();
+                        ptr += sizeof(uint32_t);
+
+                        memcpy(ptr, p.val.data(), p.val.length());
+                        ptr += p.val.length();
+                    }
+                break;
+
+                case sql_type::TEXT:
+                case sql_type::NTEXT:
+                {
+                    *(uint32_t*)ptr = 0x7fffffff;
+                    ptr += sizeof(uint32_t);
+
+                    auto col = (tds_collation*)ptr;
+
+                    col->lcid = 0x0409; // en-US
+                    col->ignore_case = 1;
+                    col->ignore_accent = 0;
+                    col->ignore_width = 1;
+                    col->ignore_kana = 1;
+                    col->binary = 0;
+                    col->binary2 = 0;
+                    col->utf8 = 0;
+                    col->reserved = 0;
+                    col->version = 0;
+                    col->sort_id = 52; // nocase.iso
+
+                    ptr += sizeof(tds_collation);
+
+                    if (p.is_null) {
+                        *(uint32_t*)ptr = 0xffffffff;
+                        ptr += sizeof(uint32_t);
+                    } else {
+                        *(uint32_t*)ptr = (uint32_t)p.val.length();
+                        ptr += sizeof(uint32_t);
+
+                        memcpy(ptr, p.val.data(), p.val.length());
+                        ptr += p.val.length();
+                    }
+
+                    break;
+                }
 
                 default:
                     throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
