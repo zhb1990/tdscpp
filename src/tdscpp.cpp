@@ -1700,7 +1700,7 @@ namespace tds {
 
             case sql_type::BITN:
             case sql_type::BIT:
-                return fmt::format(FMT_STRING("{}"), val[0] != 0);
+                return fmt::format(FMT_STRING("{}"), d[0] != 0);
 
             case sql_type::NUMERIC:
             case sql_type::DECIMAL: {
@@ -1771,9 +1771,62 @@ namespace tds {
                 if (scale2 == 0) // remove trailing dot
                     p[strlen(p) - 1] = 0;
 
-                return fmt::format(FMT_STRING("{}{}"), val[0] == 0 ? "-" : "", p);
+                return fmt::format(FMT_STRING("{}{}"), d[0] == 0 ? "-" : "", p);
             }
 
+            case sql_type::MONEYN:
+                switch (d.length()) {
+                    case sizeof(int64_t): {
+                        auto v = *(int64_t*)d.data();
+
+                        v = (v >> 32) | ((v & 0xffffffff) << 32);
+
+                        int16_t p = (int16_t)(v % 10000);
+
+                        if (p < 0)
+                            p = -p;
+
+                        return fmt::format(FMT_STRING("{}.{:04}"), v / 10000, p);
+                    }
+
+                    case sizeof(int32_t): {
+                        auto v = *(int32_t*)d.data();
+
+                        int16_t p = (int16_t)(v % 10000);
+
+                        if (p < 0)
+                            p = -p;
+
+                        return fmt::format(FMT_STRING("{}.{:02}"), v / 10000, p);
+                    }
+
+                    default:
+                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}."), d.length());
+                }
+
+            case sql_type::MONEY: {
+                auto v = *(int64_t*)d.data();
+
+                v = (v >> 32) | ((v & 0xffffffff) << 32);
+
+                int16_t p = (int16_t)(v % 10000);
+
+                if (p < 0)
+                    p = -p;
+
+                return fmt::format(FMT_STRING("{}.{:04}"), v / 10000, p);
+            }
+
+            case sql_type::SMALLMONEY: {
+                auto v = *(int32_t*)d.data();
+
+                int16_t p = (int16_t)(v % 10000);
+
+                if (p < 0)
+                    p = -p;
+
+                return fmt::format(FMT_STRING("{}.{:02}"), v / 10000, p);
+            }
 
             default:
                 throw formatted_error(FMT_STRING("Cannot convert {} to string."), type2);
