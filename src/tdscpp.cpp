@@ -3797,7 +3797,6 @@ namespace tds {
                                 case sql_type::SMALLMONEY:
                                 case sql_type::BIGINT:
                                 case sql_type::UNIQUEIDENTIFIER:
-                                case sql_type::MONEYN:
                                 case sql_type::DATE:
                                     // nop
                                 break;
@@ -3809,6 +3808,7 @@ namespace tds {
                                 case sql_type::DATETIMN:
                                 case sql_type::DATETIMEOFFSET:
                                 case sql_type::BITN:
+                                case sql_type::MONEYN:
                                     if (sv2.length() < sizeof(uint8_t))
                                         return;
 
@@ -4233,7 +4233,6 @@ namespace tds {
                             case sql_type::SMALLMONEY:
                             case sql_type::BIGINT:
                             case sql_type::UNIQUEIDENTIFIER:
-                            case sql_type::MONEYN:
                             case sql_type::DATE:
                                 // nop
                                 break;
@@ -4245,6 +4244,7 @@ namespace tds {
                             case sql_type::DATETIMN:
                             case sql_type::DATETIMEOFFSET:
                             case sql_type::BITN:
+                            case sql_type::MONEYN:
                                 if (sv2.length() < sizeof(uint8_t))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
@@ -5800,7 +5800,6 @@ namespace tds {
                 case sql_type::SMALLMONEY:
                 case sql_type::BIGINT:
                 case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::MONEYN:
                 case sql_type::DATE:
                     // nop
                     break;
@@ -5812,6 +5811,7 @@ namespace tds {
                 case sql_type::DATETIMN:
                 case sql_type::DATETIMEOFFSET:
                 case sql_type::BITN:
+                case sql_type::MONEYN:
                     bufsize++;
                     break;
 
@@ -5872,7 +5872,6 @@ namespace tds {
                 case sql_type::SMALLMONEY:
                 case sql_type::BIGINT:
                 case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::MONEYN:
                 case sql_type::DATE:
                     // nop
                 break;
@@ -5884,6 +5883,7 @@ namespace tds {
                 case sql_type::DATETIMN:
                 case sql_type::DATETIMEOFFSET:
                 case sql_type::BITN:
+                case sql_type::MONEYN:
                     *(uint8_t*)ptr = (uint8_t)col.max_length;
                     ptr++;
                 break;
@@ -6169,7 +6169,6 @@ namespace tds {
                             case sql_type::SMALLMONEY:
                             case sql_type::BIGINT:
                             case sql_type::UNIQUEIDENTIFIER:
-                            case sql_type::MONEYN:
                             case sql_type::DATE:
                                 // nop
                                 break;
@@ -6181,6 +6180,7 @@ namespace tds {
                             case sql_type::DATETIMN:
                             case sql_type::DATETIMEOFFSET:
                             case sql_type::BITN:
+                            case sql_type::MONEYN:
                                 if (sv2.length() < sizeof(uint8_t))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
