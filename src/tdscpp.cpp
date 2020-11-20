@@ -2045,6 +2045,40 @@ namespace tds {
                 return res;
             }
 
+            case sql_type::MONEYN:
+                switch (d.length()) {
+                    case sizeof(int64_t): {
+                        auto v = *(int64_t*)d.data();
+
+                        v = (v >> 32) | ((v & 0xffffffff) << 32);
+
+                        return v / 10000;
+                    }
+
+                    case sizeof(int32_t): {
+                        auto v = *(int32_t*)d.data();
+
+                        return v / 10000;
+                    }
+
+                    default:
+                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}."), d.length());
+                }
+
+            case sql_type::MONEY: {
+                auto v = *(int64_t*)d.data();
+
+                v = (v >> 32) | ((v & 0xffffffff) << 32);
+
+                return v / 10000;
+            }
+
+            case sql_type::SMALLMONEY: {
+                auto v = *(int32_t*)d.data();
+
+                return v / 10000;
+            }
+
             // MSSQL doesn't allow conversion to INT for DATE, TIME, DATETIME2, or DATETIMEOFFSET
 
             // Not allowing VARBINARY even though MSSQL does
