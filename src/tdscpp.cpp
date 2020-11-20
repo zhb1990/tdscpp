@@ -3805,6 +3805,13 @@ namespace tds {
 
                                     sv2 = sv2.substr(sizeof(uint32_t));
 
+                                    if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
+                                        if (sv2.length() < sizeof(tds_collation))
+                                            return;
+
+                                        sv2 = sv2.substr(sizeof(tds_collation));
+                                    }
+
                                     if (sv2.length() < 1)
                                         return;
 
@@ -4235,6 +4242,13 @@ namespace tds {
                                 col.max_length = *(uint32_t*)sv2.data();
 
                                 sv2 = sv2.substr(sizeof(uint32_t));
+
+                                if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
+                                    if (sv2.length() < sizeof(tds_collation))
+                                        return;
+
+                                    sv2 = sv2.substr(sizeof(tds_collation));
+                                }
 
                                 if (sv2.length() < 1)
                                     return;
