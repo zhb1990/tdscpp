@@ -6948,6 +6948,9 @@ namespace tds {
             case sql_type::DECIMAL:
             case sql_type::FLOAT:
             case sql_type::REAL:
+            case sql_type::MONEYN:
+            case sql_type::MONEY:
+            case sql_type::SMALLMONEY:
                 j = nlohmann::json((double)v);
                 break;
 
