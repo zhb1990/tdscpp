@@ -3248,10 +3248,7 @@ namespace tds {
 
                 break;
 
-            case sql_type::IMAGE:
-            case sql_type::NTEXT:
             case sql_type::SQL_VARIANT:
-            case sql_type::TEXT:
             {
                 if (sv.length() < sizeof(uint32_t))
                     return false;
@@ -3262,6 +3259,51 @@ namespace tds {
 
                 if (len == 0xffffffff)
                     return true;
+
+                if (sv.length() < len)
+                    return false;
+
+                sv = sv.substr(len);
+
+                break;
+            }
+
+            case sql_type::IMAGE:
+            case sql_type::NTEXT:
+            case sql_type::TEXT:
+            {
+                if (sv.length() < sizeof(uint8_t))
+                    return false;
+
+                // text pointer
+
+                auto textptrlen = (uint8_t)sv[0];
+
+                sv = sv.substr(1);
+
+                if (sv.length() < textptrlen)
+                    return false;
+
+                sv = sv.substr(textptrlen);
+
+                // timestamp
+
+                if (sv.length() < 8)
+                    return false;
+
+                sv = sv.substr(8);
+
+                // data
+
+                if (sv.length() < sizeof(uint32_t))
+                    return false;
+
+                auto len = *(uint32_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint32_t));
+
+//                 if (len == 0xffffffff)
+//                     return true;
 
                 if (sv.length() < len)
                     return false;
