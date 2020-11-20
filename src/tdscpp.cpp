@@ -5236,6 +5236,21 @@ namespace tds {
                     }
                 break;
 
+                case sql_type::MONEYN:
+                    bufsize += sizeof(uint8_t);
+
+                    if (!v[i].is_null)
+                        bufsize += cols[i].max_length;
+                break;
+
+                case sql_type::MONEY:
+                    bufsize += sizeof(int64_t);
+                break;
+
+                case sql_type::SMALLMONEY:
+                    bufsize += sizeof(int32_t);
+                break;
+
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
             }
@@ -5856,6 +5871,68 @@ namespace tds {
                         }
                     }
                 break;
+
+                case sql_type::MONEYN: {
+                    if (v[i].is_null) {
+                        *ptr = 0;
+                        ptr++;
+                    } else {
+                        *ptr = (uint8_t)cols[i].max_length;
+                        ptr++;
+
+                        auto val = (double)v[i];
+
+                        val *= 10000.0;
+
+                        switch (cols[i].max_length) {
+                            case sizeof(int64_t): {
+                                auto v = (int64_t)val;
+
+                                *(int32_t*)ptr = (int32_t)(v >> 32);
+                                *(int32_t*)(ptr + sizeof(int32_t)) = (int32_t)(v & 0xffffffff);
+                                break;
+                            }
+
+                            case sizeof(int32_t):
+                                *(int32_t*)ptr = (int32_t)val;
+                            break;
+
+                            default:
+                                throw formatted_error(FMT_STRING("MONEYN column {} had invalid size {}."), utf16_to_utf8(cols[i].name), cols[i].max_length);
+
+                        }
+
+                        ptr += cols[i].max_length;
+                    }
+
+                    break;
+                }
+
+                case sql_type::MONEY: {
+                    auto val = (double)v[i];
+
+                    val *= 10000.0;
+
+                    auto v = (int64_t)val;
+
+                    *(int32_t*)ptr = (int32_t)(v >> 32);
+                    *(int32_t*)(ptr + sizeof(int32_t)) = (int32_t)(v & 0xffffffff);
+
+                    ptr += sizeof(int64_t);
+
+                    break;
+                }
+
+                case sql_type::SMALLMONEY: {
+                    auto val = (double)v[i];
+
+                    val *= 10000.0;
+
+                    *(int32_t*)ptr = (int32_t)val;
+                    ptr += sizeof(int32_t);
+
+                    break;
+                }
 
                 default:
                     throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
