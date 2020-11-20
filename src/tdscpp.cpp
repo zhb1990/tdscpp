@@ -1561,6 +1561,7 @@ namespace tds {
 
             case sql_type::VARCHAR:
             case sql_type::CHAR:
+            case sql_type::TEXT:
             {
                 string_view sv(d.data(), d.length());
 
@@ -1867,6 +1868,7 @@ namespace tds {
 
             case sql_type::VARCHAR:
             case sql_type::CHAR:
+            case sql_type::TEXT:
             {
                 if (d.empty())
                     return 0;
@@ -2290,6 +2292,7 @@ namespace tds {
         switch (type2) {
             case sql_type::VARCHAR:
             case sql_type::CHAR:
+            case sql_type::TEXT:
             {
                 uint16_t y;
                 uint8_t mon, day, h, min, s;
@@ -2439,6 +2442,7 @@ namespace tds {
         switch (type2) {
             case sql_type::VARCHAR:
             case sql_type::CHAR:
+            case sql_type::TEXT:
             {
                 uint16_t y;
                 uint8_t mon, day, h, min, s;
@@ -2598,6 +2602,7 @@ namespace tds {
         switch (type2) {
             case sql_type::VARCHAR:
             case sql_type::CHAR:
+            case sql_type::TEXT:
             {
                 uint16_t y;
                 uint8_t mon, day, h, min, s;
@@ -2798,6 +2803,7 @@ namespace tds {
 
             case sql_type::VARCHAR:
             case sql_type::CHAR:
+            case sql_type::TEXT:
             {
                 if (d.empty())
                     return 0.0;
