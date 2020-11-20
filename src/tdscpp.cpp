@@ -6162,10 +6162,7 @@ namespace tds {
 
                                 break;
 
-                            case sql_type::IMAGE:
-                            case sql_type::NTEXT:
                             case sql_type::SQL_VARIANT:
-                            case sql_type::TEXT:
                                 if (sv2.length() < sizeof(uint32_t))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 4)."), sv2.length());
 
@@ -6173,6 +6170,48 @@ namespace tds {
 
                                 sv2 = sv2.substr(sizeof(uint32_t));
                                 break;
+
+                            case sql_type::IMAGE:
+                            case sql_type::NTEXT:
+                            case sql_type::TEXT:
+                            {
+                                if (sv2.length() < sizeof(uint32_t))
+                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 4)."), sv2.length());
+
+                                col.max_length = *(uint32_t*)sv2.data();
+
+                                sv2 = sv2.substr(sizeof(uint32_t));
+
+                                if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
+                                    if (sv2.length() < sizeof(tds_collation))
+                                        throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 5)."), sv2.length());
+
+                                    sv2 = sv2.substr(sizeof(tds_collation));
+                                }
+
+                                if (sv2.length() < 1)
+                                    return;
+
+                                auto num_parts = (uint8_t)sv2[0];
+
+                                sv2 = sv2.substr(1);
+
+                                for (uint8_t j = 0; j < num_parts; j++) {
+                                    if (sv2.length() < sizeof(uint16_t))
+                                        return;
+
+                                    auto partlen = *(uint16_t*)sv2.data();
+
+                                    sv2 = sv2.substr(sizeof(uint16_t));
+
+                                    if (sv2.length() < partlen * sizeof(char16_t))
+                                        return;
+
+                                    sv2 = sv2.substr(partlen * sizeof(char16_t));
+                                }
+
+                                break;
+                            }
 
                             default:
                                 throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
