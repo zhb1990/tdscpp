@@ -3935,7 +3935,6 @@ namespace tds {
                                 case sql_type::FLOAT:
                                 case sql_type::SMALLMONEY:
                                 case sql_type::BIGINT:
-                                case sql_type::UNIQUEIDENTIFIER:
                                 case sql_type::DATE:
                                     // nop
                                 break;
@@ -3948,6 +3947,7 @@ namespace tds {
                                 case sql_type::DATETIMEOFFSET:
                                 case sql_type::BITN:
                                 case sql_type::MONEYN:
+                                case sql_type::UNIQUEIDENTIFIER:
                                     if (sv2.length() < sizeof(uint8_t))
                                         return;
 
