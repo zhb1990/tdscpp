@@ -7113,4 +7113,12 @@ namespace tds {
                 j = nlohmann::json((string)v);
         }
     }
+
+    uint16_t rpc::num_columns() const {
+        return (uint16_t)cols.size();
+    }
+
+    const column& rpc::operator[](uint16_t i) const {
+        return cols[i];
+    }
 };

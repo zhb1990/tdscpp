@@ -310,6 +310,10 @@ namespace tds {
             do_rpc(conn, name);
         }
 
+        uint16_t num_columns() const;
+
+        const column& operator[](uint16_t i) const;
+
         bool fetch_row();
 
         int32_t return_status = 0;
