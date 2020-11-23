@@ -1828,6 +1828,12 @@ namespace tds {
                 return fmt::format(FMT_STRING("{}.{:02}"), v / 10000, p);
             }
 
+            case sql_type::UNIQUEIDENTIFIER:
+                return fmt::format(FMT_STRING("{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"),
+                                   *(uint32_t*)d.data(), *(uint16_t*)(d.data() + 4), *(uint16_t*)(d.data() + 6),
+                                   (uint8_t)d[8], (uint8_t)d[9], (uint8_t)d[10], (uint8_t)d[11], (uint8_t)d[12],
+                                   (uint8_t)d[13], (uint8_t)d[14], (uint8_t)d[15]);
+
             default:
                 throw formatted_error(FMT_STRING("Cannot convert {} to string."), type2);
         }
