@@ -3180,7 +3180,8 @@ namespace tds {
             case sql_type::CHAR:
             case sql_type::NCHAR:
             case sql_type::BINARY:
-                if (max_length == 0xffff) {
+            case sql_type::XML:
+                if (max_length == 0xffff || type == sql_type::XML) {
                     if (sv.length() < sizeof(uint64_t))
                         throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
 
