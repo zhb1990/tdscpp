@@ -6402,7 +6402,6 @@ namespace tds {
                             case sql_type::FLOAT:
                             case sql_type::SMALLMONEY:
                             case sql_type::BIGINT:
-                            case sql_type::UNIQUEIDENTIFIER:
                             case sql_type::DATE:
                                 // nop
                                 break;
@@ -6415,6 +6414,7 @@ namespace tds {
                             case sql_type::DATETIMEOFFSET:
                             case sql_type::BITN:
                             case sql_type::MONEYN:
+                            case sql_type::UNIQUEIDENTIFIER:
                                 if (sv2.length() < sizeof(uint8_t))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
 
