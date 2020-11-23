@@ -1605,8 +1605,10 @@ namespace tds {
             name_buf.value = (void*)spn.data();
 
             major_status = gss_import_name(&minor_status, &name_buf, GSS_C_NO_OID, &gss_name);
-            if (major_status != GSS_S_COMPLETE)
+            if (major_status != GSS_S_COMPLETE) {
+                gss_release_cred(&minor_status, &cred_handle);
                 throw gss_error("gss_import_name", major_status, minor_status);
+            }
 
             recv_tok.length = 0;
             recv_tok.value = nullptr;
@@ -1615,14 +1617,19 @@ namespace tds {
                                                 GSS_C_DELEG_FLAG, GSS_C_INDEFINITE, GSS_C_NO_CHANNEL_BINDINGS,
                                                 &recv_tok, nullptr, &send_tok, nullptr, nullptr);
 
-            if (major_status != GSS_S_CONTINUE_NEEDED && major_status != GSS_S_COMPLETE)
+            if (major_status != GSS_S_CONTINUE_NEEDED && major_status != GSS_S_COMPLETE) {
+                gss_release_cred(&minor_status, &cred_handle);
                 throw gss_error("gss_init_sec_context", major_status, minor_status);
+            }
 
             if (send_tok.length != 0) {
                 sspi = string((char*)send_tok.value, send_tok.length);
 
                 gss_release_buffer(&minor_status, &send_tok);
             }
+
+            gss_delete_sec_context(&minor_status, &ctx_handle, GSS_C_NO_BUFFER);
+            gss_release_cred(&minor_status, &cred_handle);
 #else
             throw runtime_error("No username given and Kerberos support not compiled in.");
 #endif
