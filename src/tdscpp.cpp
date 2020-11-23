@@ -4433,6 +4433,14 @@ namespace tds {
                                 sv2 = sv2.substr(sizeof(uint16_t));
                                 break;
 
+                            case sql_type::XML:
+                                if (sv2.length() < sizeof(uint8_t))
+                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+
+                                len += sizeof(uint8_t);
+                                sv2 = sv2.substr(sizeof(uint8_t));
+                                break;
+
                             case sql_type::DECIMAL:
                             case sql_type::NUMERIC:
                                 if (sv2.length() < 3)
