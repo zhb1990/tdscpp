@@ -1614,9 +1614,7 @@ namespace tds {
             if (outbuf.pvBuffer)
                 FreeContextBuffer(outbuf.pvBuffer);
 
-            if (sec_status == SEC_E_OK)
-                sspih.reset();
-            else if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE)
+            if (sec_status != SEC_E_OK && sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE)
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {}"), (enum sec_error)sec_status);
 #elif defined(HAVE_GSSAPI)
             spn = "MSSQLSvc/" + fqdn;
@@ -1771,8 +1769,6 @@ namespace tds {
                             throw runtime_error("SSPI token received, but no current SSPI context.");
 
                         send_sspi_msg(&sspih->cred_handle, &sspih->ctx_handle, spn, sv.substr(0, len));
-
-                        sspih.reset();
 
                         sv = sv.substr(len);
 
