@@ -1524,14 +1524,56 @@ namespace tds {
         }
     }
 
+#ifdef _WIN32
+    class sspi_handle {
+    public:
+        sspi_handle() {
+            SECURITY_STATUS sec_status;
+            TimeStamp timestamp;
+
+            sec_status = AcquireCredentialsHandleW(nullptr, (SEC_WCHAR*)L"Negotiate", SECPKG_CRED_OUTBOUND, nullptr,
+                                                   nullptr, nullptr, nullptr, &cred_handle, &timestamp);
+            if (FAILED(sec_status))
+                throw formatted_error(FMT_STRING("AcquireCredentialsHandle returned {}"), (enum sec_error)sec_status);
+        }
+
+        ~sspi_handle() {
+            if (ctx_handle_set)
+                DeleteSecurityContext(&ctx_handle);
+
+            FreeCredentialsHandle(&cred_handle);
+        }
+
+        SECURITY_STATUS init_security_context(const char16_t* target_name, uint32_t context_req, uint32_t target_data_rep,
+                                              PSecBufferDesc input, PSecBufferDesc output, uint32_t* context_attr,
+                                              PTimeStamp timestamp) {
+            SECURITY_STATUS sec_status;
+
+            sec_status = InitializeSecurityContextW(&cred_handle, nullptr, (SEC_WCHAR*)target_name, context_req, 0,
+                                                    target_data_rep, input, 0, &ctx_handle, output,
+                                                    (ULONG*)context_attr, timestamp);
+
+            if (FAILED(sec_status))
+                throw formatted_error(FMT_STRING("InitializeSecurityContext returned {}"), (enum sec_error)sec_status);
+
+            ctx_handle_set = true;
+
+            return sec_status;
+        }
+
+        CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1};
+        CtxtHandle ctx_handle;
+        bool ctx_handle_set = false;
+    };
+#endif
+
     void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server,
                                   const string_view& app_name) {
         enum tds_msg type;
         string payload, sspi;
 #ifdef _WIN32
         u16string spn;
-        CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1};
-        CtxtHandle ctx_handle;
+        unique_ptr<sspi_handle> sspih;
 #elif defined(HAVE_GSSAPI)
         string spn;
         gss_cred_id_t cred_handle = 0;
@@ -1552,14 +1594,9 @@ namespace tds {
             TimeStamp timestamp;
             SecBuffer outbuf;
             SecBufferDesc out;
-            unsigned long context_attr;
+            uint32_t context_attr;
 
-            if (!SecIsValidHandle(&cred_handle)) {
-                sec_status = AcquireCredentialsHandleW(nullptr, (SEC_WCHAR*)L"Negotiate", SECPKG_CRED_OUTBOUND, nullptr,
-                                                       nullptr, nullptr, nullptr, &cred_handle, &timestamp);
-                if (FAILED(sec_status))
-                    throw formatted_error(FMT_STRING("AcquireCredentialsHandle returned {}"), (enum sec_error)sec_status);
-            }
+            sspih.reset(new sspi_handle);
 
             outbuf.cbBuffer = 0;
             outbuf.BufferType = SECBUFFER_TOKEN;
@@ -1569,22 +1606,17 @@ namespace tds {
             out.cBuffers = 1;
             out.pBuffers = &outbuf;
 
-            sec_status = InitializeSecurityContextW(&cred_handle, nullptr, (SEC_WCHAR*)spn.c_str(),
-                                                    ISC_REQ_ALLOCATE_MEMORY, 0, SECURITY_NATIVE_DREP, nullptr, 0,
-                                                    &ctx_handle, &out, &context_attr, &timestamp);
-            if (FAILED(sec_status))
-                throw formatted_error(FMT_STRING("InitializeSecurityContext returned {}"), (enum sec_error)sec_status);
-
-            // FIXME - free ctx_handle eventually
-
-//             ctx_handle_set = true;
+            sec_status = sspih->init_security_context(spn.c_str(), ISC_REQ_ALLOCATE_MEMORY, SECURITY_NATIVE_DREP,
+                                                      nullptr, &out, &context_attr, &timestamp);
 
             sspi = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
 
             if (outbuf.pvBuffer)
                 FreeContextBuffer(outbuf.pvBuffer);
 
-            if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE && sec_status != SEC_E_OK)
+            if (sec_status == SEC_E_OK)
+                sspih.reset();
+            else if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE)
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {}"), (enum sec_error)sec_status);
 #elif defined(HAVE_GSSAPI)
             spn = "MSSQLSvc/" + fqdn;
@@ -1735,7 +1767,12 @@ namespace tds {
                         if (sv.length() < len)
                             throw formatted_error(FMT_STRING("Short SSPI token ({} bytes, expected {})."), type, sv.length(), len);
 
-                        send_sspi_msg(&cred_handle, &ctx_handle, spn, sv.substr(0, len));
+                        if (!sspih)
+                            throw runtime_error("SSPI token received, but no current SSPI context.");
+
+                        send_sspi_msg(&sspih->cred_handle, &sspih->ctx_handle, spn, sv.substr(0, len));
+
+                        sspih.reset();
 
                         sv = sv.substr(len);
 
