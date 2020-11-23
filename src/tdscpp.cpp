@@ -185,7 +185,306 @@ static string utf16_to_utf8(const u16string_view& sv) {
 #endif
 }
 
-#ifdef HAVE_GSSAPI
+#ifdef _WIN32
+template<>
+struct fmt::formatter<enum sec_error> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(enum sec_error t, format_context& ctx) {
+        switch (t) {
+            case sec_error::_SEC_E_OK:
+                return format_to(ctx.out(), "SEC_E_OK");
+
+            case sec_error::_SEC_E_INSUFFICIENT_MEMORY:
+                return format_to(ctx.out(), "SEC_E_INSUFFICIENT_MEMORY");
+
+            case sec_error::_SEC_E_INVALID_HANDLE:
+                return format_to(ctx.out(), "SEC_E_INVALID_HANDLE");
+
+            case sec_error::_SEC_E_UNSUPPORTED_FUNCTION:
+                return format_to(ctx.out(), "SEC_E_UNSUPPORTED_FUNCTION");
+
+            case sec_error::_SEC_E_TARGET_UNKNOWN:
+                return format_to(ctx.out(), "SEC_E_TARGET_UNKNOWN");
+
+            case sec_error::_SEC_E_INTERNAL_ERROR:
+                return format_to(ctx.out(), "SEC_E_INTERNAL_ERROR");
+
+            case sec_error::_SEC_E_SECPKG_NOT_FOUND:
+                return format_to(ctx.out(), "SEC_E_SECPKG_NOT_FOUND");
+
+            case sec_error::_SEC_E_NOT_OWNER:
+                return format_to(ctx.out(), "SEC_E_NOT_OWNER");
+
+            case sec_error::_SEC_E_CANNOT_INSTALL:
+                return format_to(ctx.out(), "SEC_E_CANNOT_INSTALL");
+
+            case sec_error::_SEC_E_INVALID_TOKEN:
+                return format_to(ctx.out(), "SEC_E_INVALID_TOKEN");
+
+            case sec_error::_SEC_E_CANNOT_PACK:
+                return format_to(ctx.out(), "SEC_E_CANNOT_PACK");
+
+            case sec_error::_SEC_E_QOP_NOT_SUPPORTED:
+                return format_to(ctx.out(), "SEC_E_QOP_NOT_SUPPORTED");
+
+            case sec_error::_SEC_E_NO_IMPERSONATION:
+                return format_to(ctx.out(), "SEC_E_NO_IMPERSONATION");
+
+            case sec_error::_SEC_E_LOGON_DENIED:
+                return format_to(ctx.out(), "SEC_E_LOGON_DENIED");
+
+            case sec_error::_SEC_E_UNKNOWN_CREDENTIALS:
+                return format_to(ctx.out(), "SEC_E_UNKNOWN_CREDENTIALS");
+
+            case sec_error::_SEC_E_NO_CREDENTIALS:
+                return format_to(ctx.out(), "SEC_E_NO_CREDENTIALS");
+
+            case sec_error::_SEC_E_MESSAGE_ALTERED:
+                return format_to(ctx.out(), "SEC_E_MESSAGE_ALTERED");
+
+            case sec_error::_SEC_E_OUT_OF_SEQUENCE:
+                return format_to(ctx.out(), "SEC_E_OUT_OF_SEQUENCE");
+
+            case sec_error::_SEC_E_NO_AUTHENTICATING_AUTHORITY:
+                return format_to(ctx.out(), "SEC_E_NO_AUTHENTICATING_AUTHORITY");
+
+            case sec_error::_SEC_I_CONTINUE_NEEDED:
+                return format_to(ctx.out(), "SEC_I_CONTINUE_NEEDED");
+
+            case sec_error::_SEC_I_COMPLETE_NEEDED:
+                return format_to(ctx.out(), "SEC_I_COMPLETE_NEEDED");
+
+            case sec_error::_SEC_I_COMPLETE_AND_CONTINUE:
+                return format_to(ctx.out(), "SEC_I_COMPLETE_AND_CONTINUE");
+
+            case sec_error::_SEC_I_LOCAL_LOGON:
+                return format_to(ctx.out(), "SEC_I_LOCAL_LOGON");
+
+            case sec_error::_SEC_I_GENERIC_EXTENSION_RECEIVED:
+                return format_to(ctx.out(), "SEC_I_GENERIC_EXTENSION_RECEIVED");
+
+            case sec_error::_SEC_E_BAD_PKGID:
+                return format_to(ctx.out(), "SEC_E_BAD_PKGID");
+
+            case sec_error::_SEC_E_CONTEXT_EXPIRED:
+                return format_to(ctx.out(), "SEC_E_CONTEXT_EXPIRED");
+
+            case sec_error::_SEC_I_CONTEXT_EXPIRED:
+                return format_to(ctx.out(), "SEC_I_CONTEXT_EXPIRED");
+
+            case sec_error::_SEC_E_INCOMPLETE_MESSAGE:
+                return format_to(ctx.out(), "SEC_E_INCOMPLETE_MESSAGE");
+
+            case sec_error::_SEC_E_INCOMPLETE_CREDENTIALS:
+                return format_to(ctx.out(), "SEC_E_INCOMPLETE_CREDENTIALS");
+
+            case sec_error::_SEC_E_BUFFER_TOO_SMALL:
+                return format_to(ctx.out(), "SEC_E_BUFFER_TOO_SMALL");
+
+            case sec_error::_SEC_I_INCOMPLETE_CREDENTIALS:
+                return format_to(ctx.out(), "SEC_I_INCOMPLETE_CREDENTIALS");
+
+            case sec_error::_SEC_I_RENEGOTIATE:
+                return format_to(ctx.out(), "SEC_I_RENEGOTIATE");
+
+            case sec_error::_SEC_E_WRONG_PRINCIPAL:
+                return format_to(ctx.out(), "SEC_E_WRONG_PRINCIPAL");
+
+            case sec_error::_SEC_I_NO_LSA_CONTEXT:
+                return format_to(ctx.out(), "SEC_I_NO_LSA_CONTEXT");
+
+            case sec_error::_SEC_E_TIME_SKEW:
+                return format_to(ctx.out(), "SEC_E_TIME_SKEW");
+
+            case sec_error::_SEC_E_UNTRUSTED_ROOT:
+                return format_to(ctx.out(), "SEC_E_UNTRUSTED_ROOT");
+
+            case sec_error::_SEC_E_ILLEGAL_MESSAGE:
+                return format_to(ctx.out(), "SEC_E_ILLEGAL_MESSAGE");
+
+            case sec_error::_SEC_E_CERT_UNKNOWN:
+                return format_to(ctx.out(), "SEC_E_CERT_UNKNOWN");
+
+            case sec_error::_SEC_E_CERT_EXPIRED:
+                return format_to(ctx.out(), "SEC_E_CERT_EXPIRED");
+
+            case sec_error::_SEC_E_ENCRYPT_FAILURE:
+                return format_to(ctx.out(), "SEC_E_ENCRYPT_FAILURE");
+
+            case sec_error::_SEC_E_DECRYPT_FAILURE:
+                return format_to(ctx.out(), "SEC_E_DECRYPT_FAILURE");
+
+            case sec_error::_SEC_E_ALGORITHM_MISMATCH:
+                return format_to(ctx.out(), "SEC_E_ALGORITHM_MISMATCH");
+
+            case sec_error::_SEC_E_SECURITY_QOS_FAILED:
+                return format_to(ctx.out(), "SEC_E_SECURITY_QOS_FAILED");
+
+            case sec_error::_SEC_E_UNFINISHED_CONTEXT_DELETED:
+                return format_to(ctx.out(), "SEC_E_UNFINISHED_CONTEXT_DELETED");
+
+            case sec_error::_SEC_E_NO_TGT_REPLY:
+                return format_to(ctx.out(), "SEC_E_NO_TGT_REPLY");
+
+            case sec_error::_SEC_E_NO_IP_ADDRESSES:
+                return format_to(ctx.out(), "SEC_E_NO_IP_ADDRESSES");
+
+            case sec_error::_SEC_E_WRONG_CREDENTIAL_HANDLE:
+                return format_to(ctx.out(), "SEC_E_WRONG_CREDENTIAL_HANDLE");
+
+            case sec_error::_SEC_E_CRYPTO_SYSTEM_INVALID:
+                return format_to(ctx.out(), "SEC_E_CRYPTO_SYSTEM_INVALID");
+
+            case sec_error::_SEC_E_MAX_REFERRALS_EXCEEDED:
+                return format_to(ctx.out(), "SEC_E_MAX_REFERRALS_EXCEEDED");
+
+            case sec_error::_SEC_E_MUST_BE_KDC:
+                return format_to(ctx.out(), "SEC_E_MUST_BE_KDC");
+
+            case sec_error::_SEC_E_STRONG_CRYPTO_NOT_SUPPORTED:
+                return format_to(ctx.out(), "SEC_E_STRONG_CRYPTO_NOT_SUPPORTED");
+
+            case sec_error::_SEC_E_TOO_MANY_PRINCIPALS:
+                return format_to(ctx.out(), "SEC_E_TOO_MANY_PRINCIPALS");
+
+            case sec_error::_SEC_E_NO_PA_DATA:
+                return format_to(ctx.out(), "SEC_E_NO_PA_DATA");
+
+            case sec_error::_SEC_E_PKINIT_NAME_MISMATCH:
+                return format_to(ctx.out(), "SEC_E_PKINIT_NAME_MISMATCH");
+
+            case sec_error::_SEC_E_SMARTCARD_LOGON_REQUIRED:
+                return format_to(ctx.out(), "SEC_E_SMARTCARD_LOGON_REQUIRED");
+
+            case sec_error::_SEC_E_SHUTDOWN_IN_PROGRESS:
+                return format_to(ctx.out(), "SEC_E_SHUTDOWN_IN_PROGRESS");
+
+            case sec_error::_SEC_E_KDC_INVALID_REQUEST:
+                return format_to(ctx.out(), "SEC_E_KDC_INVALID_REQUEST");
+
+            case sec_error::_SEC_E_KDC_UNABLE_TO_REFER:
+                return format_to(ctx.out(), "SEC_E_KDC_UNABLE_TO_REFER");
+
+            case sec_error::_SEC_E_KDC_UNKNOWN_ETYPE:
+                return format_to(ctx.out(), "SEC_E_KDC_UNKNOWN_ETYPE");
+
+            case sec_error::_SEC_E_UNSUPPORTED_PREAUTH:
+                return format_to(ctx.out(), "SEC_E_UNSUPPORTED_PREAUTH");
+
+            case sec_error::_SEC_E_DELEGATION_REQUIRED:
+                return format_to(ctx.out(), "SEC_E_DELEGATION_REQUIRED");
+
+            case sec_error::_SEC_E_BAD_BINDINGS:
+                return format_to(ctx.out(), "SEC_E_BAD_BINDINGS");
+
+            case sec_error::_SEC_E_MULTIPLE_ACCOUNTS:
+                return format_to(ctx.out(), "SEC_E_MULTIPLE_ACCOUNTS");
+
+            case sec_error::_SEC_E_NO_KERB_KEY:
+                return format_to(ctx.out(), "SEC_E_NO_KERB_KEY");
+
+            case sec_error::_SEC_E_CERT_WRONG_USAGE:
+                return format_to(ctx.out(), "SEC_E_CERT_WRONG_USAGE");
+
+            case sec_error::_SEC_E_DOWNGRADE_DETECTED:
+                return format_to(ctx.out(), "SEC_E_DOWNGRADE_DETECTED");
+
+            case sec_error::_SEC_E_SMARTCARD_CERT_REVOKED:
+                return format_to(ctx.out(), "SEC_E_SMARTCARD_CERT_REVOKED");
+
+            case sec_error::_SEC_E_ISSUING_CA_UNTRUSTED:
+                return format_to(ctx.out(), "SEC_E_ISSUING_CA_UNTRUSTED");
+
+            case sec_error::_SEC_E_REVOCATION_OFFLINE_C:
+                return format_to(ctx.out(), "SEC_E_REVOCATION_OFFLINE_C");
+
+            case sec_error::_SEC_E_PKINIT_CLIENT_FAILURE:
+                return format_to(ctx.out(), "SEC_E_PKINIT_CLIENT_FAILURE");
+
+            case sec_error::_SEC_E_SMARTCARD_CERT_EXPIRED:
+                return format_to(ctx.out(), "SEC_E_SMARTCARD_CERT_EXPIRED");
+
+            case sec_error::_SEC_E_NO_S4U_PROT_SUPPORT:
+                return format_to(ctx.out(), "SEC_E_NO_S4U_PROT_SUPPORT");
+
+            case sec_error::_SEC_E_CROSSREALM_DELEGATION_FAILURE:
+                return format_to(ctx.out(), "SEC_E_CROSSREALM_DELEGATION_FAILURE");
+
+            case sec_error::_SEC_E_REVOCATION_OFFLINE_KDC:
+                return format_to(ctx.out(), "SEC_E_REVOCATION_OFFLINE_KDC");
+
+            case sec_error::_SEC_E_ISSUING_CA_UNTRUSTED_KDC:
+                return format_to(ctx.out(), "SEC_E_ISSUING_CA_UNTRUSTED_KDC");
+
+            case sec_error::_SEC_E_KDC_CERT_EXPIRED:
+                return format_to(ctx.out(), "SEC_E_KDC_CERT_EXPIRED");
+
+            case sec_error::_SEC_E_KDC_CERT_REVOKED:
+                return format_to(ctx.out(), "SEC_E_KDC_CERT_REVOKED");
+
+            case sec_error::_SEC_I_SIGNATURE_NEEDED:
+                return format_to(ctx.out(), "SEC_I_SIGNATURE_NEEDED");
+
+            case sec_error::_SEC_E_INVALID_PARAMETER:
+                return format_to(ctx.out(), "SEC_E_INVALID_PARAMETER");
+
+            case sec_error::_SEC_E_DELEGATION_POLICY:
+                return format_to(ctx.out(), "SEC_E_DELEGATION_POLICY");
+
+            case sec_error::_SEC_E_POLICY_NLTM_ONLY:
+                return format_to(ctx.out(), "SEC_E_POLICY_NLTM_ONLY");
+
+            case sec_error::_SEC_I_NO_RENEGOTIATION:
+                return format_to(ctx.out(), "SEC_I_NO_RENEGOTIATION");
+
+            case sec_error::_SEC_E_NO_CONTEXT:
+                return format_to(ctx.out(), "SEC_E_NO_CONTEXT");
+
+            case sec_error::_SEC_E_PKU2U_CERT_FAILURE:
+                return format_to(ctx.out(), "SEC_E_PKU2U_CERT_FAILURE");
+
+            case sec_error::_SEC_E_MUTUAL_AUTH_FAILED:
+                return format_to(ctx.out(), "SEC_E_MUTUAL_AUTH_FAILED");
+
+            case sec_error::_SEC_I_MESSAGE_FRAGMENT:
+                return format_to(ctx.out(), "SEC_I_MESSAGE_FRAGMENT");
+
+            case sec_error::_SEC_E_ONLY_HTTPS_ALLOWED:
+                return format_to(ctx.out(), "SEC_E_ONLY_HTTPS_ALLOWED");
+
+            case sec_error::_SEC_I_CONTINUE_NEEDED_MESSAGE_OK:
+                return format_to(ctx.out(), "SEC_I_CONTINUE_NEEDED_MESSAGE_OK");
+
+            case sec_error::_SEC_E_APPLICATION_PROTOCOL_MISMATCH:
+                return format_to(ctx.out(), "SEC_E_APPLICATION_PROTOCOL_MISMATCH");
+
+            case sec_error::_SEC_I_ASYNC_CALL_PENDING:
+                return format_to(ctx.out(), "SEC_I_ASYNC_CALL_PENDING");
+
+            case sec_error::_SEC_E_INVALID_UPN_NAME:
+                return format_to(ctx.out(), "SEC_E_INVALID_UPN_NAME");
+
+            case sec_error::_SEC_E_EXT_BUFFER_TOO_SMALL:
+                return format_to(ctx.out(), "SEC_E_EXT_BUFFER_TOO_SMALL");
+
+            case sec_error::_SEC_E_INSUFFICIENT_BUFFERS:
+                return format_to(ctx.out(), "SEC_E_INSUFFICIENT_BUFFERS");
+
+            default:
+                return format_to(ctx.out(), "{:08x}", (uint32_t)t);
+        }
+    }
+};
+#elif defined(HAVE_GSSAPI)
 template<>
 struct fmt::formatter<enum krb5_minor> {
     constexpr auto parse(format_parse_context& ctx) {
@@ -1259,7 +1558,7 @@ namespace tds {
                 sec_status = AcquireCredentialsHandleW(nullptr, (SEC_WCHAR*)L"Negotiate", SECPKG_CRED_OUTBOUND, nullptr,
                                                        nullptr, nullptr, nullptr, &cred_handle, &timestamp);
                 if (FAILED(sec_status))
-                    throw formatted_error(FMT_STRING("AcquireCredentialsHandle returned {:08x}"), (uint32_t)sec_status);
+                    throw formatted_error(FMT_STRING("AcquireCredentialsHandle returned {}"), (enum sec_error)sec_status);
             }
 
             outbuf.cbBuffer = 0;
@@ -1274,7 +1573,7 @@ namespace tds {
                                                     ISC_REQ_ALLOCATE_MEMORY, 0, SECURITY_NATIVE_DREP, nullptr, 0,
                                                     &ctx_handle, &out, &context_attr, &timestamp);
             if (FAILED(sec_status))
-                throw formatted_error(FMT_STRING("InitializeSecurityContext returned {:08x}"), (uint32_t)sec_status);
+                throw formatted_error(FMT_STRING("InitializeSecurityContext returned {}"), (enum sec_error)sec_status);
 
             // FIXME - free ctx_handle eventually
 
@@ -1286,7 +1585,7 @@ namespace tds {
                 FreeContextBuffer(outbuf.pvBuffer);
 
             if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE && sec_status != SEC_E_OK)
-                throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {:08x}"), (uint32_t)sec_status);
+                throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {}"), (enum sec_error)sec_status);
 #elif defined(HAVE_GSSAPI)
             spn = "MSSQLSvc/" + fqdn;
 
@@ -1482,7 +1781,7 @@ namespace tds {
                                                 ISC_REQ_ALLOCATE_MEMORY, 0, SECURITY_NATIVE_DREP,
                                                 &in, 0, ctx_handle, &out, &context_attr, &timestamp);
         if (FAILED(sec_status))
-            throw formatted_error(FMT_STRING("InitializeSecurityContext returned {:08x}"), (uint32_t)sec_status);
+            throw formatted_error(FMT_STRING("InitializeSecurityContext returned {}"), (enum sec_error)sec_status);
 
         ret = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
 
