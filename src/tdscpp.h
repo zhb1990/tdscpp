@@ -285,7 +285,7 @@ namespace tds {
         ~rpc();
 
         template<typename... Args>
-        rpc(tds& conn, const std::u16string_view& name, Args&&... args) : conn(conn), name(name) {
+        rpc(tds& conn, const std::u16string_view& name, Args&&... args) : conn(conn) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -293,7 +293,20 @@ namespace tds {
             do_rpc(conn, name);
         }
 
-        rpc(tds& conn, const std::u16string_view& name) : conn(conn), name(name) {
+        rpc(tds& conn, const std::u16string_view& name) : conn(conn) {
+            do_rpc(conn, name);
+        }
+
+        template<typename... Args>
+        rpc(tds& conn, const std::string_view& name, Args&&... args) : conn(conn) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_rpc(conn, name);
+        }
+
+        rpc(tds& conn, const std::string_view& name) : conn(conn) {
             do_rpc(conn, name);
         }
 
@@ -343,6 +356,7 @@ namespace tds {
         }
 
         void do_rpc(tds& conn, const std::u16string_view& name);
+        void do_rpc(tds& conn, const std::string_view& name);
         void wait_for_packet();
 
         tds& conn;

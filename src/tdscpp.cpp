@@ -3501,8 +3501,14 @@ namespace tds {
         return true;
     }
 
+    void rpc::do_rpc(tds& conn, const string_view& name) {
+        do_rpc(conn, utf8_to_utf16(name));
+    }
+
     void rpc::do_rpc(tds& conn, const u16string_view& name) {
         size_t bufsize;
+
+        this->name = name;
 
         bufsize = sizeof(tds_all_headers) + sizeof(uint16_t) + (name.length() * sizeof(uint16_t)) + sizeof(uint16_t);
 
@@ -4222,15 +4228,15 @@ namespace tds {
         if (finished)
             return;
 
-        conn.impl->send_msg(tds_msg::attention_signal, string_view());
-
-        while (!finished) {
-            wait_for_packet();
-        }
-
-        // wait for attention acknowledgement
-
         try {
+            conn.impl->send_msg(tds_msg::attention_signal, string_view());
+
+            while (!finished) {
+                wait_for_packet();
+            }
+
+            // wait for attention acknowledgement
+
             bool ack = false;
 
             do {
