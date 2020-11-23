@@ -3107,7 +3107,7 @@ namespace tds {
                 return 1;
 
             case sql_type::SQL_NULL:
-                throw formatted_error(FMT_STRING("FIXME - fixed_len_size for {}"), type); // FIXME
+                return 0;
 
             default:
                 return 0;
