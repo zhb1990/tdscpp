@@ -51,6 +51,10 @@ target_compile_options(tdscpp PRIVATE
 
 set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER src/tdscpp.h)
 
+if(WIN32)
+    set_target_properties(tdscpp PROPERTIES PREFIX "")
+endif()
+
 if(NOT MSVC)
     target_link_options(tdscpp PUBLIC -static-libgcc)
 endif()
