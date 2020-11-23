@@ -1229,11 +1229,12 @@ namespace tds {
                                   const string_view& app_name) {
         enum tds_msg type;
         string payload, sspi;
-        u16string spn;
 #ifdef _WIN32
+        u16string spn;
         CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1};
         CtxtHandle ctx_handle;
 #elif defined(HAVE_GSSAPI)
+        string spn;
         gss_cred_id_t cred_handle = 0;
         gss_ctx_id_t ctx_handle = GSS_C_NO_CONTEXT;
 #endif
@@ -1245,9 +1246,9 @@ namespace tds {
             if (fqdn.empty())
                 throw runtime_error("Could not do SSPI authentication as could not find server FQDN.");
 
+#ifdef _WIN32
             spn = u"MSSQLSvc/" + utf8_to_utf16(fqdn);
 
-#ifdef _WIN32
             SECURITY_STATUS sec_status;
             TimeStamp timestamp;
             SecBuffer outbuf;
@@ -1287,6 +1288,8 @@ namespace tds {
             if (sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE && sec_status != SEC_E_OK)
                 throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {:08x}"), (uint32_t)sec_status);
 #elif defined(HAVE_GSSAPI)
+            spn = "MSSQLSvc/" + fqdn;
+
             OM_uint32 major_status, minor_status;
             gss_buffer_desc recv_tok, send_tok, name_buf;
             gss_name_t gss_name;
