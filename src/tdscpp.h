@@ -376,16 +376,16 @@ namespace tds {
 
     class TDSCPP query {
     public:
-        query(tds& conn, const std::string_view& q) {
+        query(tds& conn, const std::string_view& q) : conn(conn) {
             do_query(conn, q);
         }
 
-        query(tds& conn, const std::u16string_view& q) {
+        query(tds& conn, const std::u16string_view& q) : conn(conn) {
             do_query(conn, q);
         }
 
         template<typename... Args>
-        query(tds& conn, const std::string_view& q, Args&&... args) {
+        query(tds& conn, const std::string_view& q, Args&&... args) : conn(conn) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -394,13 +394,15 @@ namespace tds {
         }
 
         template<typename... Args>
-        query(tds& conn, const std::u16string_view& q, Args&&... args) {
+        query(tds& conn, const std::u16string_view& q, Args&&... args) : conn(conn) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
 
             do_query(conn, q);
         }
+
+        ~query();
 
         uint16_t num_columns() const;
 
@@ -445,9 +447,11 @@ namespace tds {
 
         std::u16string create_params_string();
 
+        tds& conn;
         std::vector<value> params;
         std::vector<column> cols;
         std::unique_ptr<rpc> r2;
+        output_param<int32_t> handle;
     };
 
     template<typename... Args>

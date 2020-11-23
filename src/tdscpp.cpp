@@ -4734,8 +4734,6 @@ namespace tds {
 
     // FIXME - can we do static assert if no. of question marks different from no. of parameters?
     void query::do_query(tds& conn, const u16string_view& q) {
-        output_param<int32_t> handle;
-
         if (!params.empty()) {
             u16string q2;
             bool in_quotes = false;
@@ -4773,8 +4771,6 @@ namespace tds {
             throw runtime_error("sp_prepare failed.");
 
         r2.reset(new rpc(conn, u"sp_execute", static_cast<value>(handle), params));
-
-        // FIXME - sp_unprepare (is this necessary?)
     }
 
     void query::do_query(tds& conn, const string_view& q) {
@@ -4791,6 +4787,21 @@ namespace tds {
 
     bool query::fetch_row() {
         return r2->fetch_row();
+    }
+
+    query::~query() {
+        try {
+            r2.reset(nullptr);
+
+            // FIXME
+            rpc r(conn, u"sp_unprepare", static_cast<value>(handle));
+
+            while (r.fetch_row()) { }
+
+            fmt::print("DEAD\n");
+        } catch (...) {
+            // can't throw inside destructor
+        }
     }
 
     u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale) {
