@@ -274,6 +274,15 @@ struct tds_VARBINARY_MAX_param {
 
 static_assert(sizeof(tds_VARBINARY_MAX_param) == 17, "tds_VARBINARY_MAX_param has wrong size");
 
+struct tds_XML_param {
+    tds_param_header h;
+    uint8_t flags;
+    uint64_t length;
+    uint32_t chunk_length;
+};
+
+static_assert(sizeof(tds_XML_param) == 16, "tds_XML_param has wrong size");
+
 struct tds_return_value {
     uint16_t param_ordinal;
     uint8_t param_name_len;

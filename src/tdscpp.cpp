@@ -3559,6 +3559,13 @@ namespace tds {
 
                     break;
 
+                case sql_type::XML:
+                    if (p.is_null)
+                        bufsize += offsetof(tds_XML_param, chunk_length);
+                    else
+                        bufsize += sizeof(tds_XML_param) + p.val.length() + sizeof(uint32_t);
+                break;
+
                 case sql_type::NUMERIC:
                 case sql_type::DECIMAL:
                     bufsize += sizeof(tds_param_header) + 4;
@@ -3730,7 +3737,7 @@ namespace tds {
                     if (!p.is_null && p.val.length() > 8000) { // MAX
                         auto h3 = (tds_VARCHAR_MAX_param*)h2;
 
-                        h3->length = h3->chunk_length = (uint16_t)p.val.length();
+                        h3->length = h3->chunk_length = (uint32_t)p.val.length();
 
                         ptr += sizeof(tds_VARCHAR_MAX_param) - sizeof(tds_param_header);
 
@@ -3766,7 +3773,7 @@ namespace tds {
                     if (!p.is_null && p.val.length() > 8000) { // MAX
                         auto h3 = (tds_VARBINARY_MAX_param*)h2;
 
-                        h3->length = h3->chunk_length = (uint16_t)p.val.length();
+                        h3->length = h3->chunk_length = (uint32_t)p.val.length();
 
                         ptr += sizeof(tds_VARBINARY_MAX_param) - sizeof(tds_param_header);
 
@@ -3784,6 +3791,28 @@ namespace tds {
                             memcpy(ptr, p.val.data(), h2->length);
                             ptr += h2->length;
                         }
+                    }
+
+                    break;
+                }
+
+                case sql_type::XML: {
+                    auto h2 = (tds_XML_param*)h;
+
+                    h2->flags = 0;
+
+                    if (p.is_null)
+                        h2->length = 0xffffffffffffffff;
+                    else {
+                        h2->length = h2->chunk_length = (uint32_t)p.val.length();
+
+                        ptr += sizeof(tds_XML_param) - sizeof(tds_param_header);
+
+                        memcpy(ptr, p.val.data(), p.val.length());
+                        ptr += p.val.length();
+
+                        *(uint32_t*)ptr = 0; // last chunk
+                        ptr += sizeof(uint32_t);
                     }
 
                     break;
