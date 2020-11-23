@@ -1841,7 +1841,7 @@ namespace tds {
     }
 
     value::operator const u16string() const {
-        if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT)
+        if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT || type == sql_type::XML)
             return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
         else
             return utf8_to_utf16(operator const string()); // FIXME - VARCHARs might not be valid UTF-8
