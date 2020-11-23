@@ -3381,7 +3381,8 @@ namespace tds {
             case sql_type::CHAR:
             case sql_type::NCHAR:
             case sql_type::BINARY:
-                if (max_length == 0xffff) {
+            case sql_type::XML:
+                if (max_length == 0xffff || type == sql_type::XML) {
                     if (sv.length() < sizeof(uint64_t))
                         return false;
 
