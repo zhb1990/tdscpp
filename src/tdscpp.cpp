@@ -3520,12 +3520,12 @@ namespace tds {
                     bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
                     break;
 
-                case sql_type::UNIQUEIDENTIFIER:
                 case sql_type::DATETIMN:
                 case sql_type::DATE:
                     bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
                     break;
 
+                case sql_type::UNIQUEIDENTIFIER:
                 case sql_type::MONEYN:
                     bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
                     break;
@@ -3669,7 +3669,6 @@ namespace tds {
 
                     break;
 
-                case sql_type::UNIQUEIDENTIFIER:
                 case sql_type::DATETIMN:
                 case sql_type::DATE:
                     if (p.is_null) {
@@ -3684,6 +3683,7 @@ namespace tds {
 
                     break;
 
+                case sql_type::UNIQUEIDENTIFIER:
                 case sql_type::MONEYN:
                     *ptr = (uint8_t)p.max_length;
                     ptr++;
