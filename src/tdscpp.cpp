@@ -1553,6 +1553,7 @@ namespace tds {
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
             case sql_type::NTEXT:
+            case sql_type::XML:
             {
                 u16string_view sv((char16_t*)d.data(), d.length() / sizeof(char16_t));
                 auto s = utf16_to_utf8(sv);
