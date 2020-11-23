@@ -4899,6 +4899,9 @@ namespace tds {
             case sql_type::UNIQUEIDENTIFIER:
                 return u"UNIQUEIDENTIFIER";
 
+            case sql_type::XML:
+                return u"XML";
+
             default:
                 throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
         }
