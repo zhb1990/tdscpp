@@ -3984,6 +3984,13 @@ namespace tds {
                                     sv2 = sv2.substr(sizeof(uint16_t));
                                 break;
 
+                                case sql_type::XML:
+                                    if (sv2.length() < sizeof(uint8_t))
+                                        return;
+
+                                    sv2 = sv2.substr(sizeof(uint8_t));
+                                break;
+
                                 case sql_type::DECIMAL:
                                 case sql_type::NUMERIC:
                                     if (sv2.length() < 1)
