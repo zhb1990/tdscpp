@@ -4878,6 +4878,9 @@ namespace tds {
             case sql_type::SMALLMONEY:
                 return u"SMALLMONEY";
 
+            case sql_type::UNIQUEIDENTIFIER:
+                return u"UNIQUEIDENTIFIER";
+
             default:
                 throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
         }
