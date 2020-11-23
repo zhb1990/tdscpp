@@ -4769,6 +4769,9 @@ namespace tds {
             cols = r1.cols;
         }
 
+        if (handle.is_null)
+            throw runtime_error("sp_prepare failed.");
+
         r2.reset(new rpc(conn, u"sp_execute", static_cast<value>(handle), params));
 
         // FIXME - sp_unprepare (is this necessary?)
