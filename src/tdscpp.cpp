@@ -2120,6 +2120,8 @@ namespace tds {
 
         if (last_packet)
             *last_packet = h.status & 1;
+
+        spid = htons(h.spid);
     }
 
     void tds_impl::handle_loginack_msg(string_view sv) {
@@ -8262,5 +8264,9 @@ namespace tds {
 
     const column& rpc::operator[](uint16_t i) const {
         return cols[i];
+    }
+
+    uint16_t tds::spid() const {
+        return impl->spid;
     }
 };

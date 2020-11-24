@@ -457,6 +457,7 @@ namespace tds {
         func_count_handler count_handler;
         uint64_t trans_id = 0;
         uint32_t packet_size = 4096;
+        uint16_t spid = 0;
     };
 
     class batch_impl {
