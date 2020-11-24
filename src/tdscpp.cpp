@@ -5927,8 +5927,6 @@ namespace tds {
             rpc r(conn, u"sp_unprepare", static_cast<value>(handle));
 
             while (r.fetch_row()) { }
-
-            fmt::print("DEAD\n");
         } catch (...) {
             // can't throw inside destructor
         }
