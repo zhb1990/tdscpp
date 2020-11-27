@@ -2164,46 +2164,63 @@ namespace tds {
             throw formatted_error(FMT_STRING("Server not using TDS 7.4. Version was {:x}, expected {:x}."), tds_version, tds_74_version);
     }
 
-    void tds_impl::handle_info_msg(const string_view& sv, bool error) {
-        uint16_t msg_len;
-        uint8_t server_name_len, proc_name_len, state, severity;
-        u16string_view msg, server_name, proc_name;
-        int32_t msgno, line_number;
+    void tds_impl::handle_info_msg(string_view sv, bool error) {
+        if (sv.length() < sizeof(tds_info_msg))
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least 6)."), sv.length());
 
-        if (sv.length() < 14)
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least 14)."), sv.length());
+        auto tim = (tds_info_msg*)sv.data();
 
-        msg_len = *(uint16_t*)&sv[6];
+        sv = sv.substr(sizeof(tds_info_msg));
 
-        if (sv.length() < 14 + (msg_len * sizeof(char16_t))) {
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least {})."),
-                                    sv.length(), 14 + (msg_len * sizeof(char16_t)));
+        if (sv.length() < sizeof(uint16_t))
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 2)."), sv.length());
+
+        auto msg_len = *(uint16_t*)sv.data();
+        sv = sv.substr(sizeof(uint16_t));
+
+        if (sv.length() < msg_len * sizeof(char16_t)) {
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least {})."),
+                                  sv.length(), msg_len * sizeof(char16_t));
         }
 
-        server_name_len = (uint8_t)sv[8 + (msg_len * sizeof(char16_t))];
+        auto msg = u16string_view((char16_t*)sv.data(), msg_len);
+        sv = sv.substr(msg_len * sizeof(char16_t));
 
-        if (sv.length() < 14 + ((msg_len + server_name_len) * sizeof(char16_t))) {
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least {})."),
-                                    sv.length(), 14 + ((msg_len + server_name_len) * sizeof(char16_t)));
+        if (sv.length() < sizeof(uint8_t))
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 1)."), sv.length());
+
+        auto server_name_len = (uint8_t)sv[0];
+        sv = sv.substr(sizeof(uint8_t));
+
+        if (sv.length() < server_name_len * sizeof(char16_t)) {
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least {})."),
+                                  sv.length(), server_name_len * sizeof(char16_t));
         }
 
-        proc_name_len = (uint8_t)sv[8 + ((msg_len + server_name_len) * sizeof(char16_t))];
+        auto server_name = u16string_view((char16_t*)sv.data(), server_name_len);
+        sv = sv.substr(server_name_len * sizeof(char16_t));
 
-        if (sv.length() < 14 + ((msg_len + server_name_len + proc_name_len) * sizeof(char16_t))) {
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least {})."),
-                                    sv.length(), 14 + ((msg_len + server_name_len + proc_name_len) * sizeof(char16_t)));
+        if (sv.length() < sizeof(uint8_t))
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 1)."), sv.length());
+
+        auto proc_name_len = (uint8_t)sv[0];
+        sv = sv.substr(sizeof(uint8_t));
+
+        if (sv.length() < proc_name_len * sizeof(char16_t)) {
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least {})."),
+                                  sv.length(), proc_name_len * sizeof(char16_t));
         }
 
-        msgno = *(int32_t*)&sv[0];
-        state = (uint8_t)sv[4];
-        severity = (uint8_t)sv[5];
-        msg = u16string_view((char16_t*)&sv[8], msg_len);
-        server_name = u16string_view((char16_t*)&sv[9 + (msg_len * sizeof(char16_t))], server_name_len);
-        proc_name = u16string_view((char16_t*)&sv[10 + ((msg_len + server_name_len) * sizeof(char16_t))], proc_name_len);
-        line_number = *(int32_t*)&sv[10 + ((msg_len + server_name_len + proc_name_len) * sizeof(char16_t))];
+        auto proc_name = u16string_view((char16_t*)sv.data(), proc_name_len);
+        sv = sv.substr(proc_name_len * sizeof(char16_t));
 
-        message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), msgno, line_number, state,
-                        severity, error);
+        if (sv.length() < sizeof(int32_t))
+            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 4)."), sv.length());
+
+        auto line_number = *(int32_t*)sv.data();
+
+        message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), tim->msgno, line_number,
+                        tim->state, tim->severity, error);
     }
 
     date::date(int32_t num) : num(num) {

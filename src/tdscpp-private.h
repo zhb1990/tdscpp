@@ -409,6 +409,14 @@ struct tds_envchange_packet_size {
 
 static_assert(sizeof(tds_envchange_packet_size) == 5, "tds_envchange_packet_size has wrong size");
 
+struct tds_info_msg {
+    int32_t msgno;
+    uint8_t state;
+    uint8_t severity;
+};
+
+static_assert(sizeof(tds_info_msg) == 6, "tds_info_msg has wrong size");
+
 #pragma pack(pop)
 
 namespace tds {
@@ -420,7 +428,7 @@ namespace tds {
         ~tds_impl();
         void send_msg(enum tds_msg type, const std::string_view& msg);
         void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);
-        void handle_info_msg(const std::string_view& sv, bool error);
+        void handle_info_msg(std::string_view sv, bool error);
         void handle_envchange_msg(const std::string_view& sv);
 
         template<typename... Args>
