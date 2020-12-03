@@ -122,8 +122,8 @@ struct tds_login_msg {
     uint16_t app_name_length;
     uint16_t server_name_offset;
     uint16_t server_name_length;
-    uint16_t unused_offset;
-    uint16_t unused_length;
+    uint16_t extension_offset;
+    uint16_t extension_length;
     uint16_t interface_library_offset;
     uint16_t interface_library_length;
     uint16_t locale_offset;

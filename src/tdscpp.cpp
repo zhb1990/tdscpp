@@ -1843,7 +1843,9 @@ namespace tds {
         uint32_t length;
         uint16_t off;
 
-        // FIXME - send features list (UTF-8 support etc.)
+        static const vector<string> features = {
+            "\x0a\x01\x00\x00\x00\x01"s // UTF-8 support
+        };
 
         length = sizeof(tds_login_msg);
         length += (uint32_t)(client_name.length() * sizeof(char16_t));
@@ -1855,6 +1857,12 @@ namespace tds {
         length += (uint32_t)(locale.length() * sizeof(char16_t));
         length += (uint32_t)(database.length() * sizeof(char16_t));
         length += (uint32_t)sspi.length();
+
+        length += sizeof(uint32_t);
+        for (const auto& f : features) {
+            length += (uint32_t)f.length();
+        }
+        length += sizeof(uint8_t);
 
         string payload;
 
@@ -1871,7 +1879,7 @@ namespace tds {
         msg->option_flags1 = option_flags1;
         msg->option_flags2 = option_flags2 | (uint8_t)(!sspi.empty() ? 0x80 : 0);
         msg->sql_type_flags = sql_type_flags;
-        msg->option_flags3 = option_flags3;
+        msg->option_flags3 = option_flags3 | 0x10;
         msg->timezone = 0;
         msg->collation = collation;
 
@@ -1944,9 +1952,6 @@ namespace tds {
             off += (uint16_t)(server_name.length() * sizeof(char16_t));
         } else
             msg->server_name_length = 0;
-
-        msg->unused_offset = 0;
-        msg->unused_length = 0;
 
         msg->interface_library_offset = off;
 
@@ -2022,7 +2027,22 @@ namespace tds {
             }
 
             memcpy((uint8_t*)msg + msg->sspi_offset, sspi.data(), sspi.length());
+
+            off += (uint16_t)sspi.length();
         }
+
+        msg->extension_offset = off;
+        msg->extension_length = sizeof(uint32_t);
+
+        *(uint32_t*)((uint8_t*)msg + msg->extension_offset) = off + sizeof(uint32_t);
+        off += sizeof(uint32_t);
+
+        for (const auto& f : features) {
+            memcpy((uint8_t*)msg + off, f.data(), f.length());
+            off += (uint16_t)f.length();
+        }
+
+        *((uint8_t*)msg + off) = 0xff;
 
         send_msg(tds_msg::tds7_login, payload);
     }
