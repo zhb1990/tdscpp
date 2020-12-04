@@ -2110,6 +2110,40 @@ namespace tds {
                     break;
                 }
 
+                case tds_token::FEATUREEXTACK:
+                {
+                    auto sv2 = sv.substr(1);
+
+                    while (true) {
+                        if (sv2.length() < 1)
+                            return;
+
+                        if ((uint8_t)sv2[0] == 0xff) {
+                            sv2 = sv2.substr(1);
+                            break;
+                        }
+
+                        if (sv2.length() < 1 + sizeof(uint32_t))
+                            return;
+
+                        auto len = *(uint32_t*)&sv2[1];
+
+                        sv2 = sv2.substr(1 + sizeof(uint32_t));
+
+                        if (sv2.length() < len)
+                            return;
+
+                        sv2 = sv2.substr(len);
+                    }
+
+                    auto token_len = sv2.data() - sv.data();
+
+                    tokens.emplace_back(sv.substr(0, token_len));
+                    sv = sv.substr(token_len);
+
+                    break;
+                }
+
                 default:
                     throw formatted_error(FMT_STRING("Unhandled token type {} while parsing tokens."), type);
             }
