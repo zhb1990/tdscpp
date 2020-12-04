@@ -2383,14 +2383,14 @@ namespace tds {
                         case tds_token::FEATUREEXTACK:
                         {
                             while (true) {
-                                auto feature = (uint8_t)sv[0];
+                                auto feature = (enum tds_feature)sv[0];
 
-                                if (feature == 0xff)
+                                if (feature == tds_feature::TERMINATOR)
                                     break;
 
                                 auto len = *(uint32_t*)&sv[1];
 
-                                if (feature == 0xa && len == 1) // UTF-8
+                                if (feature == tds_feature::UTF8_SUPPORT && len >= 1)
                                     has_utf8 = (uint8_t)sv[1 + sizeof(uint32_t)];
 
                                 sv = sv.substr(1 + sizeof(uint32_t) + len);
@@ -2667,7 +2667,7 @@ namespace tds {
             off += (uint16_t)f.length();
         }
 
-        *((uint8_t*)msg + off) = 0xff;
+        *(enum tds_feature*)((uint8_t*)msg + off) = tds_feature::TERMINATOR;
 
         send_msg(tds_msg::tds7_login, payload);
     }

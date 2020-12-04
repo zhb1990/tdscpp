@@ -417,6 +417,18 @@ struct tds_info_msg {
 
 static_assert(sizeof(tds_info_msg) == 6, "tds_info_msg has wrong size");
 
+enum class tds_feature : uint8_t {
+    SESSIONRECOVERY = 0x1,
+    FEDAUTH = 0x2,
+    COLUMNENCRYPTION = 0x4,
+    GLOBALTRANSACTIONS = 0x5,
+    AZURESQLSUPPORT = 0x8,
+    DATACLASSIFICATION = 0x9,
+    UTF8_SUPPORT = 0xa,
+    AZURESQLDNSCACHING = 0xb,
+    TERMINATOR = 0xff
+};
+
 #pragma pack(pop)
 
 namespace tds {
