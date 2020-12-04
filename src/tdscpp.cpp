@@ -5773,15 +5773,21 @@ namespace tds {
                             case sql_type::VARCHAR:
                             case sql_type::NVARCHAR:
                             case sql_type::CHAR:
-                            case sql_type::NCHAR:
+                            case sql_type::NCHAR: {
                                 if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
                                     throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
+                                auto coll = (tds_collation*)(sv2.data() + sizeof(uint16_t));
+
+                                if ((c.type == sql_type::CHAR || c.type == sql_type::VARCHAR) && conn.impl->has_utf8)
+                                    col.utf8 = coll->utf8;
+
                                 len += sizeof(uint16_t) + sizeof(tds_collation);
                                 sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
                                 break;
+                            }
 
                             case sql_type::VARBINARY:
                             case sql_type::BINARY:
