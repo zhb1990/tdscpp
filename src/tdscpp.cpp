@@ -2380,8 +2380,25 @@ namespace tds {
                         }
 #endif
 
+                        case tds_token::FEATUREEXTACK:
+                        {
+                            while (true) {
+                                auto feature = (uint8_t)sv[0];
+
+                                if (feature == 0xff)
+                                    break;
+
+                                auto len = *(uint32_t*)&sv[1];
+
+                                if (feature == 0xa && len == 1) // UTF-8
+                                    has_utf8 = (uint8_t)sv[1 + sizeof(uint32_t)];
+
+                                sv = sv.substr(1 + sizeof(uint32_t) + len);
+                            }
+                        }
+
                         default:
-                            throw formatted_error(FMT_STRING("Unhandled token type {} while logging in."), type);
+                            break;
                     }
                 }
             } while (!last_packet);

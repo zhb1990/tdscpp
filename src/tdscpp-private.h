@@ -466,6 +466,7 @@ namespace tds {
         uint64_t trans_id = 0;
         uint32_t packet_size = 4096;
         uint16_t spid = 0;
+        bool has_utf8 = false;
     };
 
     class batch_impl {
