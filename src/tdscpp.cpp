@@ -3013,11 +3013,10 @@ namespace tds {
 
 #ifdef __cpp_char8_t
     value::value(const u8string_view& sv) {
-        auto s = utf8_to_utf16(string_view((char*)sv.data(), sv.length()));
-
-        type = sql_type::NVARCHAR;
-        val.resize(s.length() * sizeof(char16_t));
-        memcpy(val.data(), s.data(), val.length());
+        type = sql_type::VARCHAR;
+        utf8 = true;
+        val.resize(sv.length());
+        memcpy(val.data(), sv.data(), sv.length());
     }
 
     value::value(const u8string& sv) : value(u8string_view(sv)) {
@@ -3027,15 +3026,14 @@ namespace tds {
     }
 
     value::value(const optional<u8string_view>& sv) {
-        type = sql_type::NVARCHAR;
+        type = sql_type::VARCHAR;
+        utf8 = true;
 
         if (!sv.has_value())
             is_null = true;
         else {
-            auto s = utf8_to_utf16(string_view((char*)sv.value().data(), sv.value().length()));
-
-            val.resize(s.length() * sizeof(char16_t));
-            memcpy(val.data(), s.data(), s.length());
+            val.resize(sv.value().length());
+            memcpy(val.data(), sv.value().data(), sv.value().length());
         }
     }
 #endif
@@ -5123,11 +5121,29 @@ namespace tds {
                     break;
 
                 case sql_type::NVARCHAR:
-                case sql_type::VARCHAR:
-                    if (!p.is_null && p.val.length() > 8000) // MAX
+                    if (p.is_null)
+                        bufsize += sizeof(tds_VARCHAR_param);
+                    else if (p.val.length() > 8000) // MAX
                         bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
                     else
-                        bufsize += sizeof(tds_VARCHAR_param) + (p.is_null ? 0 : p.val.length());
+                        bufsize += sizeof(tds_VARCHAR_param) + p.val.length();
+
+                    break;
+
+                case sql_type::VARCHAR:
+                    if (p.is_null)
+                        bufsize += sizeof(tds_VARCHAR_param);
+                    else if (p.utf8 && !conn.impl->has_utf8) {
+                        auto s = utf8_to_utf16(p.val);
+
+                        if ((s.length() * sizeof(char16_t)) > 8000) // MAX
+                            bufsize += sizeof(tds_VARCHAR_MAX_param) + (s.length() * sizeof(char16_t)) + sizeof(uint32_t);
+                        else
+                            bufsize += sizeof(tds_VARCHAR_param) + (s.length() * sizeof(char16_t));
+                    } else if (p.val.length() > 8000) // MAX
+                        bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
+                    else
+                        bufsize += sizeof(tds_VARCHAR_param) + p.val.length();
 
                     break;
 
@@ -5291,7 +5307,6 @@ namespace tds {
                     break;
 
                 case sql_type::NVARCHAR:
-                case sql_type::VARCHAR:
                 {
                     auto h2 = (tds_VARCHAR_param*)h;
 
@@ -5333,6 +5348,63 @@ namespace tds {
 
                         if (!p.is_null) {
                             memcpy(ptr, p.val.data(), h2->length);
+                            ptr += h2->length;
+                        }
+                    }
+
+                    break;
+                }
+
+                case sql_type::VARCHAR:
+                {
+                    auto h2 = (tds_VARCHAR_param*)h;
+                    string_view sv = p.val;
+                    u16string tmp;
+
+                    if (!p.is_null && !p.val.empty() && p.utf8 && !conn.impl->has_utf8) {
+                        h->type = sql_type::NVARCHAR;
+                        tmp = utf8_to_utf16(p.val);
+                        sv = string_view((char*)tmp.data(), tmp.length() * sizeof(char16_t));
+                    }
+
+                    if (p.is_null || p.val.empty())
+                        h2->max_length = sizeof(char16_t);
+                    else if (sv.length() > 8000) // MAX
+                        h2->max_length = 0xffff;
+                    else
+                        h2->max_length = (uint16_t)sv.length();
+
+                    h2->collation.lcid = 0x0409; // en-US
+                    h2->collation.ignore_case = 1;
+                    h2->collation.ignore_accent = 0;
+                    h2->collation.ignore_width = 1;
+                    h2->collation.ignore_kana = 1;
+                    h2->collation.binary = 0;
+                    h2->collation.binary2 = 0;
+                    h2->collation.utf8 = p.utf8 && conn.impl->has_utf8 ? 1 : 0;
+                    h2->collation.reserved = 0;
+                    h2->collation.version = 2;
+                    h2->collation.sort_id = 0;
+
+                    if (!p.is_null && sv.length() > 8000) { // MAX
+                        auto h3 = (tds_VARCHAR_MAX_param*)h2;
+
+                        h3->length = h3->chunk_length = (uint32_t)sv.length();
+
+                        ptr += sizeof(tds_VARCHAR_MAX_param) - sizeof(tds_param_header);
+
+                        memcpy(ptr, sv.data(), sv.length());
+                        ptr += sv.length();
+
+                        *(uint32_t*)ptr = 0; // last chunk
+                        ptr += sizeof(uint32_t);
+                    } else {
+                        h2->length = (uint16_t)(p.is_null ? 0xffff : sv.length());
+
+                        ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
+
+                        if (!p.is_null) {
+                            memcpy(ptr, sv.data(), h2->length);
                             ptr += h2->length;
                         }
                     }

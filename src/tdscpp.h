@@ -220,6 +220,7 @@ namespace tds {
         std::string val;
         bool is_null = false;
         bool is_output = false;
+        bool utf8 = false;
         unsigned int max_length = 0;
         uint8_t precision;
         uint8_t scale;
