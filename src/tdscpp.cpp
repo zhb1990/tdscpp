@@ -2285,7 +2285,7 @@ namespace tds {
             string buf;
             list<string> tokens;
             vector<column> buf_columns;
-            string_view sspibuf;
+            string sspibuf;
 
             do {
                 wait_for_msg(type, payload, &last_packet);
