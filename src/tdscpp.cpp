@@ -6322,14 +6322,19 @@ namespace tds {
         return s;
     }
 
-    static vector<col_info> get_col_info(tds& tds, const u16string_view& table, const vector<u16string>& np) {
+    static vector<col_info> get_col_info(tds& tds, const u16string_view& table, const vector<u16string>& np, const u16string_view& db) {
         map<u16string, col_info> info;
         vector<col_info> ret;
 
-        // FIXME - database name
-
         {
-            query sq(tds, "SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable FROM sys.columns WHERE object_id = OBJECT_ID(?)", table);
+            unique_ptr<query> sq2;
+
+            if (db.empty())
+                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable FROM sys.columns WHERE object_id = OBJECT_ID(?)", table));
+            else
+                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable FROM " + u16string(db) + u".sys.columns WHERE object_id = OBJECT_ID(?)", u16string(db) + u"." + u16string(table)));
+
+            auto& sq = *sq2;
 
             while (sq.fetch_row()) {
                 info.emplace(sq[0], col_info((sql_type)(unsigned int)sq[1], (unsigned int)sq[2], (uint8_t)(unsigned int)sq[3], (uint8_t)(unsigned int)sq[4], (string)sq[5], (unsigned int)sq[6] != 0));
@@ -6348,16 +6353,16 @@ namespace tds {
         return ret;
     }
 
-    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp) {
+    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp, const u16string_view& db) {
         if (np.empty())
             throw runtime_error("List of columns not supplied.");
 
         // FIXME - do we need to make sure no duplicates in np?
 
-        auto cols = get_col_info(*this, table, np);
+        auto cols = get_col_info(*this, table, np, db);
 
         {
-            u16string q = u"INSERT BULK " + u16string(table) + u"(";
+            u16string q = u"INSERT BULK " + (!db.empty() ? (u16string(db) + u".") : u"") + u16string(table) + u"(";
             bool first = true;
 
             for (unsigned int i = 0; i < cols.size(); i++) {
@@ -6393,14 +6398,14 @@ namespace tds {
         impl->bcp_sendmsg(string_view((char*)buf.data(), buf.size()));
     }
 
-    void tds::bcp(const string_view& table, const vector<string>& np, const vector<vector<value>>& vp) {
+    void tds::bcp(const string_view& table, const vector<string>& np, const vector<vector<value>>& vp, const string_view& db) {
         vector<u16string> np2;
 
         for (const auto& s : np) {
             np2.emplace_back(utf8_to_utf16(s));
         }
 
-        bcp(utf8_to_utf16(table), np2, vp);
+        bcp(utf8_to_utf16(table), np2, vp, utf8_to_utf16(db));
     }
 
     template<unsigned N>

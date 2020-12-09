@@ -446,7 +446,8 @@ namespace tds {
         template<typename... Args>
         void run(const std::string_view& s, Args&&... args);
 
-        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp);
+        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp,
+                 const std::u16string_view& db);
 
         void connect(const std::string& server, uint16_t port, bool get_fqdn);
         void send_prelogin_msg();
