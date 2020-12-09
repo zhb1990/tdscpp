@@ -6675,9 +6675,9 @@ namespace tds {
                     bufsize++;
 
                     if (!v[i].is_null) {
-                        if (cols[i].max_length <= 2)
+                        if (cols[i].scale <= 2)
                             bufsize += 3;
-                        else if (cols[i].max_length <= 4)
+                        else if (cols[i].scale <= 4)
                             bufsize += 4;
                         else
                             bufsize += 5;
@@ -6690,9 +6690,9 @@ namespace tds {
                     if (!v[i].is_null) {
                         bufsize += 3;
 
-                        if (cols[i].max_length <= 2)
+                        if (cols[i].scale <= 2)
                             bufsize += 3;
-                        else if (cols[i].max_length <= 4)
+                        else if (cols[i].scale <= 4)
                             bufsize += 4;
                         else
                             bufsize += 5;
@@ -6705,9 +6705,9 @@ namespace tds {
                     if (!v[i].is_null) {
                         bufsize += 5;
 
-                        if (cols[i].max_length <= 2)
+                        if (cols[i].scale <= 2)
                             bufsize += 3;
-                        else if (cols[i].max_length <= 4)
+                        else if (cols[i].scale <= 4)
                             bufsize += 4;
                         else
                             bufsize += 5;
@@ -7086,17 +7086,17 @@ namespace tds {
                         auto t = (time)v[i];
                         uint64_t secs = (t.hour * 3600) + (t.minute * 60) + t.second;
 
-                        for (unsigned int j = 0; j < cols[i].max_length; j++) {
+                        for (unsigned int j = 0; j < cols[i].scale; j++) {
                             secs *= 10;
                         }
 
-                        if (cols[i].max_length <= 2) {
+                        if (cols[i].scale <= 2) {
                             *(uint8_t*)ptr = 3;
                             ptr++;
 
                             memcpy(ptr, &secs, 3);
                             ptr += 3;
-                        } else if (cols[i].max_length <= 4) {
+                        } else if (cols[i].scale <= 4) {
                             *(uint8_t*)ptr = 4;
                             ptr++;
 
@@ -7121,17 +7121,17 @@ namespace tds {
                         uint32_t n = dt.d.num + 693595;
                         uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
-                        for (unsigned int j = 0; j < cols[i].max_length; j++) {
+                        for (unsigned int j = 0; j < cols[i].scale; j++) {
                             secs *= 10;
                         }
 
-                        if (cols[i].max_length <= 2) {
+                        if (cols[i].scale <= 2) {
                             *(uint8_t*)ptr = 6;
                             ptr++;
 
                             memcpy(ptr, &secs, 3);
                             ptr += 3;
-                        } else if (cols[i].max_length <= 4) {
+                        } else if (cols[i].scale <= 4) {
                             *(uint8_t*)ptr = 7;
                             ptr++;
 
@@ -7159,17 +7159,17 @@ namespace tds {
                         uint32_t n = dto.d.num + 693595;
                         uint64_t secs = (dto.t.hour * 3600) + (dto.t.minute * 60) + dto.t.second;
 
-                        for (unsigned int j = 0; j < cols[i].max_length; j++) {
+                        for (unsigned int j = 0; j < cols[i].scale; j++) {
                             secs *= 10;
                         }
 
-                        if (cols[i].max_length <= 2) {
+                        if (cols[i].scale <= 2) {
                             *(uint8_t*)ptr = 8;
                             ptr++;
 
                             memcpy(ptr, &secs, 3);
                             ptr += 3;
-                        } else if (cols[i].max_length <= 4) {
+                        } else if (cols[i].scale <= 4) {
                             *(uint8_t*)ptr = 9;
                             ptr++;
 
@@ -7213,14 +7213,14 @@ namespace tds {
                     } else {
                         auto dt = (datetime)v[i];
 
-                        switch (cols[i].max_length) {
+                        switch (cols[i].scale) {
                             case 4: {
                                 if (dt.d.num < 0)
                                     throw formatted_error(FMT_STRING("Datetime \"{}\" too early for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
                                 else if (dt.d.num > numeric_limits<uint16_t>::max())
                                     throw formatted_error(FMT_STRING("Datetime \"{}\" too late for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
 
-                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                                *(uint8_t*)ptr = (uint8_t)cols[i].scale;
                                 ptr++;
 
                                 *(uint16_t*)ptr = (uint16_t)dt.d.num;
@@ -7235,7 +7235,7 @@ namespace tds {
                             case 8: {
                                 uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
-                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                                *(uint8_t*)ptr = (uint8_t)cols[i].scale;
                                 ptr++;
 
                                 *(int32_t*)ptr = dt.d.num;
@@ -7248,7 +7248,7 @@ namespace tds {
                             }
 
                             default:
-                                throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].max_length);
+                                throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].scale);
                         }
                     }
                 break;
@@ -7691,13 +7691,17 @@ namespace tds {
 
                 case sql_type::INTN:
                 case sql_type::FLTN:
+                case sql_type::BITN:
+                case sql_type::MONEYN:
+                    *(uint8_t*)ptr = (uint8_t)col.max_length;
+                    ptr++;
+                break;
+
                 case sql_type::TIME:
                 case sql_type::DATETIME2:
                 case sql_type::DATETIMN:
                 case sql_type::DATETIMEOFFSET:
-                case sql_type::BITN:
-                case sql_type::MONEYN:
-                    *(uint8_t*)ptr = (uint8_t)col.max_length;
+                    *(uint8_t*)ptr = col.scale;
                     ptr++;
                 break;
 
