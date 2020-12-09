@@ -223,26 +223,10 @@ struct tds_INT_param {
 
 static_assert(sizeof(tds_INT_param) == 5, "tds_INT_param has wrong size");
 
-struct tds_collation {
-    uint32_t lcid : 20;
-    uint32_t ignore_case : 1;
-    uint32_t ignore_accent : 1;
-    uint32_t ignore_width : 1;
-    uint32_t ignore_kana : 1;
-    uint32_t binary : 1;
-    uint32_t binary2 : 1;
-    uint32_t utf8 : 1;
-    uint32_t reserved : 1;
-    uint32_t version : 4;
-    uint8_t sort_id;
-};
-
-static_assert(sizeof(tds_collation) == 5, "tds_collation has wrong size");
-
 struct tds_VARCHAR_param {
     tds_param_header h;
     uint16_t max_length;
-    tds_collation collation;
+    tds::collation collation;
     uint16_t length;
 };
 
@@ -251,7 +235,7 @@ static_assert(sizeof(tds_VARCHAR_param) == 12, "tds_VARCHAR_param has wrong size
 struct tds_VARCHAR_MAX_param {
     tds_param_header h;
     uint16_t max_length;
-    tds_collation collation;
+    tds::collation collation;
     uint64_t length;
     uint32_t chunk_length;
 };

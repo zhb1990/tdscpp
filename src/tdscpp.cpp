@@ -1897,12 +1897,12 @@ namespace tds {
                             case sql_type::NVARCHAR:
                             case sql_type::CHAR:
                             case sql_type::NCHAR:
-                                if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
+                                if (sv2.length() < sizeof(uint16_t) + sizeof(collation))
                                     return;
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
-                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(collation));
                             break;
 
                             case sql_type::VARBINARY:
@@ -1958,10 +1958,10 @@ namespace tds {
                                 sv2 = sv2.substr(sizeof(uint32_t));
 
                                 if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
-                                    if (sv2.length() < sizeof(tds_collation))
+                                    if (sv2.length() < sizeof(collation))
                                         return;
 
-                                    sv2 = sv2.substr(sizeof(tds_collation));
+                                    sv2 = sv2.substr(sizeof(collation));
                                 }
 
                                 if (sv2.length() < 1)
@@ -5179,7 +5179,7 @@ namespace tds {
 
                 case sql_type::TEXT:
                 case sql_type::NTEXT:
-                    bufsize += sizeof(tds_param_header) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(tds_collation);
+                    bufsize += sizeof(tds_param_header) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(collation);
 
                     if (!p.is_null)
                         bufsize += p.val.length();
@@ -5510,7 +5510,7 @@ namespace tds {
                     *(uint32_t*)ptr = 0x7fffffff;
                     ptr += sizeof(uint32_t);
 
-                    auto col = (tds_collation*)ptr;
+                    auto col = (collation*)ptr;
 
                     col->lcid = 0x0409; // en-US
                     col->ignore_case = 1;
@@ -5524,7 +5524,7 @@ namespace tds {
                     col->version = 0;
                     col->sort_id = 52; // nocase.iso
 
-                    ptr += sizeof(tds_collation);
+                    ptr += sizeof(collation);
 
                     if (p.is_null) {
                         *(uint32_t*)ptr = 0xffffffff;
@@ -5774,18 +5774,18 @@ namespace tds {
                             case sql_type::NVARCHAR:
                             case sql_type::CHAR:
                             case sql_type::NCHAR: {
-                                if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
+                                if (sv2.length() < sizeof(uint16_t) + sizeof(collation))
+                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(collation));
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
-                                auto coll = (tds_collation*)(sv2.data() + sizeof(uint16_t));
+                                col.coll = *(collation*)(sv2.data() + sizeof(uint16_t));
 
                                 if ((c.type == sql_type::CHAR || c.type == sql_type::VARCHAR) && conn.impl->has_utf8)
-                                    col.utf8 = coll->utf8;
+                                    col.utf8 = col.coll.utf8;
 
-                                len += sizeof(uint16_t) + sizeof(tds_collation);
-                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                                len += sizeof(uint16_t) + sizeof(collation);
+                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(collation));
                                 break;
                             }
 
@@ -5843,10 +5843,10 @@ namespace tds {
                                 sv2 = sv2.substr(sizeof(uint32_t));
 
                                 if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
-                                    if (sv2.length() < sizeof(tds_collation))
+                                    if (sv2.length() < sizeof(collation))
                                         return;
 
-                                    sv2 = sv2.substr(sizeof(tds_collation));
+                                    sv2 = sv2.substr(sizeof(collation));
                                 }
 
                                 if (sv2.length() < 1)
@@ -7462,7 +7462,7 @@ namespace tds {
                 case sql_type::NVARCHAR:
                 case sql_type::CHAR:
                 case sql_type::NCHAR:
-                    bufsize += sizeof(uint16_t) + sizeof(tds_collation);
+                    bufsize += sizeof(uint16_t) + sizeof(collation);
                     break;
 
                 case sql_type::VARBINARY:
@@ -7538,7 +7538,7 @@ namespace tds {
                     *(uint16_t*)ptr = (uint16_t)col.max_length;
                     ptr += sizeof(uint16_t);
 
-                    auto c = (tds_collation*)ptr;
+                    auto c = (collation*)ptr;
 
                     c->lcid = 0x0409; // en-US
                     c->ignore_case = 1;
@@ -7552,7 +7552,7 @@ namespace tds {
                     c->version = 0;
                     c->sort_id = 52; // nocase.iso
 
-                    ptr += sizeof(tds_collation);
+                    ptr += sizeof(collation);
 
                     break;
                 }
@@ -7837,18 +7837,18 @@ namespace tds {
                             case sql_type::NVARCHAR:
                             case sql_type::CHAR:
                             case sql_type::NCHAR: {
-                                if (sv2.length() < sizeof(uint16_t) + sizeof(tds_collation))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(tds_collation));
+                                if (sv2.length() < sizeof(uint16_t) + sizeof(collation))
+                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(collation));
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
-                                auto coll = (tds_collation*)(sv2.data() + sizeof(uint16_t));
+                                col.coll = *(collation*)(sv2.data() + sizeof(uint16_t));
 
                                 if ((c.type == sql_type::CHAR || c.type == sql_type::VARCHAR) && conn.impl->has_utf8)
-                                    col.utf8 = coll->utf8;
+                                    col.utf8 = col.coll.utf8;
 
-                                len += sizeof(uint16_t) + sizeof(tds_collation);
-                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds_collation));
+                                len += sizeof(uint16_t) + sizeof(collation);
+                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(collation));
                                 break;
                             }
 
@@ -7906,10 +7906,10 @@ namespace tds {
                                 sv2 = sv2.substr(sizeof(uint32_t));
 
                                 if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
-                                    if (sv2.length() < sizeof(tds_collation))
+                                    if (sv2.length() < sizeof(collation))
                                         throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 5)."), sv2.length());
 
-                                    sv2 = sv2.substr(sizeof(tds_collation));
+                                    sv2 = sv2.substr(sizeof(collation));
                                 }
 
                                 if (sv2.length() < 1)

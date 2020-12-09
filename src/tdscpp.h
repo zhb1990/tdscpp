@@ -226,10 +226,31 @@ namespace tds {
         uint8_t scale;
     };
 
+#pragma pack(push,1)
+
+    struct collation {
+        uint32_t lcid : 20;
+        uint32_t ignore_case : 1;
+        uint32_t ignore_accent : 1;
+        uint32_t ignore_width : 1;
+        uint32_t ignore_kana : 1;
+        uint32_t binary : 1;
+        uint32_t binary2 : 1;
+        uint32_t utf8 : 1;
+        uint32_t reserved : 1;
+        uint32_t version : 4;
+        uint8_t sort_id;
+    };
+
+    static_assert(sizeof(collation) == 5, "tds::collation has wrong size");
+
+#pragma pack(pop)
+
     class TDSCPP column : public value {
     public:
         std::u16string name;
         bool nullable;
+        collation coll;
 
         operator const std::string() const {
             return (std::string)static_cast<value>(*this);
