@@ -6134,7 +6134,7 @@ namespace tds {
         }
     }
 
-    u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale) {
+    static u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, const u16string_view& collation) {
         switch (type) {
             case sql_type::TINYINT:
                 return u"TINYINT";
@@ -6176,10 +6176,17 @@ namespace tds {
                 return u"NCHAR(" + to_u16string(length == 0 ? 1 : (length / sizeof(char16_t))) + u")";
 
             case sql_type::VARCHAR:
-                if (length > 8000)
-                    return u"VARCHAR(MAX)";
-                else
-                    return u"VARCHAR(" + to_u16string(length == 0 ? 1 : length) + u")";
+                if (collation.empty()) {
+                    if (length > 8000)
+                        return u"VARCHAR(MAX)";
+                    else
+                        return u"VARCHAR(" + to_u16string(length == 0 ? 1 : length) + u")";
+                } else {
+                    if (length > 8000)
+                        return u"VARCHAR(MAX) COLLATE " + u16string(collation);
+                    else
+                        return u"VARCHAR(" + to_u16string(length == 0 ? 1 : length) + u") COLLATE " + u16string(collation);
+                }
 
             case sql_type::CHAR:
                 return u"CHAR(" + to_u16string(length == 0 ? 1 : length) + u")";
@@ -6295,7 +6302,7 @@ namespace tds {
                 s += u", ";
 
             s += u"@P" + to_u16string(num) + u" ";
-            s += type_to_string(p.type, p.val.length(), p.precision, p.scale);
+            s += type_to_string(p.type, p.val.length(), p.precision, p.scale, u"");
 
             num++;
         }
@@ -6337,7 +6344,7 @@ namespace tds {
             auto& sq = *sq2;
 
             while (sq.fetch_row()) {
-                info.emplace(sq[0], col_info((sql_type)(unsigned int)sq[1], (unsigned int)sq[2], (uint8_t)(unsigned int)sq[3], (uint8_t)(unsigned int)sq[4], (string)sq[5], (unsigned int)sq[6] != 0));
+                info.emplace(sq[0], col_info((sql_type)(unsigned int)sq[1], (unsigned int)sq[2], (uint8_t)(unsigned int)sq[3], (uint8_t)(unsigned int)sq[4], (u16string)sq[5], (unsigned int)sq[6] != 0));
             }
         }
 
@@ -6370,7 +6377,7 @@ namespace tds {
                     q += u", ";
 
                 q += sql_escape(np[i]) + u" ";
-                q += type_to_string(cols[i].type, cols[i].max_length, cols[i].precision, cols[i].scale);
+                q += type_to_string(cols[i].type, cols[i].max_length, cols[i].precision, cols[i].scale, cols[i].collation);
 
                 first = false;
             }
