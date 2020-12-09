@@ -418,14 +418,14 @@ enum class tds_feature : uint8_t {
 namespace tds {
     class col_info {
     public:
-        col_info(sql_type type, unsigned int max_length, uint8_t precision, uint8_t scale,
+        col_info(sql_type type, int16_t max_length, uint8_t precision, uint8_t scale,
                  const std::u16string_view& collation, bool nullable, unsigned int codepage) :
                  type(type), max_length(max_length), precision(precision), scale(scale),
                  collation(collation), nullable(nullable), codepage(codepage) {
         }
 
         sql_type type;
-        unsigned int max_length;
+        int16_t max_length;
         uint8_t precision;
         uint8_t scale;
         std::u16string collation;

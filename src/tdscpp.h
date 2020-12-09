@@ -214,6 +214,10 @@ namespace tds {
             return static_cast<uint64_t>(static_cast<int64_t>(*this));
         }
 
+        operator int16_t() const {
+            return static_cast<int16_t>(static_cast<int64_t>(*this));
+        }
+
         operator float() const {
             return static_cast<float>(static_cast<double>(*this));
         }
@@ -292,6 +296,10 @@ namespace tds {
 
         operator uint64_t() const {
             return (uint64_t)static_cast<value>(*this);
+        }
+
+        operator int16_t() const {
+            return (int16_t)static_cast<value>(*this);
         }
 
         operator float() const {
