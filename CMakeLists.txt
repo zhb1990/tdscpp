@@ -20,6 +20,10 @@ if(ENABLE_KRB5)
 set(HAVE_GSSAPI 1)
 endif()
 
+if(NOT WIN32)
+find_package(ICU COMPONENTS uc REQUIRED)
+endif()
+
 find_package(fmt REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -42,6 +46,10 @@ if(WIN32)
 endif()
 
 target_link_libraries(tdscpp fmt::fmt-header-only)
+
+if(NOT WIN32)
+target_link_libraries(tdscpp ICU::uc)
+endif()
 
 target_compile_options(tdscpp PRIVATE
      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:

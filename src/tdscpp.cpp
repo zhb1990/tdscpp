@@ -38,6 +38,7 @@
 
 #ifndef _WIN32
 #define CP_UTF8 65001
+#include <unicode/ucnv.h>
 #endif
 
 using namespace std;
@@ -6474,7 +6475,91 @@ namespace tds {
         if (len == 0)
             throw runtime_error("WideCharToMultiByte 2 failed.");
 #else
-        // FIXME - use iconv
+        UErrorCode status = U_ZERO_ERROR;
+        const char* cp;
+
+        switch (codepage) {
+            case 437:
+                cp = "ibm-437_P100-1995";
+                break;
+
+            case 850:
+                cp = "ibm-850_P100-1995";
+                break;
+
+            case 874:
+                cp = "windows-874-2000";
+                break;
+
+            case 932:
+                cp = "ibm-942_P12A-1999";
+                break;
+
+            case 936:
+                cp = "ibm-1386_P100-2001";
+                break;
+
+            case 949:
+                cp = "windows-949-2000";
+                break;
+
+            case 950:
+                cp = "windows-950-2000";
+                break;
+
+            case 1250:
+                cp = "ibm-1250_P100-1995";
+                break;
+
+            case 1251:
+                cp = "ibm-1251_P100-1995";
+                break;
+
+            case 1252:
+                cp = "ibm-5348_P100-1997";
+                break;
+
+            case 1253:
+                cp = "ibm-1253_P100-1995";
+                break;
+
+            case 1254:
+                cp = "ibm-1254_P100-1995";
+                break;
+
+            case 1255:
+                cp = "ibm-1255_P100-1995";
+                break;
+
+            case 1256:
+                cp = "ibm-1256_P110-1997";
+                break;
+
+            case 1257:
+                cp = "ibm-1257_P100-1995";
+                break;
+
+            case 1258:
+                cp = "ibm-1258_P100-1997";
+                break;
+
+            default:
+                throw formatted_error(FMT_STRING("Could not find ICU name for Windows code page {}."), codepage);
+        }
+
+        UConverter* conv = ucnv_open(cp, &status);
+
+        if (U_FAILURE(status))
+            throw formatted_error(FMT_STRING("ucnv_open failed for code page {} ({})"), cp, u_errorName(status));
+
+        ret.resize(UCNV_GET_MAX_BYTES_FOR_STRING(s.length(), ucnv_getMaxCharSize(conv)));
+
+        auto len = ucnv_fromUChars(conv, ret.data(), (int32_t)ret.length(), s.data(), (int32_t)s.length(), &status);
+
+        if (ret.length() > (uint32_t)len)
+            ret = ret.substr(0, len);
+
+        ucnv_close(conv);
 #endif
 
         return ret;
