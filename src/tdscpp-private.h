@@ -416,6 +416,22 @@ enum class tds_feature : uint8_t {
 #pragma pack(pop)
 
 namespace tds {
+    class col_info {
+    public:
+        col_info(sql_type type, unsigned int max_length, uint8_t precision, uint8_t scale,
+                 const std::string_view& collation, bool nullable) :
+                 type(type), max_length(max_length), precision(precision), scale(scale),
+                 collation(collation), nullable(nullable) {
+        }
+
+        sql_type type;
+        unsigned int max_length;
+        uint8_t precision;
+        uint8_t scale;
+        std::string collation;
+        bool nullable;
+    };
+
     class tds_impl {
     public:
         tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -444,8 +460,8 @@ namespace tds {
                             const std::u16string_view& locale, const std::u16string_view& database, const std::string& sspi,
                             const std::u16string_view& attach_db, const std::u16string_view& new_password);
         void handle_loginack_msg(std::string_view sv);
-        std::vector<uint8_t> bcp_colmetadata(const std::vector<column>& cols);
-        std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<column>& cols);
+        std::vector<uint8_t> bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
+        std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
         void bcp_sendmsg(const std::string_view& msg);
 #ifdef _WIN32
         void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, const std::string_view& sspi);

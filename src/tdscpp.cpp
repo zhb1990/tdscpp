@@ -6322,40 +6322,39 @@ namespace tds {
         return s;
     }
 
-    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp) {
-        vector<column> cols;
+    static vector<col_info> get_col_info(tds& tds, const u16string_view& table, const vector<u16string>& np) {
+        map<u16string, col_info> info;
+        vector<col_info> ret;
 
+        // FIXME - database name
+
+        {
+            query sq(tds, "SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable FROM sys.columns WHERE object_id = OBJECT_ID(?)", table);
+
+            while (sq.fetch_row()) {
+                info.emplace(sq[0], col_info((sql_type)(unsigned int)sq[1], (unsigned int)sq[2], (uint8_t)(unsigned int)sq[3], (uint8_t)(unsigned int)sq[4], (string)sq[5], (unsigned int)sq[6] != 0));
+            }
+        }
+
+        ret.reserve(np.size());
+
+        for (const auto& n : np) {
+            if (info.count(n) == 0)
+                throw formatted_error(FMT_STRING("Column {} not found in table {}."), utf16_to_utf8(n), utf16_to_utf8(table));
+
+            ret.emplace_back(info.at(n));
+        }
+
+        return ret;
+    }
+
+    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp) {
         if (np.empty())
             throw runtime_error("List of columns not supplied.");
 
         // FIXME - do we need to make sure no duplicates in np?
 
-        {
-            output_param<int32_t> handle;
-            bool first = true;
-
-            u16string q = u"SELECT TOP 0 ";
-
-            for (const auto& n : np) {
-                if (!first)
-                    q += u", ";
-
-                q += sql_escape(n);
-                first = false;
-            }
-
-            q += u" FROM "s + u16string(table); // FIXME - escape schema name and table name
-
-            {
-                rpc r1(*this, u"sp_prepare", handle, u"", q, 1);
-
-                while (r1.fetch_row()) { }
-
-                cols = r1.cols; // get column types
-            }
-
-            rpc r2(*this, u"sp_unprepare", static_cast<value>(handle));
-        }
+        auto cols = get_col_info(*this, table, np);
 
         {
             u16string q = u"INSERT BULK " + u16string(table) + u"(";
@@ -6379,10 +6378,10 @@ namespace tds {
         // FIXME - handle INT NULLs and VARCHAR NULLs
 
         // send COLMETADATA for rows
-        auto buf = impl->bcp_colmetadata(cols);
+        auto buf = impl->bcp_colmetadata(np, cols);
 
         for (const auto& v : vp) {
-            auto buf2 = impl->bcp_row(v, cols);
+            auto buf2 = impl->bcp_row(v, np, cols);
 
             // FIXME - if buf full, send packet (maximum packet size is 4096?)
 
@@ -6436,12 +6435,12 @@ namespace tds {
         }
     }
 
-    vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<column>& cols) {
+    vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<u16string>& np, const vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
         for (unsigned int i = 0; i < v.size(); i++) {
             if (v[i].is_null && !cols[i].nullable)
-                throw formatted_error(FMT_STRING("Cannot insert NULL into column {} marked NOT NULL."), utf16_to_utf8(cols[i].name));
+                throw formatted_error(FMT_STRING("Cannot insert NULL into column {} marked NOT NULL."), utf16_to_utf8(np[i]));
 
             switch (cols[i].type) {
                 case sql_type::INTN:
@@ -6686,7 +6685,7 @@ namespace tds {
                         switch (cols[i].max_length) {
                             case sizeof(uint8_t):
                                 if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
-                                    throw formatted_error(FMT_STRING("{} is out of bounds for TINYINT column {}."), n, utf16_to_utf8(cols[i].name));
+                                    throw formatted_error(FMT_STRING("{} is out of bounds for TINYINT column {}."), n, utf16_to_utf8(np[i]));
 
                                 *ptr = (uint8_t)n;
                                 ptr++;
@@ -6694,7 +6693,7 @@ namespace tds {
 
                             case sizeof(int16_t):
                                 if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
-                                    throw formatted_error(FMT_STRING("{} is out of bounds for SMALLINT column {}."), n, utf16_to_utf8(cols[i].name));
+                                    throw formatted_error(FMT_STRING("{} is out of bounds for SMALLINT column {}."), n, utf16_to_utf8(np[i]));
 
                                 *(int16_t*)ptr = (int16_t)n;
                                 ptr += sizeof(int16_t);
@@ -6702,7 +6701,7 @@ namespace tds {
 
                             case sizeof(int32_t):
                                 if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
-                                    throw formatted_error(FMT_STRING("{} is out of bounds for INT column {}."), n, utf16_to_utf8(cols[i].name));
+                                    throw formatted_error(FMT_STRING("{} is out of bounds for INT column {}."), n, utf16_to_utf8(np[i]));
 
                                 *(int32_t*)ptr = (int32_t)n;
                                 ptr += sizeof(int32_t);
@@ -6762,7 +6761,7 @@ namespace tds {
                             ptr += sizeof(uint16_t);
                         } else if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
                             if (v[i].val.length() > cols[i].max_length)
-                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), v[i].val, utf16_to_utf8(cols[i].name), cols[i].max_length);
+                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), v[i].val, utf16_to_utf8(np[i]), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)v[i].val.length();
                             ptr += sizeof(uint16_t);
@@ -6773,7 +6772,7 @@ namespace tds {
                             auto s = (string)v[i];
 
                             if (s.length() > cols[i].max_length)
-                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), s, utf16_to_utf8(cols[i].name), cols[i].max_length);
+                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), s, utf16_to_utf8(np[i]), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)s.length();
                             ptr += sizeof(uint16_t);
@@ -6829,7 +6828,7 @@ namespace tds {
                             if (v[i].val.length() > cols[i].max_length) {
                                 throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."),
                                                       utf16_to_utf8(u16string_view((char16_t*)v[i].val.data(), v[i].val.length() / sizeof(char16_t))),
-                                                      utf16_to_utf8(cols[i].name), cols[i].max_length / sizeof(char16_t));
+                                                      utf16_to_utf8(np[i]), cols[i].max_length / sizeof(char16_t));
                             }
 
                             *(uint16_t*)ptr = (uint16_t)v[i].val.length();
@@ -6843,7 +6842,7 @@ namespace tds {
                             if (s.length() > cols[i].max_length) {
                                 throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."),
                                                       utf16_to_utf8(u16string_view((char16_t*)s.data(), s.length() / sizeof(char16_t))),
-                                                      utf16_to_utf8(cols[i].name), cols[i].max_length / sizeof(char16_t));
+                                                      utf16_to_utf8(np[i]), cols[i].max_length / sizeof(char16_t));
                             }
 
                             *(uint16_t*)ptr = (uint16_t)(s.length() * sizeof(char16_t));
@@ -6883,7 +6882,7 @@ namespace tds {
                             ptr += sizeof(uint16_t);
                         } else if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
                             if (v[i].val.length() > cols[i].max_length)
-                                throw formatted_error(FMT_STRING("Binary data too long for column {} ({} bytes, maximum {})."), utf16_to_utf8(cols[i].name), v[i].val.length(), cols[i].max_length);
+                                throw formatted_error(FMT_STRING("Binary data too long for column {} ({} bytes, maximum {})."), utf16_to_utf8(np[i]), v[i].val.length(), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)v[i].val.length();
                             ptr += sizeof(uint16_t);
@@ -7049,9 +7048,9 @@ namespace tds {
                         switch (cols[i].max_length) {
                             case 4: {
                                 if (dt.d.num < 0)
-                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too early for SMALLDATETIME column {}."), dt, utf16_to_utf8(cols[i].name));
+                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too early for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
                                 else if (dt.d.num > numeric_limits<uint16_t>::max())
-                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too late for SMALLDATETIME column {}."), dt, utf16_to_utf8(cols[i].name));
+                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too late for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
 
                                 *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
                                 ptr++;
@@ -7138,7 +7137,7 @@ namespace tds {
                     auto n = (int64_t)v[i];
 
                     if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
-                        throw formatted_error(FMT_STRING("Value {} is out of bounds for TINYINT column {}."), n, utf16_to_utf8(cols[i].name));
+                        throw formatted_error(FMT_STRING("Value {} is out of bounds for TINYINT column {}."), n, utf16_to_utf8(np[i]));
 
                     *(uint8_t*)ptr = (uint8_t)n;
                     ptr += sizeof(uint8_t);
@@ -7150,7 +7149,7 @@ namespace tds {
                     auto n = (int64_t)v[i];
 
                     if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
-                        throw formatted_error(FMT_STRING("Value {} is out of bounds for SMALLINT column {}."), n, utf16_to_utf8(cols[i].name));
+                        throw formatted_error(FMT_STRING("Value {} is out of bounds for SMALLINT column {}."), n, utf16_to_utf8(np[i]));
 
                     *(int32_t*)ptr = (int16_t)n;
                     ptr += sizeof(int16_t);
@@ -7162,7 +7161,7 @@ namespace tds {
                     auto n = (int64_t)v[i];
 
                     if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
-                        throw formatted_error(FMT_STRING("Value {} is out of bounds for INT column {}."), n, utf16_to_utf8(cols[i].name));
+                        throw formatted_error(FMT_STRING("Value {} is out of bounds for INT column {}."), n, utf16_to_utf8(np[i]));
 
                     *(int32_t*)ptr = (int32_t)n;
                     ptr += sizeof(int32_t);
@@ -7234,10 +7233,10 @@ namespace tds {
                         if (d > pow(10, cols[i].precision)) {
                             if (neg) {
                                 throw formatted_error(FMT_STRING("Value {} is too small for NUMERIC({},{}) column {}."), v[i], cols[i].precision,
-                                                      cols[i].scale, utf16_to_utf8(cols[i].name));
+                                                      cols[i].scale, utf16_to_utf8(np[i]));
                             } else {
                                 throw formatted_error(FMT_STRING("Value {} is too large for NUMERIC({},{}) column {}."), v[i], cols[i].precision,
-                                                      cols[i].scale, utf16_to_utf8(cols[i].name));
+                                                      cols[i].scale, utf16_to_utf8(np[i]));
                             }
                         }
 
@@ -7307,7 +7306,7 @@ namespace tds {
                             break;
 
                             default:
-                                throw formatted_error(FMT_STRING("MONEYN column {} had invalid size {}."), utf16_to_utf8(cols[i].name), cols[i].max_length);
+                                throw formatted_error(FMT_STRING("MONEYN column {} had invalid size {}."), utf16_to_utf8(np[i]), cols[i].max_length);
 
                         }
 
@@ -7425,10 +7424,12 @@ namespace tds {
         }
     }
 
-    vector<uint8_t> tds_impl::bcp_colmetadata(const vector<column>& cols) {
+    vector<uint8_t> tds_impl::bcp_colmetadata(const vector<u16string>& np, const vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
 
-        for (const auto& col : cols) {
+        for (unsigned int i = 0; i < cols.size(); i++) {
+            const auto& col = cols[i];
+
             switch (col.type) {
                 case sql_type::SQL_NULL:
                 case sql_type::TINYINT:
@@ -7479,7 +7480,7 @@ namespace tds {
                     throw formatted_error(FMT_STRING("Unhandled type {} when creating COLMETADATA token."), col.type);
             }
 
-            bufsize += sizeof(uint8_t) + (col.name.length() * sizeof(char16_t));
+            bufsize += sizeof(uint8_t) + (np[i].length() * sizeof(char16_t));
         }
 
         vector<uint8_t> buf(bufsize);
@@ -7488,7 +7489,8 @@ namespace tds {
         *(tds_token*)ptr = tds_token::COLMETADATA; ptr++;
         *(uint16_t*)ptr = (uint16_t)cols.size(); ptr += sizeof(uint16_t);
 
-        for (const auto& col : cols) {
+        for (unsigned int i = 0; i < cols.size(); i++) {
+            const auto& col = cols[i];
             auto c = (tds_colmetadata_col*)ptr;
 
             c->user_type = 0;
@@ -7540,17 +7542,19 @@ namespace tds {
 
                     auto c = (collation*)ptr;
 
-                    c->lcid = 0x0409; // en-US
-                    c->ignore_case = 1;
+                    // collation seems to be ignored, depends on what INSERT BULK says
+
+                    c->lcid = 0;
+                    c->ignore_case = 0;
                     c->ignore_accent = 0;
-                    c->ignore_width = 1;
-                    c->ignore_kana = 1;
+                    c->ignore_width = 0;
+                    c->ignore_kana = 0;
                     c->binary = 0;
                     c->binary2 = 0;
                     c->utf8 = 0;
                     c->reserved = 0;
                     c->version = 0;
-                    c->sort_id = 52; // nocase.iso
+                    c->sort_id = 0;
 
                     ptr += sizeof(collation);
 
@@ -7587,11 +7591,11 @@ namespace tds {
                     throw formatted_error(FMT_STRING("Unhandled type {} when creating COLMETADATA token."), col.type);
             }
 
-            *(uint8_t*)ptr = (uint8_t)col.name.length();
+            *(uint8_t*)ptr = (uint8_t)np[i].length();
             ptr++;
 
-            memcpy(ptr, col.name.data(), col.name.length() * sizeof(char16_t));
-            ptr += col.name.length() * sizeof(char16_t);
+            memcpy(ptr, np[i].data(), np[i].length() * sizeof(char16_t));
+            ptr += np[i].length() * sizeof(char16_t);
         }
 
         return buf;
