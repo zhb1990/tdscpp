@@ -419,9 +419,9 @@ namespace tds {
     class col_info {
     public:
         col_info(sql_type type, unsigned int max_length, uint8_t precision, uint8_t scale,
-                 const std::u16string_view& collation, bool nullable) :
+                 const std::u16string_view& collation, bool nullable, unsigned int codepage) :
                  type(type), max_length(max_length), precision(precision), scale(scale),
-                 collation(collation), nullable(nullable) {
+                 collation(collation), nullable(nullable), codepage(codepage) {
         }
 
         sql_type type;
@@ -430,6 +430,7 @@ namespace tds {
         uint8_t scale;
         std::u16string collation;
         bool nullable;
+        unsigned int codepage;
     };
 
     class tds_impl {

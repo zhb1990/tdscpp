@@ -36,6 +36,10 @@
 
 // #define DEBUG_SHOW_MSGS
 
+#ifndef _WIN32
+#define CP_UTF8 65001
+#endif
+
 using namespace std;
 
 static const uint32_t tds_74_version = 0x4000074;
@@ -6337,14 +6341,16 @@ namespace tds {
             unique_ptr<query> sq2;
 
             if (db.empty())
-                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable FROM sys.columns WHERE object_id = OBJECT_ID(?)", table));
+                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM sys.columns WHERE object_id = OBJECT_ID(?)", table));
             else
-                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable FROM " + u16string(db) + u".sys.columns WHERE object_id = OBJECT_ID(?)", u16string(db) + u"." + u16string(table)));
+                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM " + u16string(db) + u".sys.columns WHERE object_id = OBJECT_ID(?)", u16string(db) + u"." + u16string(table)));
 
             auto& sq = *sq2;
 
             while (sq.fetch_row()) {
-                info.emplace(sq[0], col_info((sql_type)(unsigned int)sq[1], (unsigned int)sq[2], (uint8_t)(unsigned int)sq[3], (uint8_t)(unsigned int)sq[4], (u16string)sq[5], (unsigned int)sq[6] != 0));
+                info.emplace(sq[0], col_info((sql_type)(unsigned int)sq[1], (unsigned int)sq[2], (uint8_t)(unsigned int)sq[3],
+                                             (uint8_t)(unsigned int)sq[4], (u16string)sq[5], (unsigned int)sq[6] != 0,
+                                             (unsigned int)sq[7]));
             }
         }
 
@@ -6447,6 +6453,33 @@ namespace tds {
         }
     }
 
+    static string encode_charset(const u16string_view& s, unsigned int codepage) {
+        string ret;
+
+        if (s.empty())
+            return "";
+
+#ifdef _WIN32
+        auto len = WideCharToMultiByte(codepage, 0, (const wchar_t*)s.data(), (int)s.length(), nullptr, 0,
+                                       nullptr, nullptr);
+
+        if (len == 0)
+            throw runtime_error("WideCharToMultiByte 1 failed.");
+
+        ret.resize(len);
+
+        len = WideCharToMultiByte(codepage, 0, (const wchar_t*)s.data(), (int)s.length(), ret.data(), len,
+                                  nullptr, nullptr);
+
+        if (len == 0)
+            throw runtime_error("WideCharToMultiByte 2 failed.");
+#else
+        // FIXME - use iconv
+#endif
+
+        return ret;
+    }
+
     vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<u16string>& np, const vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
@@ -6473,13 +6506,19 @@ namespace tds {
                         if (cols[i].max_length == 0xffff) // MAX
                             bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
-                        if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
+                        if ((v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) && cols[i].codepage == CP_UTF8) {
                             bufsize += v[i].val.length();
 
                             if (cols[i].max_length == 0xffff && !v[i].val.empty())
                                 bufsize += sizeof(uint32_t);
-                        } else {
+                        } else if (cols[i].codepage == CP_UTF8) {
                             auto s = (string)v[i];
+                            bufsize += s.length();
+
+                            if (cols[i].max_length == 0xffff && !s.empty())
+                                bufsize += sizeof(uint32_t);
+                        } else {
+                            auto s = encode_charset((u16string)v[i], cols[i].codepage);
                             bufsize += s.length();
 
                             if (cols[i].max_length == 0xffff && !s.empty())
@@ -6736,7 +6775,7 @@ namespace tds {
                         if (v[i].is_null) {
                             *(uint64_t*)ptr = 0xffffffffffffffff;
                             ptr += sizeof(uint64_t);
-                        } else if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
+                        } else if ((v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) && cols[i].codepage == CP_UTF8) {
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
 
@@ -6750,8 +6789,24 @@ namespace tds {
 
                             *(uint32_t*)ptr = 0;
                             ptr += sizeof(uint32_t);
-                        } else {
+                        } else if (cols[i].codepage == CP_UTF8) {
                             auto s = (string)v[i];
+
+                            *(uint64_t*)ptr = 0xfffffffffffffffe;
+                            ptr += sizeof(uint64_t);
+
+                            if (!s.empty()) {
+                                *(uint32_t*)ptr = (uint32_t)s.length();
+                                ptr += sizeof(uint32_t);
+
+                                memcpy(ptr, s.data(), s.length());
+                                ptr += s.length();
+                            }
+
+                            *(uint32_t*)ptr = 0;
+                            ptr += sizeof(uint32_t);
+                        } else {
+                            auto s = encode_charset((u16string)v[i], cols[i].codepage);
 
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
@@ -6771,7 +6826,7 @@ namespace tds {
                         if (v[i].is_null) {
                             *(uint16_t*)ptr = 0xffff;
                             ptr += sizeof(uint16_t);
-                        } else if (v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) {
+                        } else if ((v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) && cols[i].codepage == CP_UTF8) {
                             if (v[i].val.length() > cols[i].max_length)
                                 throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), v[i].val, utf16_to_utf8(np[i]), cols[i].max_length);
 
@@ -6780,11 +6835,22 @@ namespace tds {
 
                             memcpy(ptr, v[i].val.data(), v[i].val.length());
                             ptr += v[i].val.length();
-                        } else {
+                        } else if (cols[i].codepage == CP_UTF8) {
                             auto s = (string)v[i];
 
                             if (s.length() > cols[i].max_length)
                                 throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), s, utf16_to_utf8(np[i]), cols[i].max_length);
+
+                            *(uint16_t*)ptr = (uint16_t)s.length();
+                            ptr += sizeof(uint16_t);
+
+                            memcpy(ptr, s.data(), s.length());
+                            ptr += s.length();
+                        } else {
+                            auto s = encode_charset((u16string)v[i], cols[i].codepage);
+
+                            if (s.length() > cols[i].max_length)
+                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), (string)v[i], utf16_to_utf8(np[i]), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)s.length();
                             ptr += sizeof(uint16_t);
