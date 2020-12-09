@@ -2155,6 +2155,10 @@ namespace tds {
         }
     }
 
+    static u16string_view extract_message(const string_view& sv) {
+        return u16string_view((char16_t*)&sv[8], *(uint16_t*)&sv[6]);
+    }
+
     void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server,
                                   const string_view& app_name) {
         enum tds_msg type;
@@ -2279,11 +2283,15 @@ namespace tds {
                         client_name, user_u16, password_u16, utf8_to_utf16(app_name), utf8_to_utf16(server), u"", u"us_english",
                         u"", sspi, u"", u"");
 
+        // FIXME - timeout
+
         bool received_loginack;
 #ifdef _WIN32
         bool go_again;
+#endif
 
         do {
+#ifdef _WIN32
             go_again = false;
 #endif
             bool last_packet;
@@ -2356,6 +2364,8 @@ namespace tds {
                             } else if (type == tds_token::TDS_ERROR) {
                                 if (message_handler)
                                     handle_info_msg(sv.substr(0, len), true);
+
+                                throw formatted_error(FMT_STRING("Login failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
                             } else if (type == tds_token::ENVCHANGE)
                                 handle_envchange_msg(sv.substr(0, len));
 
@@ -2411,11 +2421,10 @@ namespace tds {
 #ifdef _WIN32
             if (go_again)
                 send_sspi_msg(&sspih->cred_handle, &sspih->ctx_handle, spn, sspibuf);
-        } while (go_again);
 #endif
-
-        if (!received_loginack)
-            throw formatted_error(FMT_STRING("Did not receive LOGINACK message from server."));
+            if (received_loginack)
+                break;
+        } while (true);
     }
 
 #ifdef _WIN32
@@ -5610,10 +5619,6 @@ namespace tds {
         } catch (...) {
             // can't throw in destructor
         }
-    }
-
-    static u16string_view extract_message(const string_view& sv) {
-        return u16string_view((char16_t*)&sv[8], *(uint16_t*)&sv[6]);
     }
 
     void rpc::wait_for_packet() {
