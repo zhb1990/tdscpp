@@ -6240,6 +6240,9 @@ namespace tds {
             case sql_type::BITN:
                 return u"BIT";
 
+            case sql_type::DATETIM4:
+                return u"SMALLDATETIME";
+
             case sql_type::DATETIMN:
                 switch (length) {
                     case 4:
