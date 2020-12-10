@@ -6394,7 +6394,7 @@ namespace tds {
                 first = false;
             }
 
-            q += u")";
+            q += u") WITH (TABLOCK)";
 
             batch b(*this, q);
         }
