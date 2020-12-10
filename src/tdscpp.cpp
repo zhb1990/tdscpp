@@ -7251,14 +7251,14 @@ namespace tds {
                     } else {
                         auto dt = (datetime)v[i];
 
-                        switch (cols[i].scale) {
+                        switch (cols[i].max_length) {
                             case 4: {
                                 if (dt.d.num < 0)
                                     throw formatted_error(FMT_STRING("Datetime \"{}\" too early for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
                                 else if (dt.d.num > numeric_limits<uint16_t>::max())
                                     throw formatted_error(FMT_STRING("Datetime \"{}\" too late for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
 
-                                *(uint8_t*)ptr = (uint8_t)cols[i].scale;
+                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
                                 ptr++;
 
                                 *(uint16_t*)ptr = (uint16_t)dt.d.num;
@@ -7273,7 +7273,7 @@ namespace tds {
                             case 8: {
                                 uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
-                                *(uint8_t*)ptr = (uint8_t)cols[i].scale;
+                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
                                 ptr++;
 
                                 *(int32_t*)ptr = dt.d.num;
@@ -7286,7 +7286,7 @@ namespace tds {
                             }
 
                             default:
-                                throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].scale);
+                                throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].max_length);
                         }
                     }
                 break;
