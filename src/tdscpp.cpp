@@ -6357,8 +6357,40 @@ namespace tds {
             auto& sq = *sq2;
 
             while (sq.fetch_row()) {
-                info.emplace(sq[0], col_info((sql_type)(unsigned int)sq[1], (int16_t)sq[2], (uint8_t)(unsigned int)sq[3],
-                                             (uint8_t)(unsigned int)sq[4], (u16string)sq[5], (unsigned int)sq[6] != 0,
+                auto type = (sql_type)(unsigned int)sq[1];
+                auto nullable = (unsigned int)sq[6] != 0;
+
+                if (nullable) {
+                    switch (type) {
+                        case sql_type::TINYINT:
+                        case sql_type::SMALLINT:
+                        case sql_type::INT:
+                        case sql_type::BIGINT:
+                            type = sql_type::INTN;
+                            break;
+
+                        case sql_type::REAL:
+                        case sql_type::FLOAT:
+                            type = sql_type::FLTN;
+                            break;
+
+                        case sql_type::DATETIME:
+                        case sql_type::DATETIM4:
+                            type = sql_type::DATETIMN;
+                            break;
+
+                        case sql_type::MONEY:
+                        case sql_type::SMALLMONEY:
+                            type = sql_type::MONEYN;
+                            break;
+
+                        default:
+                            break;
+                    }
+                }
+
+                info.emplace(sq[0], col_info(type, (int16_t)sq[2], (uint8_t)(unsigned int)sq[3],
+                                             (uint8_t)(unsigned int)sq[4], (u16string)sq[5], nullable,
                                              (unsigned int)sq[7]));
             }
         }
