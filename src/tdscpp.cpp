@@ -6608,7 +6608,10 @@ namespace tds {
     vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<u16string>& np, const vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
-        for (unsigned int i = 0; i < v.size(); i++) {
+        for (unsigned int i = 0; i < cols.size(); i++) {
+            if (i >= v.size())
+                throw formatted_error(FMT_STRING("Trying to send {} columns in a BCP row, expected {}."), v.size(), cols.size());
+
             if (v[i].is_null && !cols[i].nullable)
                 throw formatted_error(FMT_STRING("Cannot insert NULL into column {} marked NOT NULL."), utf16_to_utf8(np[i]));
 
@@ -6846,7 +6849,7 @@ namespace tds {
         *(tds_token*)ptr = tds_token::ROW;
         ptr++;
 
-        for (unsigned int i = 0; i < v.size(); i++) {
+        for (unsigned int i = 0; i < cols.size(); i++) {
             switch (cols[i].type) {
                 case sql_type::INTN:
                     if (v[i].is_null) {
