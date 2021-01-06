@@ -4123,7 +4123,7 @@ namespace tds {
                 from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
                 from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
 
-                if (!is_valid_date(y, mon, d) || h >= 60 || min >= 60 || s >= 60)
+                if (!is_valid_date(y, mon, d) || h >= 24 || min >= 60 || s >= 60)
                     return false;
 
                 return true;
@@ -4146,7 +4146,7 @@ namespace tds {
                 t = t.substr(1);
             }
 
-            if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+            if (!parse_time(t, h, min, s) || h >= 24 || min >= 60 || s >= 60)
                 return false;
 
             return true;
@@ -4154,7 +4154,7 @@ namespace tds {
 
         // try to parse solo time
 
-        if (!parse_time(t, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+        if (!parse_time(t, h, min, s) || h >= 24 || min >= 60 || s >= 60)
             return false;
 
         y = 1900;
