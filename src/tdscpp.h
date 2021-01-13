@@ -203,6 +203,7 @@ namespace tds {
         value(const std::vector<std::byte>& bin);
         value(bool b);
         value(const std::optional<bool>& b);
+        value(const std::chrono::time_point<std::chrono::system_clock>& chr) : value((datetime)chr) { }
 
         operator const std::string() const;
         operator const std::u16string() const;
