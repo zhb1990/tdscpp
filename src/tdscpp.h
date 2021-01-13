@@ -7,6 +7,8 @@
 #include <optional>
 #include <vector>
 #include <map>
+#include <chrono>
+#include <time.h>
 #include <nlohmann/json.hpp>
 
 #ifdef _MSC_VER
@@ -135,6 +137,14 @@ namespace tds {
         datetime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second) :
             d(year, month, day), t(hour, minute, second) { }
         datetime(int32_t num, uint32_t secs) : d(num), t(secs) { }
+
+        datetime(const std::chrono::time_point<std::chrono::system_clock>& chr) {
+            auto tt = std::chrono::system_clock::to_time_t(chr);
+            auto s = localtime(&tt);
+
+            d = date((uint16_t)(s->tm_year + 1900), (uint8_t)(s->tm_mon + 1), (uint8_t)s->tm_mday);
+            t = time((uint8_t)s->tm_hour, (uint8_t)s->tm_min, (uint8_t)s->tm_sec);
+        }
 
         date d;
         time t;
