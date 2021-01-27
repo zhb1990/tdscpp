@@ -6547,7 +6547,7 @@ namespace tds {
                 return u"DATETIME";
 
             case sql_type::DATETIME2:
-                return u"DATETIME2";
+                return u"DATETIME2(" + to_u16string(scale) + u")";
 
             case sql_type::DATETIMEOFFSET:
                 return u"DATETIMEOFFSET";
