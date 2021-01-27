@@ -6541,7 +6541,7 @@ namespace tds {
                 return u"DATE";
 
             case sql_type::TIME:
-                return u"TIME";
+                return u"TIME(" + to_u16string(scale) + u")";
 
             case sql_type::DATETIME:
                 return u"DATETIME";
