@@ -6550,7 +6550,7 @@ namespace tds {
                 return u"DATETIME2(" + to_u16string(scale) + u")";
 
             case sql_type::DATETIMEOFFSET:
-                return u"DATETIMEOFFSET";
+                return u"DATETIMEOFFSET(" + to_u16string(scale) + u")";
 
             case sql_type::VARBINARY:
                 if (length > 8000)
