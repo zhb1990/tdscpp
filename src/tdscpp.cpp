@@ -3123,6 +3123,7 @@ namespace tds {
 
         type = sql_type::TIME;
         max_length = 0; // TIME(0)
+        scale = 0;
 
         val.resize(3);
         memcpy(val.data(), &secs, val.length());
@@ -3131,6 +3132,7 @@ namespace tds {
     value::value(const optional<time>& t) {
         type = sql_type::TIME;
         max_length = 0; // TIME(0)
+        scale = 0;
 
         if (!t.has_value())
             is_null = true;
@@ -3151,6 +3153,7 @@ namespace tds {
         uint32_t secs;
 
         type = sql_type::DATETIME2;
+        scale = 0;
         val.resize(6);
         max_length = 0; // DATETIME2(0)
 
@@ -3166,6 +3169,7 @@ namespace tds {
 
     value::value(const optional<datetime>& dt) {
         type = sql_type::DATETIME2;
+        scale = 0;
         val.resize(6);
         max_length = 0; // DATETIME2(0)
 
@@ -3191,6 +3195,7 @@ namespace tds {
         uint32_t secs;
 
         type = sql_type::DATETIMEOFFSET;
+        scale = 0;
         val.resize(8);
         max_length = 0; // DATETIMEOFFSET(0)
 
@@ -3209,6 +3214,7 @@ namespace tds {
     value::value(const optional<datetimeoffset>& dto) {
         type = sql_type::DATETIMEOFFSET;
         val.resize(8);
+        scale = 0;
         max_length = 0; // DATETIMEOFFSET(0)
 
         if (!dto.has_value())
