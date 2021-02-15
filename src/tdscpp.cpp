@@ -1384,7 +1384,7 @@ namespace tds {
         ret = getaddrinfo(server.c_str(), nullptr, &hints, &res);
 
         if (ret != 0)
-            throw formatted_error(FMT_STRING("getaddrinfo returned {}"), ret);
+            throw formatted_error("getaddrinfo returned {}", ret);
 
         orig_res = res;
 #ifdef _WIN32
@@ -1444,10 +1444,10 @@ namespace tds {
 
 #ifdef _WIN32
         if (sock == INVALID_SOCKET)
-            throw formatted_error(FMT_STRING("Could not connect to {}:{}."), server, port);
+            throw formatted_error("Could not connect to {}:{}.", server, port);
 #else
         if (sock <= 0)
-            throw formatted_error(FMT_STRING("Could not connect to {}:{}."), server, port);
+            throw formatted_error("Could not connect to {}:{}.", server, port);
 #endif
     }
 
@@ -1523,7 +1523,7 @@ namespace tds {
             // FIXME - timeout
 
             if (type != tds_msg::tabular_result)
-                throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+                throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
             // FIXME - parse payload for anything we care about (in particular, what server says about encryption)
         }
@@ -1539,7 +1539,7 @@ namespace tds {
             sec_status = AcquireCredentialsHandleW(nullptr, (SEC_WCHAR*)L"Negotiate", SECPKG_CRED_OUTBOUND, nullptr,
                                                    nullptr, nullptr, nullptr, &cred_handle, &timestamp);
             if (FAILED(sec_status))
-                throw formatted_error(FMT_STRING("AcquireCredentialsHandle returned {}"), (enum sec_error)sec_status);
+                throw formatted_error("AcquireCredentialsHandle returned {}", (enum sec_error)sec_status);
         }
 
         ~sspi_handle() {
@@ -1559,7 +1559,7 @@ namespace tds {
                                                     (ULONG*)context_attr, timestamp);
 
             if (FAILED(sec_status))
-                throw formatted_error(FMT_STRING("InitializeSecurityContext returned {}"), (enum sec_error)sec_status);
+                throw formatted_error("InitializeSecurityContext returned {}", (enum sec_error)sec_status);
 
             ctx_handle_set = true;
 
@@ -1786,7 +1786,7 @@ namespace tds {
             }
 
             default:
-                throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), type);
+                throw formatted_error("Unhandled type {} in ROW message.", type);
         }
 
         return true;
@@ -1994,7 +1994,7 @@ namespace tds {
                             }
 
                             default:
-                                throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
+                                throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
                         }
 
                         if (sv2.length() < 1)
@@ -2110,7 +2110,7 @@ namespace tds {
                         tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_return_value) + 2 + len));
                         sv = sv.substr(1 + sizeof(tds_return_value) + 2 + len);
                     } else
-                        throw formatted_error(FMT_STRING("Unhandled type {} in RETURNVALUE message."), h->type);
+                        throw formatted_error("Unhandled type {} in RETURNVALUE message.", h->type);
 
                     break;
                 }
@@ -2150,7 +2150,7 @@ namespace tds {
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled token type {} while parsing tokens."), type);
+                    throw formatted_error("Unhandled token type {} while parsing tokens.", type);
             }
         }
     }
@@ -2207,7 +2207,7 @@ namespace tds {
                 FreeContextBuffer(outbuf.pvBuffer);
 
             if (sec_status != SEC_E_OK && sec_status != SEC_I_CONTINUE_NEEDED && sec_status != SEC_I_COMPLETE_AND_CONTINUE)
-                throw formatted_error(FMT_STRING("InitializeSecurityContext returned unexpected status {}"), (enum sec_error)sec_status);
+                throw formatted_error("InitializeSecurityContext returned unexpected status {}", (enum sec_error)sec_status);
 #elif defined(HAVE_GSSAPI)
             spn = "MSSQLSvc/" + fqdn;
 
@@ -2264,9 +2264,9 @@ namespace tds {
 
             if (gethostname(s, sizeof(s)) != 0) {
 #ifdef _WIN32
-                throw formatted_error(FMT_STRING("gethostname failed (error {})"), WSAGetLastError());
+                throw formatted_error("gethostname failed (error {})", WSAGetLastError());
 #else
-                throw formatted_error(FMT_STRING("gethostname failed (error {})"), errno);
+                throw formatted_error("gethostname failed (error {})", errno);
 #endif
             }
 
@@ -2305,7 +2305,7 @@ namespace tds {
                 // FIXME - timeout
 
                 if (type != tds_msg::tabular_result)
-                    throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+                    throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
                 buf += payload;
 
@@ -2318,7 +2318,7 @@ namespace tds {
                 }
 
                 if (last_packet && !buf.empty())
-                    throw formatted_error(FMT_STRING("Data remaining in buffer"));
+                    throw formatted_error("Data remaining in buffer");
 
                 received_loginack = false;
 
@@ -2336,7 +2336,7 @@ namespace tds {
                         case tds_token::DONEINPROC:
                         case tds_token::DONEPROC:
                             if (sv.length() < sizeof(tds_done_msg))
-                                throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+                                throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                             break;
 
@@ -2346,14 +2346,14 @@ namespace tds {
                         case tds_token::ENVCHANGE:
                         {
                             if (sv.length() < sizeof(uint16_t))
-                                throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                                throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                             auto len = *(uint16_t*)&sv[0];
 
                             sv = sv.substr(sizeof(uint16_t));
 
                             if (sv.length() < len)
-                                throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                                throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                             if (type == tds_token::LOGINACK) {
                                 handle_loginack_msg(sv.substr(0, len));
@@ -2365,7 +2365,7 @@ namespace tds {
                                 if (message_handler)
                                     handle_info_msg(sv.substr(0, len), true);
 
-                                throw formatted_error(FMT_STRING("Login failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                                throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                             } else if (type == tds_token::ENVCHANGE)
                                 handle_envchange_msg(sv.substr(0, len));
 
@@ -2376,14 +2376,14 @@ namespace tds {
                         case tds_token::SSPI: // FIXME - handle doing this with GSSAPI
                         {
                             if (sv.length() < sizeof(uint16_t))
-                                throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                                throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                             auto len = *(uint16_t*)&sv[0];
 
                             sv = sv.substr(sizeof(uint16_t));
 
                             if (sv.length() < len)
-                                throw formatted_error(FMT_STRING("Short SSPI token ({} bytes, expected {})."), type, sv.length(), len);
+                                throw formatted_error("Short SSPI token ({} bytes, expected {}).", type, sv.length(), len);
 
                             if (!sspih)
                                 throw runtime_error("SSPI token received, but no current SSPI context.");
@@ -2460,7 +2460,7 @@ namespace tds {
                                                 ISC_REQ_ALLOCATE_MEMORY, 0, SECURITY_NATIVE_DREP,
                                                 &in, 0, ctx_handle, &out, &context_attr, &timestamp);
         if (FAILED(sec_status))
-            throw formatted_error(FMT_STRING("InitializeSecurityContext returned {}"), (enum sec_error)sec_status);
+            throw formatted_error("InitializeSecurityContext returned {}", (enum sec_error)sec_status);
 
         ret = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
 
@@ -2717,14 +2717,14 @@ namespace tds {
 
 #ifdef _WIN32
             if (ret < 0)
-                throw formatted_error(FMT_STRING("send failed (error {})"), WSAGetLastError());
+                throw formatted_error("send failed (error {})", WSAGetLastError());
 #else
             if (ret < 0)
-                throw formatted_error(FMT_STRING("send failed (error {})"), errno);
+                throw formatted_error("send failed (error {})", errno);
 #endif
 
             if ((size_t)ret < payload.length())
-                throw formatted_error(FMT_STRING("send sent {} bytes, expected {}"), ret, payload.length());
+                throw formatted_error("send sent {} bytes, expected {}", ret, payload.length());
 
             if (sv2.length() == sv.length())
                 return;
@@ -2740,20 +2740,20 @@ namespace tds {
 
 #ifdef _WIN32
         if (ret < 0)
-            throw formatted_error(FMT_STRING("recv failed (error {})"), WSAGetLastError());
+            throw formatted_error("recv failed (error {})", WSAGetLastError());
 #else
         if (ret < 0)
-            throw formatted_error(FMT_STRING("recv failed (error {})"), errno);
+            throw formatted_error("recv failed (error {})", errno);
 #endif
 
         if (ret == 0)
-            throw formatted_error(FMT_STRING("Disconnected."));
+            throw formatted_error("Disconnected.");
 
         if ((size_t)ret < sizeof(h))
-            throw formatted_error(FMT_STRING("recv received {} bytes, expected {}"), ret, sizeof(h));
+            throw formatted_error("recv received {} bytes, expected {}", ret, sizeof(h));
 
         if (htons(h.length) < sizeof(tds_header)) {
-            throw formatted_error(FMT_STRING("message length was {}, expected at least {}"),
+            throw formatted_error("message length was {}, expected at least {}",
                                     htons(h.length), sizeof(tds_header));
         }
 
@@ -2767,13 +2767,13 @@ namespace tds {
             ret = recv(sock, payload.data(), (int)len, MSG_WAITALL);
 
             if (ret < 0)
-                throw formatted_error(FMT_STRING("recv failed (error {})"), errno);
+                throw formatted_error("recv failed (error {})", errno);
 
             if (ret == 0)
-                throw formatted_error(FMT_STRING("Disconnected."));
+                throw formatted_error("Disconnected.");
 
             if ((unsigned int)ret < len)
-                throw formatted_error(FMT_STRING("recv received {} bytes, expected {}"), ret, len);
+                throw formatted_error("recv received {} bytes, expected {}", ret, len);
         } else
             payload.clear();
 
@@ -2820,25 +2820,25 @@ namespace tds {
 #endif
 
         if (tds_version != tds_74_version)
-            throw formatted_error(FMT_STRING("Server not using TDS 7.4. Version was {:x}, expected {:x}."), tds_version, tds_74_version);
+            throw formatted_error("Server not using TDS 7.4. Version was {:x}, expected {:x}.", tds_version, tds_74_version);
     }
 
     void tds_impl::handle_info_msg(string_view sv, bool error) {
         if (sv.length() < sizeof(tds_info_msg))
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes, expected at least 6)."), sv.length());
+            throw formatted_error("Short INFO message ({} bytes, expected at least 6).", sv.length());
 
         auto tim = (tds_info_msg*)sv.data();
 
         sv = sv.substr(sizeof(tds_info_msg));
 
         if (sv.length() < sizeof(uint16_t))
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 2)."), sv.length());
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 2).", sv.length());
 
         auto msg_len = *(uint16_t*)sv.data();
         sv = sv.substr(sizeof(uint16_t));
 
         if (sv.length() < msg_len * sizeof(char16_t)) {
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least {})."),
+            throw formatted_error("Short INFO message ({} bytes left, expected at least {}).",
                                   sv.length(), msg_len * sizeof(char16_t));
         }
 
@@ -2846,13 +2846,13 @@ namespace tds {
         sv = sv.substr(msg_len * sizeof(char16_t));
 
         if (sv.length() < sizeof(uint8_t))
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 1)."), sv.length());
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 1).", sv.length());
 
         auto server_name_len = (uint8_t)sv[0];
         sv = sv.substr(sizeof(uint8_t));
 
         if (sv.length() < server_name_len * sizeof(char16_t)) {
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least {})."),
+            throw formatted_error("Short INFO message ({} bytes left, expected at least {}).",
                                   sv.length(), server_name_len * sizeof(char16_t));
         }
 
@@ -2860,13 +2860,13 @@ namespace tds {
         sv = sv.substr(server_name_len * sizeof(char16_t));
 
         if (sv.length() < sizeof(uint8_t))
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 1)."), sv.length());
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 1).", sv.length());
 
         auto proc_name_len = (uint8_t)sv[0];
         sv = sv.substr(sizeof(uint8_t));
 
         if (sv.length() < proc_name_len * sizeof(char16_t)) {
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least {})."),
+            throw formatted_error("Short INFO message ({} bytes left, expected at least {}).",
                                   sv.length(), proc_name_len * sizeof(char16_t));
         }
 
@@ -2874,7 +2874,7 @@ namespace tds {
         sv = sv.substr(proc_name_len * sizeof(char16_t));
 
         if (sv.length() < sizeof(int32_t))
-            throw formatted_error(FMT_STRING("Short INFO message ({} bytes left, expected at least 4)."), sv.length());
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 4).", sv.length());
 
         auto line_number = *(int32_t*)sv.data();
 
@@ -3358,7 +3358,7 @@ namespace tds {
                         return fmt::format(FMT_STRING("{}"), *(int64_t*)d.data());
 
                     default:
-                        throw formatted_error(FMT_STRING("INTN has unexpected length {}."), d.length());
+                        throw formatted_error("INTN has unexpected length {}.", d.length());
                 }
             break;
 
@@ -3400,7 +3400,7 @@ namespace tds {
                         return fmt::format(FMT_STRING("{}"), *(double*)d.data());
 
                     default:
-                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), d.length());
+                        throw formatted_error("FLTN has unexpected length {}.", d.length());
                 }
             break;
 
@@ -3481,7 +3481,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
+                        throw formatted_error("DATETIMN has invalid length {}.", d.length());
                 }
 
             case sql_type::DATETIM4: {
@@ -3614,7 +3614,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}."), d.length());
+                        throw formatted_error("MONEYN has unexpected length {}.", d.length());
                 }
 
             case sql_type::MONEY: {
@@ -3648,7 +3648,7 @@ namespace tds {
                                    (uint8_t)d[13], (uint8_t)d[14], (uint8_t)d[15]);
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to string"), type2);
+                throw formatted_error("Cannot convert {} to string", type2);
         }
     }
 
@@ -3704,7 +3704,7 @@ namespace tds {
                         return *(int64_t*)d.data();
 
                     default:
-                        throw formatted_error(FMT_STRING("INTN has unexpected length {}."), d.length());
+                        throw formatted_error("INTN has unexpected length {}.", d.length());
                 }
 
             case sql_type::REAL:
@@ -3722,7 +3722,7 @@ namespace tds {
                         return (int64_t)*(double*)d.data();
 
                     default:
-                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), d.length());
+                        throw formatted_error("FLTN has unexpected length {}.", d.length());
                 }
 
             case sql_type::BITN:
@@ -3741,9 +3741,9 @@ namespace tds {
                 for (auto c : d) {
                     if (c == '-') {
                         if (!first)
-                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), d);
+                            throw formatted_error("Cannot convert string \"{}\" to integer", d);
                     } else if (c < '0' || c > '9')
-                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), d);
+                        throw formatted_error("Cannot convert string \"{}\" to integer", d);
 
                     first = false;
                 }
@@ -3753,9 +3753,9 @@ namespace tds {
                 auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), d);
+                    throw formatted_error("Cannot convert string \"{}\" to integer", d);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT"), d);
+                    throw formatted_error("String \"{}\" was too large to convert to BIGINT", d);
 
                 return res;
             }
@@ -3777,9 +3777,9 @@ namespace tds {
                 for (auto c : v) {
                     if (c == u'-') {
                         if (!first)
-                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), utf16_to_utf8(v));
+                            throw formatted_error("Cannot convert string \"{}\" to integer", utf16_to_utf8(v));
                     } else if (c < u'0' || c > u'9')
-                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), utf16_to_utf8(v));
+                        throw formatted_error("Cannot convert string \"{}\" to integer", utf16_to_utf8(v));
 
                     s += (char)c;
                     first = false;
@@ -3790,9 +3790,9 @@ namespace tds {
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), s);
+                    throw formatted_error("Cannot convert string \"{}\" to integer", s);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT"), s);
+                    throw formatted_error("String \"{}\" was too large to convert to BIGINT", s);
 
                 return res;
             }
@@ -3825,7 +3825,7 @@ namespace tds {
                         return *(int32_t*)d.data(); // MSSQL adds 1 if after midday
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -3843,11 +3843,11 @@ namespace tds {
                 for (auto c : s) {
                     if (c == '-') {
                         if (!first)
-                            throw formatted_error(FMT_STRING("Cannot convert {} to integer"), s);
+                            throw formatted_error("Cannot convert {} to integer", s);
                     } else if (c == '.')
                         break;
                     else if (c < '0' || c > '9')
-                        throw formatted_error(FMT_STRING("Cannot convert {} to integer"), s);
+                        throw formatted_error("Cannot convert {} to integer", s);
 
                     first = false;
                 }
@@ -3857,9 +3857,9 @@ namespace tds {
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert {} to integer"), s);
+                    throw formatted_error("Cannot convert {} to integer", s);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("{} was too large to convert to BIGINT"), s);
+                    throw formatted_error("{} was too large to convert to BIGINT", s);
 
                 return res;
             }
@@ -3881,7 +3881,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}"), d.length());
+                        throw formatted_error("MONEYN has unexpected length {}", d.length());
                 }
 
             case sql_type::MONEY: {
@@ -3903,7 +3903,7 @@ namespace tds {
             // Not allowing VARBINARY even though MSSQL does
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to integer"), type2);
+                throw formatted_error("Cannot convert {} to integer", type2);
         }
     }
 
@@ -4213,7 +4213,7 @@ namespace tds {
                     return date{1900, 1, 1};
 
                 if (!parse_datetime(t, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date"), d);
+                    throw formatted_error("Cannot convert string \"{}\" to date", d);
 
                 return date{y, mon, day};
             }
@@ -4253,7 +4253,7 @@ namespace tds {
                 auto sv = string_view(t2);
 
                 if (!parse_datetime(sv, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date"), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error("Cannot convert string \"{}\" to date", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
                 return date{y, mon, day};
             }
@@ -4278,7 +4278,7 @@ namespace tds {
                         return date{*(int32_t*)d.data()};
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -4303,7 +4303,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to date"), type2);
+                throw formatted_error("Cannot convert {} to date", type2);
         }
     }
 
@@ -4364,7 +4364,7 @@ namespace tds {
                     return time{0, 0, 0};
 
                 if (!parse_datetime(t, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time"), d);
+                    throw formatted_error("Cannot convert string \"{}\" to time", d);
 
                 return time{h, min, s};
             }
@@ -4402,7 +4402,7 @@ namespace tds {
                 }
 
                 if (!parse_datetime(t2, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time"), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error("Cannot convert string \"{}\" to time", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
                 return time{h, min, s};
             }
@@ -4431,7 +4431,7 @@ namespace tds {
                         return time{*(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -4464,7 +4464,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to TIME for integers, floats, BITs, or DATE
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to time"), type2);
+                throw formatted_error("Cannot convert {} to time", type2);
         }
     }
 
@@ -4525,7 +4525,7 @@ namespace tds {
                     return datetime{1900, 1, 1, 0, 0, 0};
 
                 if (!parse_datetime(t, y, mon, day, h, min, s))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime"), d);
+                    throw formatted_error("Cannot convert string \"{}\" to datetime", d);
 
                 return datetime{y, mon, day, h, min, s};
             }
@@ -4563,7 +4563,7 @@ namespace tds {
                 }
 
                 if (!parse_datetime(t2, y, mon, day, h, min, s))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime"), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error("Cannot convert string \"{}\" to datetime", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
                 return datetime{y, mon, day, h, min, s};
             }
@@ -4600,7 +4600,7 @@ namespace tds {
                         return datetime{*(int32_t*)d.data(), *(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -4639,7 +4639,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to DATETIME2 for integers, floats, or BIT
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to datetime"), type2);
+                throw formatted_error("Cannot convert {} to datetime", type2);
         }
     }
 
@@ -4699,7 +4699,7 @@ namespace tds {
                         return *(double*)d.data();
 
                     default:
-                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}"), d.length());
+                        throw formatted_error("FLTN has unexpected length {}", d.length());
                 }
 
             case sql_type::VARCHAR:
@@ -4716,16 +4716,16 @@ namespace tds {
                 auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), d);
+                    throw formatted_error("Cannot convert string \"{}\" to float", d);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), d);
+                    throw formatted_error("String \"{}\" was too large to convert to float.", d);
 
                 return res;
 #else
                 try {
                     return stod(string(d));
                 } catch (...) {
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), d);
+                    throw formatted_error("Cannot convert string \"{}\" to float", d);
                 }
 #endif
             }
@@ -4753,16 +4753,16 @@ namespace tds {
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), s);
+                    throw formatted_error("Cannot convert string \"{}\" to float", s);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), s);
+                    throw formatted_error("String \"{}\" was too large to convert to float.", s);
 
                 return res;
 #else
                 try {
                     return stod(s);
                 } catch (...) {
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), s);
+                    throw formatted_error("Cannot convert string \"{}\" to float", s);
                 }
 #endif
             }
@@ -4821,7 +4821,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
                 }
 
             case sql_type::DATETIM4: {
@@ -4838,7 +4838,7 @@ namespace tds {
                 try {
                     return stod(s);
                 } catch (...) {
-                    throw formatted_error(FMT_STRING("Cannot convert {} to float"), s);
+                    throw formatted_error("Cannot convert {} to float", s);
                 }
             }
 
@@ -4859,7 +4859,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}"), d.length());
+                        throw formatted_error("MONEYN has unexpected length {}", d.length());
                 }
 
             case sql_type::MONEY: {
@@ -4879,7 +4879,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to FLOAT for DATE, TIME, DATETIME2, DATETIMEOFFSET, or VARBINARY
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to float"), type2);
+                throw formatted_error("Cannot convert {} to float", type2);
         }
     }
 
@@ -4978,7 +4978,7 @@ namespace tds {
                     return 1258;
 
                 default:
-                    throw formatted_error(FMT_STRING("Could not map LCID {} to codepage."), coll.lcid);
+                    throw formatted_error("Could not map LCID {} to codepage.", coll.lcid);
             }
         } else { // SQL collations
             switch (coll.sort_id) {
@@ -5073,7 +5073,7 @@ namespace tds {
                     return 1257;
 
                 default:
-                    throw formatted_error(FMT_STRING("Could not map sort ID {} to codepage."), coll.sort_id);
+                    throw formatted_error("Could not map sort ID {} to codepage.", coll.sort_id);
             }
         }
     }
@@ -5168,13 +5168,13 @@ namespace tds {
                 break;
 
             default:
-                throw formatted_error(FMT_STRING("Could not find ICU name for Windows code page {}."), codepage);
+                throw formatted_error("Could not find ICU name for Windows code page {}.", codepage);
         }
 
         UConverter* conv = ucnv_open(cp, &status);
 
         if (U_FAILURE(status))
-            throw formatted_error(FMT_STRING("ucnv_open failed for code page {} ({})"), cp, u_errorName(status));
+            throw formatted_error("ucnv_open failed for code page {} ({})", cp, u_errorName(status));
 
         us.resize(s.length() * 2); // sic - each input byte might expand to 2 char16_ts
 
@@ -5220,7 +5220,7 @@ namespace tds {
                 col.val.resize(len);
 
                 if (sv.length() < len)
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
                 memcpy(col.val.data(), sv.data(), len);
 
@@ -5243,7 +5243,7 @@ namespace tds {
             case sql_type::DATETIMEOFFSET:
             {
                 if (sv.length() < sizeof(uint8_t))
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
 
                 auto len = *(uint8_t*)sv.data();
 
@@ -5253,7 +5253,7 @@ namespace tds {
                 col.is_null = len == 0;
 
                 if (sv.length() < len)
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
                 memcpy(col.val.data(), sv.data(), len);
                 sv = sv.substr(len);
@@ -5270,7 +5270,7 @@ namespace tds {
             case sql_type::XML:
                 if (max_length == 0xffff || type == sql_type::XML) {
                     if (sv.length() < sizeof(uint64_t))
-                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
 
                     auto len = *(uint64_t*)sv.data();
 
@@ -5290,7 +5290,7 @@ namespace tds {
 
                     do {
                         if (sv.length() < sizeof(uint32_t))
-                            throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
+                            throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
 
                         auto chunk_len = *(uint32_t*)sv.data();
 
@@ -5300,14 +5300,14 @@ namespace tds {
                             break;
 
                         if (sv.length() < chunk_len)
-                            throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), chunk_len);
+                            throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), chunk_len);
 
                         col.val += sv.substr(0, chunk_len);
                         sv = sv.substr(chunk_len);
                     } while (true);
                 } else {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 2)."), sv.length());
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least 2).", sv.length());
 
                     auto len = *(uint16_t*)sv.data();
 
@@ -5322,7 +5322,7 @@ namespace tds {
                     col.is_null = false;
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
                     memcpy(col.val.data(), sv.data(), len);
                     sv = sv.substr(len);
@@ -5340,7 +5340,7 @@ namespace tds {
             case sql_type::SQL_VARIANT:
             {
                 if (sv.length() < sizeof(uint32_t))
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
 
                 auto len = *(uint32_t*)sv.data();
 
@@ -5351,7 +5351,7 @@ namespace tds {
 
                 if (!col.is_null) {
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
                     memcpy(col.val.data(), sv.data(), len);
                     sv = sv.substr(len);
@@ -5367,14 +5367,14 @@ namespace tds {
                 // text pointer
 
                 if (sv.length() < sizeof(uint8_t))
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 1)."), sv.length());
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
 
                 auto textptrlen = (uint8_t)sv[0];
 
                 sv = sv.substr(1);
 
                 if (sv.length() < textptrlen)
-                    throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), textptrlen);
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), textptrlen);
 
                 sv = sv.substr(textptrlen);
 
@@ -5384,14 +5384,14 @@ namespace tds {
                     // timestamp
 
                     if (sv.length() < 8)
-                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 8)."), sv.length());
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
 
                     sv = sv.substr(8);
 
                     // data
 
                     if (sv.length() < sizeof(uint32_t))
-                        throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least 4)."), sv.length());
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
 
                     auto len = *(uint32_t*)sv.data();
 
@@ -5402,7 +5402,7 @@ namespace tds {
 
                     if (!col.is_null) {
                         if (sv.length() < len)
-                            throw formatted_error(FMT_STRING("Short ROW message ({} bytes left, expected at least {})."), sv.length(), len);
+                            throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
                         memcpy(col.val.data(), sv.data(), len);
                         sv = sv.substr(len);
@@ -5413,7 +5413,7 @@ namespace tds {
             }
 
             default:
-                throw formatted_error(FMT_STRING("Unhandled type {} in ROW message."), type);
+                throw formatted_error("Unhandled type {} in ROW message.", type);
         }
     }
 
@@ -5530,7 +5530,7 @@ namespace tds {
                 break;
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+                    throw formatted_error("Unhandled type {} in RPC params.", p.type);
             }
         }
 
@@ -5885,7 +5885,7 @@ namespace tds {
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled type {} in RPC params."), p.type);
+                    throw formatted_error("Unhandled type {} in RPC params.", p.type);
             }
         }
 
@@ -5960,7 +5960,7 @@ namespace tds {
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
-            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
         buf += payload;
 
@@ -5973,7 +5973,7 @@ namespace tds {
         }
 
         if (last_packet && !buf.empty())
-            throw formatted_error(FMT_STRING("Data remaining in buffer"));
+            throw formatted_error("Data remaining in buffer");
 
         while (!tokens.empty()) {
             auto t = move(tokens.front());
@@ -5990,7 +5990,7 @@ namespace tds {
                 case tds_token::DONEINPROC:
                 case tds_token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                     if (conn.impl->count_handler) {
                         auto msg = (tds_done_msg*)sv.data();
@@ -6007,14 +6007,14 @@ namespace tds {
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                     auto len = *(uint16_t*)&sv[0];
 
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
                         if (conn.impl->message_handler)
@@ -6023,7 +6023,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
                         else
-                            throw formatted_error(FMT_STRING("RPC {} failed: {}"), utf16_to_utf8(name), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                            throw formatted_error("RPC {} failed: {}", utf16_to_utf8(name), utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -6033,7 +6033,7 @@ namespace tds {
                 case tds_token::RETURNSTATUS:
                 {
                     if (sv.length() < sizeof(int32_t))
-                        throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected 4)."), sv.length());
+                        throw formatted_error("Short RETURNSTATUS message ({} bytes, expected 4).", sv.length());
 
                     return_status = *(int32_t*)&sv[0];
 
@@ -6043,7 +6043,7 @@ namespace tds {
                 case tds_token::COLMETADATA:
                 {
                     if (sv.length() < 4)
-                        throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes, expected at least 4)."), sv.length());
+                        throw formatted_error("Short COLMETADATA message ({} bytes, expected at least 4).", sv.length());
 
                     auto num_columns = *(uint16_t*)&sv[0];
 
@@ -6060,7 +6060,7 @@ namespace tds {
 
                     for (unsigned int i = 0; i < num_columns; i++) {
                         if (sv2.length() < sizeof(tds_colmetadata_col))
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(tds_colmetadata_col));
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(tds_colmetadata_col));
 
                         auto& c = *(tds_colmetadata_col*)&sv2[0];
 
@@ -6102,7 +6102,7 @@ namespace tds {
                             case sql_type::MONEYN:
                             case sql_type::UNIQUEIDENTIFIER:
                                 if (sv2.length() < sizeof(uint8_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
 
                                 col.max_length = *(uint8_t*)sv2.data();
 
@@ -6115,7 +6115,7 @@ namespace tds {
                             case sql_type::CHAR:
                             case sql_type::NCHAR: {
                                 if (sv2.length() < sizeof(uint16_t) + sizeof(collation))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(collation));
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(uint16_t) + sizeof(collation));
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
@@ -6132,7 +6132,7 @@ namespace tds {
                             case sql_type::VARBINARY:
                             case sql_type::BINARY:
                                 if (sv2.length() < sizeof(uint16_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t));
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(uint16_t));
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
@@ -6142,7 +6142,7 @@ namespace tds {
 
                             case sql_type::XML:
                                 if (sv2.length() < sizeof(uint8_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
 
                                 len += sizeof(uint8_t);
                                 sv2 = sv2.substr(sizeof(uint8_t));
@@ -6151,7 +6151,7 @@ namespace tds {
                             case sql_type::DECIMAL:
                             case sql_type::NUMERIC:
                                 if (sv2.length() < 3)
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 3)."), sv2.length(), 3);
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 3).", sv2.length(), 3);
 
                                 col.max_length = (uint8_t)sv2[0];
                                 col.precision = (uint8_t)sv2[1];
@@ -6214,11 +6214,11 @@ namespace tds {
                             }
 
                             default:
-                                throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
+                                throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
                         }
 
                         if (sv2.length() < 1)
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
 
                         auto name_len = *(uint8_t*)&sv2[0];
 
@@ -6226,7 +6226,7 @@ namespace tds {
                         len++;
 
                         if (sv2.length() < name_len * sizeof(char16_t))
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), name_len * sizeof(char16_t));
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), name_len * sizeof(char16_t));
 
                         col.name = u16string_view((char16_t*)sv2.data(), name_len);
 
@@ -6242,7 +6242,7 @@ namespace tds {
                     auto h = (tds_return_value*)&sv[0];
 
                     if (sv.length() < sizeof(tds_return_value))
-                        throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_value));
+                        throw formatted_error("Short RETURNVALUE message ({} bytes, expected at least {}).", sv.length(), sizeof(tds_return_value));
 
                     // FIXME - param name
 
@@ -6250,12 +6250,12 @@ namespace tds {
                         uint8_t len;
 
                         if (sv.length() < sizeof(tds_return_value) + 2)
-                            throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected at least {})."), sv.length(), sizeof(tds_return_value) + 2);
+                            throw formatted_error("Short RETURNVALUE message ({} bytes, expected at least {}).", sv.length(), sizeof(tds_return_value) + 2);
 
                         len = *((uint8_t*)&sv[0] + sizeof(tds_return_value) + 1);
 
                         if (sv.length() < sizeof(tds_return_value) + 2 + len)
-                            throw formatted_error(FMT_STRING("Short RETURNVALUE message ({} bytes, expected {})."), sv.length(), sizeof(tds_return_value) + 2 + len);
+                            throw formatted_error("Short RETURNVALUE message ({} bytes, expected {}).", sv.length(), sizeof(tds_return_value) + 2 + len);
 
                         if (output_params.count(h->param_ordinal) != 0) {
                             value& out = *output_params.at(h->param_ordinal);
@@ -6272,7 +6272,7 @@ namespace tds {
                             }
                         }
                     } else
-                        throw formatted_error(FMT_STRING("Unhandled type {} in RETURNVALUE message."), h->type);
+                        throw formatted_error("Unhandled type {} in RETURNVALUE message.", h->type);
 
                     break;
                 }
@@ -6306,7 +6306,7 @@ namespace tds {
                     auto bitset_length = (cols.size() + 7) / 8;
 
                     if (sv.length() < bitset_length)
-                        throw formatted_error(FMT_STRING("Short NBCROW message ({} bytes, expected at least {})."), sv.length(), bitset_length);
+                        throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sv.length(), bitset_length);
 
                     string_view bitset(sv.data(), bitset_length);
                     auto bsv = (uint8_t)bitset[0];
@@ -6338,19 +6338,19 @@ namespace tds {
                 case tds_token::ORDER:
                 {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short ORDER message ({} bytes, expected at least {})."), sv.length(), sizeof(uint16_t));
+                        throw formatted_error("Short ORDER message ({} bytes, expected at least {}).", sv.length(), sizeof(uint16_t));
 
                     auto len = *(uint16_t*)sv.data();
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short ORDER message ({} bytes, expected {})."), sv.length(), len);
+                        throw formatted_error("Short ORDER message ({} bytes, expected {}).", sv.length(), len);
 
                     break;
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled token type {} while executing RPC."), type);
+                    throw formatted_error("Unhandled token type {} while executing RPC.", type);
             }
         }
 
@@ -6503,7 +6503,7 @@ namespace tds {
                         return u"BIGINT";
 
                     default:
-                        throw formatted_error(FMT_STRING("INTN has invalid length {}."), length);
+                        throw formatted_error("INTN has invalid length {}.", length);
                 }
 
             case sql_type::NVARCHAR:
@@ -6540,7 +6540,7 @@ namespace tds {
                         return u"FLOAT";
 
                     default:
-                        throw formatted_error(FMT_STRING("FLTN has invalid length {}."), length);
+                        throw formatted_error("FLTN has invalid length {}.", length);
                 }
 
             case sql_type::DATE:
@@ -6582,7 +6582,7 @@ namespace tds {
                         return u"DATETIME";
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), length);
+                        throw formatted_error("DATETIMN has invalid length {}.", length);
                 }
 
             case sql_type::FLOAT:
@@ -6616,7 +6616,7 @@ namespace tds {
                         return u"MONEY";
 
                     default:
-                        throw formatted_error(FMT_STRING("MONEYN has invalid length {}."), length);
+                        throw formatted_error("MONEYN has invalid length {}.", length);
                 }
 
             case sql_type::MONEY:
@@ -6632,7 +6632,7 @@ namespace tds {
                 return u"XML";
 
             default:
-                throw formatted_error(FMT_STRING("Could not get type string for {}."), type);
+                throw formatted_error("Could not get type string for {}.", type);
         }
     }
 
@@ -6729,7 +6729,7 @@ namespace tds {
 
         for (const auto& n : np) {
             if (info.count(n) == 0)
-                throw formatted_error(FMT_STRING("Column {} not found in table {}."), utf16_to_utf8(n), utf16_to_utf8(table));
+                throw formatted_error("Column {} not found in table {}.", utf16_to_utf8(n), utf16_to_utf8(table));
 
             ret.emplace_back(info.at(n));
         }
@@ -6914,13 +6914,13 @@ namespace tds {
                 break;
 
             default:
-                throw formatted_error(FMT_STRING("Could not find ICU name for Windows code page {}."), codepage);
+                throw formatted_error("Could not find ICU name for Windows code page {}.", codepage);
         }
 
         UConverter* conv = ucnv_open(cp, &status);
 
         if (U_FAILURE(status))
-            throw formatted_error(FMT_STRING("ucnv_open failed for code page {} ({})"), cp, u_errorName(status));
+            throw formatted_error("ucnv_open failed for code page {} ({})", cp, u_errorName(status));
 
         ret.resize(UCNV_GET_MAX_BYTES_FOR_STRING(s.length(), ucnv_getMaxCharSize(conv)));
 
@@ -6940,10 +6940,10 @@ namespace tds {
 
         for (unsigned int i = 0; i < cols.size(); i++) {
             if (i >= v.size())
-                throw formatted_error(FMT_STRING("Trying to send {} columns in a BCP row, expected {}."), v.size(), cols.size());
+                throw formatted_error("Trying to send {} columns in a BCP row, expected {}.", v.size(), cols.size());
 
             if (v[i].is_null && !cols[i].nullable)
-                throw formatted_error(FMT_STRING("Cannot insert NULL into column {} marked NOT NULL."), utf16_to_utf8(np[i]));
+                throw formatted_error("Cannot insert NULL into column {} marked NOT NULL.", utf16_to_utf8(np[i]));
 
             switch (cols[i].type) {
                 case sql_type::INTN:
@@ -7028,7 +7028,7 @@ namespace tds {
                             if (cols[i].max_length == -1 && !v[i].val.empty())
                                 bufsize += sizeof(uint32_t);
                         } else
-                            throw formatted_error(FMT_STRING("Could not convert {} to {}."), v[i].type, cols[i].type);
+                            throw formatted_error("Could not convert {} to {}.", v[i].type, cols[i].type);
                     }
                 break;
 
@@ -7169,7 +7169,7 @@ namespace tds {
                 break;
 
                 default:
-                    throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
+                    throw formatted_error("Unable to send {} in BCP row.", cols[i].type);
             }
         }
 
@@ -7194,13 +7194,13 @@ namespace tds {
                         try {
                             n = (int64_t)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         switch (cols[i].max_length) {
                             case sizeof(uint8_t):
                                 if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
-                                    throw formatted_error(FMT_STRING("{} is out of bounds for TINYINT column {}."), n, utf16_to_utf8(np[i]));
+                                    throw formatted_error("{} is out of bounds for TINYINT column {}.", n, utf16_to_utf8(np[i]));
 
                                 *ptr = (uint8_t)n;
                                 ptr++;
@@ -7208,7 +7208,7 @@ namespace tds {
 
                             case sizeof(int16_t):
                                 if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
-                                    throw formatted_error(FMT_STRING("{} is out of bounds for SMALLINT column {}."), n, utf16_to_utf8(np[i]));
+                                    throw formatted_error("{} is out of bounds for SMALLINT column {}.", n, utf16_to_utf8(np[i]));
 
                                 *(int16_t*)ptr = (int16_t)n;
                                 ptr += sizeof(int16_t);
@@ -7216,7 +7216,7 @@ namespace tds {
 
                             case sizeof(int32_t):
                                 if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
-                                    throw formatted_error(FMT_STRING("{} is out of bounds for INT column {}."), n, utf16_to_utf8(np[i]));
+                                    throw formatted_error("{} is out of bounds for INT column {}.", n, utf16_to_utf8(np[i]));
 
                                 *(int32_t*)ptr = (int32_t)n;
                                 ptr += sizeof(int32_t);
@@ -7228,7 +7228,7 @@ namespace tds {
                             break;
 
                             default:
-                                throw formatted_error(FMT_STRING("Invalid INTN size {}."), cols[i].max_length);
+                                throw formatted_error("Invalid INTN size {}.", cols[i].max_length);
                         }
                     }
                 break;
@@ -7292,7 +7292,7 @@ namespace tds {
                             ptr += sizeof(uint16_t);
                         } else if ((v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) && cols[i].codepage == CP_UTF8) {
                             if (v[i].val.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), v[i].val, utf16_to_utf8(np[i]), cols[i].max_length);
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", v[i].val, utf16_to_utf8(np[i]), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)v[i].val.length();
                             ptr += sizeof(uint16_t);
@@ -7303,7 +7303,7 @@ namespace tds {
                             auto s = (string)v[i];
 
                             if (s.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), s, utf16_to_utf8(np[i]), cols[i].max_length);
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", s, utf16_to_utf8(np[i]), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)s.length();
                             ptr += sizeof(uint16_t);
@@ -7314,7 +7314,7 @@ namespace tds {
                             auto s = encode_charset((u16string)v[i], cols[i].codepage);
 
                             if (s.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."), (string)v[i], utf16_to_utf8(np[i]), cols[i].max_length);
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", (string)v[i], utf16_to_utf8(np[i]), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)s.length();
                             ptr += sizeof(uint16_t);
@@ -7368,7 +7368,7 @@ namespace tds {
                             ptr += sizeof(uint16_t);
                         } else if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
                             if (v[i].val.length() > (uint16_t)cols[i].max_length) {
-                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."),
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
                                                       utf16_to_utf8(u16string_view((char16_t*)v[i].val.data(), v[i].val.length() / sizeof(char16_t))),
                                                       utf16_to_utf8(np[i]), cols[i].max_length / sizeof(char16_t));
                             }
@@ -7382,7 +7382,7 @@ namespace tds {
                             auto s = (u16string)v[i];
 
                             if (s.length() > (uint16_t)cols[i].max_length) {
-                                throw formatted_error(FMT_STRING("String \"{}\" too long for column {} (maximum length {})."),
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
                                                       utf16_to_utf8(u16string_view((char16_t*)s.data(), s.length() / sizeof(char16_t))),
                                                       utf16_to_utf8(np[i]), cols[i].max_length / sizeof(char16_t));
                             }
@@ -7417,14 +7417,14 @@ namespace tds {
                             *(uint32_t*)ptr = 0;
                             ptr += sizeof(uint32_t);
                         } else
-                            throw formatted_error(FMT_STRING("Could not convert {} to {}."), v[i].type, cols[i].type);
+                            throw formatted_error("Could not convert {} to {}.", v[i].type, cols[i].type);
                     } else {
                         if (v[i].is_null) {
                             *(uint16_t*)ptr = 0xffff;
                             ptr += sizeof(uint16_t);
                         } else if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
                             if (v[i].val.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error(FMT_STRING("Binary data too long for column {} ({} bytes, maximum {})."), utf16_to_utf8(np[i]), v[i].val.length(), cols[i].max_length);
+                                throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(np[i]), v[i].val.length(), cols[i].max_length);
 
                             *(uint16_t*)ptr = (uint16_t)v[i].val.length();
                             ptr += sizeof(uint16_t);
@@ -7432,7 +7432,7 @@ namespace tds {
                             memcpy(ptr, v[i].val.data(), v[i].val.length());
                             ptr += v[i].val.length();
                         } else
-                            throw formatted_error(FMT_STRING("Could not convert {} to {}."), v[i].type, cols[i].type);
+                            throw formatted_error("Could not convert {} to {}.", v[i].type, cols[i].type);
                     }
                 break;
 
@@ -7446,7 +7446,7 @@ namespace tds {
                         try {
                             d = (date)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         uint32_t n = d.num + 693595;
@@ -7469,7 +7469,7 @@ namespace tds {
                         try {
                             t = (time)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         uint64_t secs = (t.hour * 3600) + (t.minute * 60) + t.second;
@@ -7510,7 +7510,7 @@ namespace tds {
                         try {
                             dt = (datetime)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         uint32_t n = dt.d.num + 693595;
@@ -7555,7 +7555,7 @@ namespace tds {
                         try {
                             dto = (datetime)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         uint32_t n = dto.d.num + 693595;
@@ -7601,7 +7601,7 @@ namespace tds {
                     try {
                         dt = (datetime)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     uint32_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
@@ -7625,15 +7625,15 @@ namespace tds {
                         try {
                             dt = (datetime)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         switch (cols[i].max_length) {
                             case 4: {
                                 if (dt.d.num < 0)
-                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too early for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
+                                    throw formatted_error("Datetime \"{}\" too early for SMALLDATETIME column {}.", dt, utf16_to_utf8(np[i]));
                                 else if (dt.d.num > numeric_limits<uint16_t>::max())
-                                    throw formatted_error(FMT_STRING("Datetime \"{}\" too late for SMALLDATETIME column {}."), dt, utf16_to_utf8(np[i]));
+                                    throw formatted_error("Datetime \"{}\" too late for SMALLDATETIME column {}.", dt, utf16_to_utf8(np[i]));
 
                                 *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
                                 ptr++;
@@ -7663,7 +7663,7 @@ namespace tds {
                             }
 
                             default:
-                                throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), cols[i].max_length);
+                                throw formatted_error("DATETIMN has invalid length {}.", cols[i].max_length);
                         }
                     }
                 break;
@@ -7678,7 +7678,7 @@ namespace tds {
                         try {
                             d = (double)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
@@ -7698,7 +7698,7 @@ namespace tds {
                             break;
 
                             default:
-                                throw formatted_error(FMT_STRING("FLTN has invalid length {}."), cols[i].max_length);
+                                throw formatted_error("FLTN has invalid length {}.", cols[i].max_length);
                         }
                     }
                 break;
@@ -7718,7 +7718,7 @@ namespace tds {
                         try {
                             n = (int64_t)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         *(uint8_t*)ptr = sizeof(uint8_t);
@@ -7734,11 +7734,11 @@ namespace tds {
                     try {
                         n = (int64_t)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
-                        throw formatted_error(FMT_STRING("Value {} is out of bounds for TINYINT column {}."), n, utf16_to_utf8(np[i]));
+                        throw formatted_error("Value {} is out of bounds for TINYINT column {}.", n, utf16_to_utf8(np[i]));
 
                     *(uint8_t*)ptr = (uint8_t)n;
                     ptr += sizeof(uint8_t);
@@ -7752,11 +7752,11 @@ namespace tds {
                     try {
                         n = (int64_t)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
-                        throw formatted_error(FMT_STRING("Value {} is out of bounds for SMALLINT column {}."), n, utf16_to_utf8(np[i]));
+                        throw formatted_error("Value {} is out of bounds for SMALLINT column {}.", n, utf16_to_utf8(np[i]));
 
                     *(int32_t*)ptr = (int16_t)n;
                     ptr += sizeof(int16_t);
@@ -7770,11 +7770,11 @@ namespace tds {
                     try {
                         n = (int64_t)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
-                        throw formatted_error(FMT_STRING("Value {} is out of bounds for INT column {}."), n, utf16_to_utf8(np[i]));
+                        throw formatted_error("Value {} is out of bounds for INT column {}.", n, utf16_to_utf8(np[i]));
 
                     *(int32_t*)ptr = (int32_t)n;
                     ptr += sizeof(int32_t);
@@ -7788,7 +7788,7 @@ namespace tds {
                     try {
                         n = (int64_t)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     *(int64_t*)ptr = n;
@@ -7803,7 +7803,7 @@ namespace tds {
                     try {
                         n = (double)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     *(double*)ptr = n;
@@ -7818,7 +7818,7 @@ namespace tds {
                     try {
                         n = (double)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     *(float*)ptr = (float)n;
@@ -7837,7 +7837,7 @@ namespace tds {
                         try {
                             n = (int64_t)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         *(uint8_t*)ptr = n != 0 ? 1 : 0;
@@ -7859,7 +7859,7 @@ namespace tds {
                         try {
                             d = (double)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         if (d < 0) {
@@ -7875,10 +7875,10 @@ namespace tds {
 
                         if (d > pow(10, cols[i].precision)) {
                             if (neg) {
-                                throw formatted_error(FMT_STRING("Value {} is too small for NUMERIC({},{}) column {}."), v[i], cols[i].precision,
+                                throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", v[i], cols[i].precision,
                                                       cols[i].scale, utf16_to_utf8(np[i]));
                             } else {
-                                throw formatted_error(FMT_STRING("Value {} is too large for NUMERIC({},{}) column {}."), v[i], cols[i].precision,
+                                throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", v[i], cols[i].precision,
                                                       cols[i].scale, utf16_to_utf8(np[i]));
                             }
                         }
@@ -7936,7 +7936,7 @@ namespace tds {
                         try {
                             val = (double)v[i];
                         } catch (const exception& e) {
-                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         val *= 10000.0;
@@ -7955,7 +7955,7 @@ namespace tds {
                             break;
 
                             default:
-                                throw formatted_error(FMT_STRING("MONEYN column {} had invalid size {}."), utf16_to_utf8(np[i]), cols[i].max_length);
+                                throw formatted_error("MONEYN column {} had invalid size {}.", utf16_to_utf8(np[i]), cols[i].max_length);
 
                         }
 
@@ -7971,7 +7971,7 @@ namespace tds {
                     try {
                         val = (double)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     val *= 10000.0;
@@ -7992,7 +7992,7 @@ namespace tds {
                     try {
                         val = (double)v[i];
                     } catch (const exception& e) {
-                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
 
                     val *= 10000.0;
@@ -8004,7 +8004,7 @@ namespace tds {
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unable to send {} in BCP row."), cols[i].type);
+                    throw formatted_error("Unable to send {} in BCP row.", cols[i].type);
             }
         }
 
@@ -8021,7 +8021,7 @@ namespace tds {
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
-            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
         string_view sv = payload;
 
@@ -8036,7 +8036,7 @@ namespace tds {
                 case tds_token::DONEINPROC:
                 case tds_token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                     if (count_handler) {
                         auto msg = (tds_done_msg*)sv.data();
@@ -8054,14 +8054,14 @@ namespace tds {
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                     auto len = *(uint16_t*)&sv[0];
 
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
                         if (message_handler)
@@ -8070,7 +8070,7 @@ namespace tds {
                         if (message_handler)
                             handle_info_msg(sv.substr(0, len), true);
 
-                        throw formatted_error(FMT_STRING("BCP failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                        throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         handle_envchange_msg(sv.substr(0, len));
 
@@ -8080,7 +8080,7 @@ namespace tds {
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled token type {} in BCP response."), type);
+                    throw formatted_error("Unhandled token type {} in BCP response.", type);
             }
         }
     }
@@ -8138,7 +8138,7 @@ namespace tds {
                     break;
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled type {} when creating COLMETADATA token."), col.type);
+                    throw formatted_error("Unhandled type {} when creating COLMETADATA token.", col.type);
             }
 
             bufsize += sizeof(uint8_t) + (np[i].length() * sizeof(char16_t));
@@ -8253,7 +8253,7 @@ namespace tds {
                 break;
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled type {} when creating COLMETADATA token."), col.type);
+                    throw formatted_error("Unhandled type {} when creating COLMETADATA token.", col.type);
             }
 
             *(uint8_t*)ptr = (uint8_t)np[i].length();
@@ -8368,7 +8368,7 @@ namespace tds {
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
-            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
         buf += payload;
 
@@ -8381,7 +8381,7 @@ namespace tds {
         }
 
         if (last_packet && !buf.empty())
-            throw formatted_error(FMT_STRING("Data remaining in buffer"));
+            throw formatted_error("Data remaining in buffer");
 
         while (!tokens.empty()) {
             auto t = move(tokens.front());
@@ -8411,14 +8411,14 @@ namespace tds {
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                     auto len = *(uint16_t*)&sv[0];
 
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
                         if (conn.impl->message_handler)
@@ -8427,7 +8427,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
                         else
-                            throw formatted_error(FMT_STRING("SQL batch failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                            throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -8437,7 +8437,7 @@ namespace tds {
                 case tds_token::COLMETADATA:
                 {
                     if (sv.length() < 4)
-                        throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes, expected at least 4)."), sv.length());
+                        throw formatted_error("Short COLMETADATA message ({} bytes, expected at least 4).", sv.length());
 
                     auto num_columns = *(uint16_t*)&sv[0];
 
@@ -8454,7 +8454,7 @@ namespace tds {
 
                     for (unsigned int i = 0; i < num_columns; i++) {
                         if (sv2.length() < sizeof(tds_colmetadata_col))
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(tds_colmetadata_col));
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(tds_colmetadata_col));
 
                         auto& c = *(tds_colmetadata_col*)&sv2[0];
 
@@ -8494,7 +8494,7 @@ namespace tds {
                             case sql_type::MONEYN:
                             case sql_type::UNIQUEIDENTIFIER:
                                 if (sv2.length() < sizeof(uint8_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
 
                                 col.max_length = *(uint8_t*)sv2.data();
 
@@ -8507,7 +8507,7 @@ namespace tds {
                             case sql_type::CHAR:
                             case sql_type::NCHAR: {
                                 if (sv2.length() < sizeof(uint16_t) + sizeof(collation))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t) + sizeof(collation));
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(uint16_t) + sizeof(collation));
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
@@ -8524,7 +8524,7 @@ namespace tds {
                             case sql_type::VARBINARY:
                             case sql_type::BINARY:
                                 if (sv2.length() < sizeof(uint16_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), sizeof(uint16_t));
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(uint16_t));
 
                                 col.max_length = *(uint16_t*)sv2.data();
 
@@ -8534,7 +8534,7 @@ namespace tds {
 
                             case sql_type::XML:
                                 if (sv2.length() < sizeof(uint8_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
 
                                 len += sizeof(uint8_t);
                                 sv2 = sv2.substr(sizeof(uint8_t));
@@ -8543,7 +8543,7 @@ namespace tds {
                             case sql_type::DECIMAL:
                             case sql_type::NUMERIC:
                                 if (sv2.length() < 3)
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 3)."), sv2.length());
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 3).", sv2.length());
 
                                 col.max_length = (uint8_t)sv2[0];
                                 col.precision = (uint8_t)sv2[1];
@@ -8556,7 +8556,7 @@ namespace tds {
 
                             case sql_type::SQL_VARIANT:
                                 if (sv2.length() < sizeof(uint32_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 4)."), sv2.length());
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 4).", sv2.length());
 
                                 col.max_length = *(uint32_t*)sv2.data();
 
@@ -8568,7 +8568,7 @@ namespace tds {
                             case sql_type::TEXT:
                             {
                                 if (sv2.length() < sizeof(uint32_t))
-                                    throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 4)."), sv2.length());
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 4).", sv2.length());
 
                                 col.max_length = *(uint32_t*)sv2.data();
 
@@ -8576,7 +8576,7 @@ namespace tds {
 
                                 if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
                                     if (sv2.length() < sizeof(collation))
-                                        throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 5)."), sv2.length());
+                                        throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 5).", sv2.length());
 
                                     sv2 = sv2.substr(sizeof(collation));
                                 }
@@ -8606,11 +8606,11 @@ namespace tds {
                             }
 
                             default:
-                                throw formatted_error(FMT_STRING("Unhandled type {} in COLMETADATA message."), c.type);
+                                throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
                         }
 
                         if (sv2.length() < 1)
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least 1)."), sv2.length());
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
 
                         auto name_len = *(uint8_t*)&sv2[0];
 
@@ -8618,7 +8618,7 @@ namespace tds {
                         len++;
 
                         if (sv2.length() < name_len * sizeof(char16_t))
-                            throw formatted_error(FMT_STRING("Short COLMETADATA message ({} bytes left, expected at least {})."), sv2.length(), name_len * sizeof(char16_t));
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), name_len * sizeof(char16_t));
 
                         col.name = u16string_view((char16_t*)sv2.data(), name_len);
 
@@ -8658,7 +8658,7 @@ namespace tds {
                     auto bitset_length = (cols.size() + 7) / 8;
 
                     if (sv.length() < bitset_length)
-                        throw formatted_error(FMT_STRING("Short NBCROW message ({} bytes, expected at least {})."), sv.length(), bitset_length);
+                        throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sv.length(), bitset_length);
 
                     string_view bitset(sv.data(), bitset_length);
                     auto bsv = (uint8_t)bitset[0];
@@ -8690,13 +8690,13 @@ namespace tds {
                 case tds_token::ORDER:
                 {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short ORDER message ({} bytes, expected at least {})."), sv.length(), sizeof(uint16_t));
+                        throw formatted_error("Short ORDER message ({} bytes, expected at least {}).", sv.length(), sizeof(uint16_t));
 
                     auto len = *(uint16_t*)sv.data();
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short ORDER message ({} bytes, expected {})."), sv.length(), len);
+                        throw formatted_error("Short ORDER message ({} bytes, expected {}).", sv.length(), len);
 
                     break;
                 }
@@ -8704,13 +8704,13 @@ namespace tds {
                 case tds_token::RETURNSTATUS:
                 {
                     if (sv.length() < sizeof(int32_t))
-                        throw formatted_error(FMT_STRING("Short RETURNSTATUS message ({} bytes, expected 4)."), sv.length());
+                        throw formatted_error("Short RETURNSTATUS message ({} bytes, expected 4).", sv.length());
 
                     break;
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled token type {} while executing SQL batch."), type);
+                    throw formatted_error("Unhandled token type {} while executing SQL batch.", type);
             }
         }
 
@@ -8762,15 +8762,15 @@ namespace tds {
         switch (ec->type) {
             case tds_envchange_type::begin_trans: {
                 if (sv.length() < sizeof(tds_envchange_begin_trans) - offsetof(tds_envchange_begin_trans, header.type))
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), sv.length());
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sv.length());
 
                 auto tebt = (tds_envchange_begin_trans*)ec;
 
                 if (tebt->header.length < offsetof(tds_envchange_begin_trans, new_len))
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), tebt->header.length);
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tebt->header.length);
 
                 if (tebt->new_len != 8)
-                    throw formatted_error(FMT_STRING("Unexpected transaction ID length ({} bytes, expected 8)."), tebt->new_len);
+                    throw formatted_error("Unexpected transaction ID length ({} bytes, expected 8).", tebt->new_len);
 
                 trans_id = tebt->trans_id;
 
@@ -8779,12 +8779,12 @@ namespace tds {
 
             case tds_envchange_type::rollback_trans: {
                 if (sv.length() < sizeof(tds_envchange_rollback_trans) - offsetof(tds_envchange_rollback_trans, header.type))
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), sv.length());
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sv.length());
 
                 auto tert = (tds_envchange_rollback_trans*)ec;
 
                 if (tert->header.length < offsetof(tds_envchange_rollback_trans, new_len))
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), tert->header.length);
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tert->header.length);
 
                 trans_id = 0;
 
@@ -8793,12 +8793,12 @@ namespace tds {
 
             case tds_envchange_type::commit_trans: {
                 if (sv.length() < sizeof(tds_envchange_commit_trans) - offsetof(tds_envchange_begin_trans, header.type))
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), sv.length());
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sv.length());
 
                 auto tect = (tds_envchange_commit_trans*)ec;
 
                 if (tect->header.length < offsetof(tds_envchange_begin_trans, new_len))
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected 11)."), tect->header.length);
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tect->header.length);
 
                 trans_id = 0;
 
@@ -8807,12 +8807,12 @@ namespace tds {
 
             case tds_envchange_type::packet_size: {
                 if (sv.length() < sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type))
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected at least 2)."), sv.length());
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least 2).", sv.length());
 
                 auto teps = (tds_envchange_packet_size*)ec;
 
                 if (teps->header.length < sizeof(tds_envchange_packet_size) + (teps->new_len * sizeof(char16_t))) {
-                    throw formatted_error(FMT_STRING("Short ENVCHANGE message ({} bytes, expected at least {})."),
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).",
                                           teps->header.length, sizeof(tds_envchange_packet_size) + (teps->new_len * sizeof(char16_t)));
                 }
 
@@ -8824,7 +8824,7 @@ namespace tds {
                         v *= 10;
                         v += c - '0';
                     } else
-                        throw formatted_error(FMT_STRING("Server returned invalid packet size \"{}\"."), utf16_to_utf8(s));
+                        throw formatted_error("Server returned invalid packet size \"{}\".", utf16_to_utf8(s));
                 }
 
                 packet_size = v;
@@ -8860,7 +8860,7 @@ namespace tds {
         conn.impl->wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
-            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
         string_view sv = payload;
 
@@ -8873,7 +8873,7 @@ namespace tds {
                 case tds_token::DONEINPROC:
                 case tds_token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                     sv = sv.substr(sizeof(tds_done_msg));
                 break;
@@ -8883,14 +8883,14 @@ namespace tds {
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                     auto len = *(uint16_t*)&sv[0];
 
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
                         if (conn.impl->message_handler)
@@ -8899,7 +8899,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
-                        throw formatted_error(FMT_STRING("TM_BEGIN_XACT request failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                        throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -8909,7 +8909,7 @@ namespace tds {
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled token type {} in transaction manager response."), type);
+                    throw formatted_error("Unhandled token type {} in transaction manager response.", type);
             }
         }
     }
@@ -8942,7 +8942,7 @@ namespace tds {
             conn.impl->wait_for_msg(type, payload);
 
             if (type != tds_msg::tabular_result)
-                throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+                throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
             string_view sv = payload;
 
@@ -8955,7 +8955,7 @@ namespace tds {
                     case tds_token::DONEINPROC:
                     case tds_token::DONEPROC:
                         if (sv.length() < sizeof(tds_done_msg))
-                            throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+                            throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                         sv = sv.substr(sizeof(tds_done_msg));
                         break;
@@ -8965,14 +8965,14 @@ namespace tds {
                     case tds_token::ENVCHANGE:
                     {
                         if (sv.length() < sizeof(uint16_t))
-                            throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                            throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                         auto len = *(uint16_t*)&sv[0];
 
                         sv = sv.substr(sizeof(uint16_t));
 
                         if (sv.length() < len)
-                            throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                            throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                         if (type == tds_token::INFO) {
                             if (conn.impl->message_handler) {
@@ -8990,7 +8990,7 @@ namespace tds {
                                 }
                             }
 
-                            throw formatted_error(FMT_STRING("TM_ROLLBACK_XACT request failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                            throw formatted_error("TM_ROLLBACK_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                         } else if (type == tds_token::ENVCHANGE)
                             conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -9000,7 +9000,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("Unhandled token type {} in transaction manager response."), type);
+                        throw formatted_error("Unhandled token type {} in transaction manager response.", type);
                 }
             }
         } catch (...) {
@@ -9029,7 +9029,7 @@ namespace tds {
         conn.impl->wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
-            throw formatted_error(FMT_STRING("Received message type {}, expected tabular_result"), (int)type);
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
         string_view sv = payload;
 
@@ -9042,7 +9042,7 @@ namespace tds {
                 case tds_token::DONEINPROC:
                 case tds_token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), sizeof(tds_done_msg));
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                     sv = sv.substr(sizeof(tds_done_msg));
                 break;
@@ -9052,14 +9052,14 @@ namespace tds {
                 case tds_token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected at least 2)."), type, sv.length());
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
 
                     auto len = *(uint16_t*)&sv[0];
 
                     sv = sv.substr(sizeof(uint16_t));
 
                     if (sv.length() < len)
-                        throw formatted_error(FMT_STRING("Short {} message ({} bytes, expected {})."), type, sv.length(), len);
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
                         if (conn.impl->message_handler)
@@ -9068,7 +9068,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
-                        throw formatted_error(FMT_STRING("TM_COMMIT_XACT request failed: {}"), utf16_to_utf8(extract_message(sv.substr(0, len))));
+                        throw formatted_error("TM_COMMIT_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
@@ -9078,7 +9078,7 @@ namespace tds {
                 }
 
                 default:
-                    throw formatted_error(FMT_STRING("Unhandled token type {} in transaction manager response."), type);
+                    throw formatted_error("Unhandled token type {} in transaction manager response.", type);
             }
         }
 
