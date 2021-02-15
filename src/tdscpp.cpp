@@ -3648,7 +3648,7 @@ namespace tds {
                                    (uint8_t)d[13], (uint8_t)d[14], (uint8_t)d[15]);
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to string."), type2);
+                throw formatted_error(FMT_STRING("Cannot convert {} to string"), type2);
         }
     }
 
@@ -3741,9 +3741,9 @@ namespace tds {
                 for (auto c : d) {
                     if (c == '-') {
                         if (!first)
-                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), d);
+                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), d);
                     } else if (c < '0' || c > '9')
-                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), d);
+                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), d);
 
                     first = false;
                 }
@@ -3753,9 +3753,9 @@ namespace tds {
                 auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), d);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), d);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT."), d);
+                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT"), d);
 
                 return res;
             }
@@ -3777,9 +3777,9 @@ namespace tds {
                 for (auto c : v) {
                     if (c == u'-') {
                         if (!first)
-                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), utf16_to_utf8(v));
+                            throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), utf16_to_utf8(v));
                     } else if (c < u'0' || c > u'9')
-                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), utf16_to_utf8(v));
+                        throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), utf16_to_utf8(v));
 
                     s += (char)c;
                     first = false;
@@ -3790,9 +3790,9 @@ namespace tds {
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer."), s);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to integer"), s);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT."), s);
+                    throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to BIGINT"), s);
 
                 return res;
             }
@@ -3825,7 +3825,7 @@ namespace tds {
                         return *(int32_t*)d.data(); // MSSQL adds 1 if after midday
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -3843,11 +3843,11 @@ namespace tds {
                 for (auto c : s) {
                     if (c == '-') {
                         if (!first)
-                            throw formatted_error(FMT_STRING("Cannot convert {} to integer."), s);
+                            throw formatted_error(FMT_STRING("Cannot convert {} to integer"), s);
                     } else if (c == '.')
                         break;
                     else if (c < '0' || c > '9')
-                        throw formatted_error(FMT_STRING("Cannot convert {} to integer."), s);
+                        throw formatted_error(FMT_STRING("Cannot convert {} to integer"), s);
 
                     first = false;
                 }
@@ -3857,9 +3857,9 @@ namespace tds {
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert {} to integer."), s);
+                    throw formatted_error(FMT_STRING("Cannot convert {} to integer"), s);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error(FMT_STRING("{} was too large to convert to BIGINT."), s);
+                    throw formatted_error(FMT_STRING("{} was too large to convert to BIGINT"), s);
 
                 return res;
             }
@@ -3881,7 +3881,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}."), d.length());
+                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}"), d.length());
                 }
 
             case sql_type::MONEY: {
@@ -3903,7 +3903,7 @@ namespace tds {
             // Not allowing VARBINARY even though MSSQL does
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to integer."), type2);
+                throw formatted_error(FMT_STRING("Cannot convert {} to integer"), type2);
         }
     }
 
@@ -4213,7 +4213,7 @@ namespace tds {
                     return date{1900, 1, 1};
 
                 if (!parse_datetime(t, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), d);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date"), d);
 
                 return date{y, mon, day};
             }
@@ -4253,7 +4253,7 @@ namespace tds {
                 auto sv = string_view(t2);
 
                 if (!parse_datetime(sv, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date."), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to date"), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
                 return date{y, mon, day};
             }
@@ -4278,7 +4278,7 @@ namespace tds {
                         return date{*(int32_t*)d.data()};
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -4303,7 +4303,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to date."), type2);
+                throw formatted_error(FMT_STRING("Cannot convert {} to date"), type2);
         }
     }
 
@@ -4364,7 +4364,7 @@ namespace tds {
                     return time{0, 0, 0};
 
                 if (!parse_datetime(t, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), d);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time"), d);
 
                 return time{h, min, s};
             }
@@ -4402,7 +4402,7 @@ namespace tds {
                 }
 
                 if (!parse_datetime(t2, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time."), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to time"), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
                 return time{h, min, s};
             }
@@ -4431,7 +4431,7 @@ namespace tds {
                         return time{*(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -4464,7 +4464,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to TIME for integers, floats, BITs, or DATE
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to time."), type2);
+                throw formatted_error(FMT_STRING("Cannot convert {} to time"), type2);
         }
     }
 
@@ -4525,7 +4525,7 @@ namespace tds {
                     return datetime{1900, 1, 1, 0, 0, 0};
 
                 if (!parse_datetime(t, y, mon, day, h, min, s))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), d);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime"), d);
 
                 return datetime{y, mon, day, h, min, s};
             }
@@ -4563,7 +4563,7 @@ namespace tds {
                 }
 
                 if (!parse_datetime(t2, y, mon, day, h, min, s))
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime."), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to datetime"), utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
                 return datetime{y, mon, day, h, min, s};
             }
@@ -4600,7 +4600,7 @@ namespace tds {
                         return datetime{*(int32_t*)d.data(), *(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
                 }
 
             case sql_type::DATETIM4:
@@ -4639,7 +4639,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to DATETIME2 for integers, floats, or BIT
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to datetime."), type2);
+                throw formatted_error(FMT_STRING("Cannot convert {} to datetime"), type2);
         }
     }
 
@@ -4699,7 +4699,7 @@ namespace tds {
                         return *(double*)d.data();
 
                     default:
-                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}."), d.length());
+                        throw formatted_error(FMT_STRING("FLTN has unexpected length {}"), d.length());
                 }
 
             case sql_type::VARCHAR:
@@ -4716,7 +4716,7 @@ namespace tds {
                 auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), d);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), d);
                 else if (ec == errc::result_out_of_range)
                     throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), d);
 
@@ -4725,7 +4725,7 @@ namespace tds {
                 try {
                     return stod(string(d));
                 } catch (...) {
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), d);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), d);
                 }
 #endif
             }
@@ -4753,7 +4753,7 @@ namespace tds {
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), s);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), s);
                 else if (ec == errc::result_out_of_range)
                     throw formatted_error(FMT_STRING("String \"{}\" was too large to convert to float."), s);
 
@@ -4762,7 +4762,7 @@ namespace tds {
                 try {
                     return stod(s);
                 } catch (...) {
-                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float."), s);
+                    throw formatted_error(FMT_STRING("Cannot convert string \"{}\" to float"), s);
                 }
 #endif
             }
@@ -4821,7 +4821,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}."), d.length());
+                        throw formatted_error(FMT_STRING("DATETIMN has invalid length {}"), d.length());
                 }
 
             case sql_type::DATETIM4: {
@@ -4838,7 +4838,7 @@ namespace tds {
                 try {
                     return stod(s);
                 } catch (...) {
-                    throw formatted_error(FMT_STRING("Cannot convert {} to float."), s);
+                    throw formatted_error(FMT_STRING("Cannot convert {} to float"), s);
                 }
             }
 
@@ -4859,7 +4859,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}."), d.length());
+                        throw formatted_error(FMT_STRING("MONEYN has unexpected length {}"), d.length());
                 }
 
             case sql_type::MONEY: {
@@ -4879,7 +4879,7 @@ namespace tds {
             // MSSQL doesn't allow conversion to FLOAT for DATE, TIME, DATETIME2, DATETIMEOFFSET, or VARBINARY
 
             default:
-                throw formatted_error(FMT_STRING("Cannot convert {} to float."), type2);
+                throw formatted_error(FMT_STRING("Cannot convert {} to float"), type2);
         }
     }
 
@@ -7189,7 +7189,13 @@ namespace tds {
                         *ptr = (uint8_t)cols[i].max_length;
                         ptr++;
 
-                        auto n = (int64_t)v[i];
+                        int64_t n;
+
+                        try {
+                            n = (int64_t)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
 
                         switch (cols[i].max_length) {
                             case sizeof(uint8_t):
@@ -7435,7 +7441,14 @@ namespace tds {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
-                        auto d = (date)v[i];
+                        date d;
+
+                        try {
+                            d = (date)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
+
                         uint32_t n = d.num + 693595;
 
                         *(uint8_t*)ptr = 3;
@@ -7451,7 +7464,14 @@ namespace tds {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
-                        auto t = (time)v[i];
+                        time t;
+
+                        try {
+                            t = (time)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
+
                         uint64_t secs = (t.hour * 3600) + (t.minute * 60) + t.second;
 
                         for (unsigned int j = 0; j < cols[i].scale; j++) {
@@ -7485,7 +7505,14 @@ namespace tds {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
-                        auto dt = (datetime)v[i];
+                        datetime dt;
+
+                        try {
+                            dt = (datetime)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
+
                         uint32_t n = dt.d.num + 693595;
                         uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
@@ -7523,7 +7550,14 @@ namespace tds {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
-                        auto dto = (datetime)v[i];
+                        datetime dto;
+
+                        try {
+                            dto = (datetime)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
+
                         uint32_t n = dto.d.num + 693595;
                         uint64_t secs = (dto.t.hour * 3600) + (dto.t.minute * 60) + dto.t.second;
 
@@ -7562,7 +7596,14 @@ namespace tds {
                 break;
 
                 case sql_type::DATETIME: {
-                    auto dt = (datetime)v[i];
+                    datetime dt;
+
+                    try {
+                        dt = (datetime)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
+
                     uint32_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
                     *(int32_t*)ptr = dt.d.num;
@@ -7579,7 +7620,13 @@ namespace tds {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
-                        auto dt = (datetime)v[i];
+                        datetime dt;
+
+                        try {
+                            dt = (datetime)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
 
                         switch (cols[i].max_length) {
                             case 4: {
@@ -7626,7 +7673,13 @@ namespace tds {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
-                        auto d = (double)v[i];
+                        double d;
+
+                        try {
+                            d = (double)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
 
                         *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
                         ptr++;
@@ -7660,7 +7713,13 @@ namespace tds {
                         *(uint8_t*)ptr = v[i].val[0];
                         ptr += sizeof(uint8_t);
                     } else {
-                        auto n = (int64_t)v[i];
+                        int64_t n;
+
+                        try {
+                            n = (int64_t)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
 
                         *(uint8_t*)ptr = sizeof(uint8_t);
                         ptr++;
@@ -7670,7 +7729,13 @@ namespace tds {
                 break;
 
                 case sql_type::TINYINT: {
-                    auto n = (int64_t)v[i];
+                    int64_t n;
+
+                    try {
+                        n = (int64_t)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
                         throw formatted_error(FMT_STRING("Value {} is out of bounds for TINYINT column {}."), n, utf16_to_utf8(np[i]));
@@ -7682,7 +7747,13 @@ namespace tds {
                 }
 
                 case sql_type::SMALLINT: {
-                    auto n = (int64_t)v[i];
+                    int64_t n;
+
+                    try {
+                        n = (int64_t)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
                         throw formatted_error(FMT_STRING("Value {} is out of bounds for SMALLINT column {}."), n, utf16_to_utf8(np[i]));
@@ -7694,7 +7765,13 @@ namespace tds {
                 }
 
                 case sql_type::INT: {
-                    auto n = (int64_t)v[i];
+                    int64_t n;
+
+                    try {
+                        n = (int64_t)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
                         throw formatted_error(FMT_STRING("Value {} is out of bounds for INT column {}."), n, utf16_to_utf8(np[i]));
@@ -7706,7 +7783,13 @@ namespace tds {
                 }
 
                 case sql_type::BIGINT: {
-                    auto n = (int64_t)v[i];
+                    int64_t n;
+
+                    try {
+                        n = (int64_t)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     *(int64_t*)ptr = n;
                     ptr += sizeof(int64_t);
@@ -7715,7 +7798,13 @@ namespace tds {
                 }
 
                 case sql_type::FLOAT: {
-                    auto n = (double)v[i];
+                    double n;
+
+                    try {
+                        n = (double)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     *(double*)ptr = n;
                     ptr += sizeof(double);
@@ -7724,7 +7813,13 @@ namespace tds {
                 }
 
                 case sql_type::REAL: {
-                    auto n = (double)v[i];
+                    double n;
+
+                    try {
+                        n = (double)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     *(float*)ptr = (float)n;
                     ptr += sizeof(float);
@@ -7737,7 +7832,13 @@ namespace tds {
                         *(uint8_t*)ptr = v[i].val[0];
                         ptr += sizeof(uint8_t);
                     } else {
-                        auto n = (int64_t)v[i];
+                        int64_t n;
+
+                        try {
+                            n = (int64_t)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
 
                         *(uint8_t*)ptr = n != 0 ? 1 : 0;
                         ptr += sizeof(uint8_t);
@@ -7753,7 +7854,13 @@ namespace tds {
                         ptr++;
                     } else {
                         bool neg = false;
-                        auto d = (double)v[i];
+                        double d;
+
+                        try {
+                            d = (double)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
 
                         if (d < 0) {
                             neg = true;
@@ -7824,7 +7931,13 @@ namespace tds {
                         *ptr = (uint8_t)cols[i].max_length;
                         ptr++;
 
-                        auto val = (double)v[i];
+                        double val;
+
+                        try {
+                            val = (double)v[i];
+                        } catch (const exception& e) {
+                            throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                        }
 
                         val *= 10000.0;
 
@@ -7853,7 +7966,13 @@ namespace tds {
                 }
 
                 case sql_type::MONEY: {
-                    auto val = (double)v[i];
+                    double val;
+
+                    try {
+                        val = (double)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     val *= 10000.0;
 
@@ -7868,7 +7987,13 @@ namespace tds {
                 }
 
                 case sql_type::SMALLMONEY: {
-                    auto val = (double)v[i];
+                    double val;
+
+                    try {
+                        val = (double)v[i];
+                    } catch (const exception& e) {
+                        throw formatted_error(FMT_STRING("{} (column {})"), e.what(), utf16_to_utf8(np[i]));
+                    }
 
                     val *= 10000.0;
 
