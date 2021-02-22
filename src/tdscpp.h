@@ -209,6 +209,10 @@ namespace tds {
         template<size_t N>
         value(const std::array<std::byte, N>& bin) : value(std::vector<std::byte>{bin.begin(), bin.end()}) { }
 
+        template<size_t N>
+        value(const std::optional<std::array<std::byte, N>>& bin) :
+            value(bin.has_value() ? std::optional<std::vector<std::byte>>{std::vector<std::byte>{bin.value().begin(), bin.value().end()}} : std::optional<std::vector<std::byte>>{std::nullopt}) { }
+
         operator const std::string() const;
         operator const std::u16string() const;
         operator int64_t() const;
