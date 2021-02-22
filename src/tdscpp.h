@@ -205,6 +205,9 @@ namespace tds {
         value(const std::optional<bool>& b);
         value(const std::chrono::time_point<std::chrono::system_clock>& chr) : value((datetime)chr) { }
 
+        template<size_t N>
+        value(const std::array<std::byte, N>& bin) : value(std::vector<std::byte>{bin.begin(), bin.end()}) { }
+
         operator const std::string() const;
         operator const std::u16string() const;
         operator int64_t() const;
@@ -403,6 +406,11 @@ namespace tds {
             params.emplace_back(v);
         }
 
+        template<size_t N>
+        void add_param(std::array<std::byte, N>& bin) {
+            params.emplace_back(bin);
+        }
+
         template<typename T>
         void add_param(std::optional<T>& v) {
             if (!v.has_value()) {
@@ -487,6 +495,11 @@ namespace tds {
 
         void add_param(std::vector<std::byte>& v) {
             params.emplace_back(v);
+        }
+
+        template<size_t N>
+        void add_param(std::array<std::byte, N>& bin) {
+            params.emplace_back(bin);
         }
 
         template<typename T>
