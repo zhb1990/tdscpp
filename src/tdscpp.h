@@ -201,6 +201,7 @@ namespace tds {
         value(const datetimeoffset& dt);
         value(const std::optional<datetimeoffset>& t);
         value(const std::vector<std::byte>& bin);
+        value(const std::optional<std::vector<std::byte>>& bin);
         value(bool b);
         value(const std::optional<bool>& b);
         value(const std::chrono::time_point<std::chrono::system_clock>& chr) : value((datetime)chr) { }
