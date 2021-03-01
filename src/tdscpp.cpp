@@ -4311,6 +4311,16 @@ namespace tds {
 
             // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
 
+            case sql_type::TINYINT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::BIGINT:
+            case sql_type::INTN: {
+                auto n = (int64_t)*this;
+
+                throw formatted_error("Cannot convert integer {} to date", n);
+            }
+
             default:
                 throw formatted_error("Cannot convert {} to date", type2);
         }
