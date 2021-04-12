@@ -449,6 +449,15 @@ namespace tds {
         std::u16string name;
     };
 
+    template<typename T>
+    concept is_string = requires(T t) { { std::string_view{t} }; };
+
+    template<typename T>
+    concept is_u16string = requires(T t) { { std::u16string_view{t} }; };
+
+    template<typename T>
+    concept is_u8string = requires(T t) { { std::u8string_view{t} }; };
+
     class TDSCPP query {
     public:
         query(tds& conn, const std::string_view& q) : conn(conn) {
@@ -500,7 +509,7 @@ namespace tds {
             params.emplace_back(t);
         }
 
-        template<typename T> requires (std::ranges::input_range<T> && !byte_list<T>)
+        template<typename T> requires (std::ranges::input_range<T> && !byte_list<T> && !is_string<T> && !is_u16string<T> && !is_u8string<T>)
         void add_param(T&& v) {
             for (const auto& t : v) {
                 params.emplace_back(t);
