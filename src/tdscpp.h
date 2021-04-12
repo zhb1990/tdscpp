@@ -181,6 +181,7 @@ namespace tds {
         value(const std::optional<int64_t>& i);
         value(uint32_t i);
         value(const std::optional<uint32_t>& i);
+        value(wchar_t) = delete;
         value(const std::u16string_view& sv);
         value(const std::u16string& sv);
         value(const char16_t* sv);
