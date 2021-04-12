@@ -3236,23 +3236,6 @@ namespace tds {
         }
     }
 
-    value::value(const vector<std::byte>& bin) {
-        type = sql_type::VARBINARY;
-        val.resize(bin.size());
-        memcpy(val.data(), bin.data(), bin.size());
-    }
-
-    value::value(const optional<vector<std::byte>>& bin) {
-        type = sql_type::VARBINARY;
-
-        if (!bin.has_value())
-            is_null = true;
-        else {
-            val.resize(bin.value().size());
-            memcpy(val.data(), bin.value().data(), bin.value().size());
-        }
-    }
-
     value::value(bool b) {
         type = sql_type::BITN;
         val.resize(sizeof(uint8_t));

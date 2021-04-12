@@ -7,6 +7,7 @@
 #include <optional>
 #include <vector>
 #include <map>
+#include <span>
 #include <chrono>
 #include <time.h>
 #include <nlohmann/json.hpp>
@@ -160,6 +161,13 @@ namespace tds {
         int16_t offset;
     };
 
+#ifdef __cpp_concepts
+    template<typename T>
+    concept byte_list = requires(T t) {
+        { std::span<std::byte>{t} };
+    };
+#endif
+
     class TDSCPP value {
     public:
         // make sure pointers don't get interpreted as bools
@@ -200,18 +208,31 @@ namespace tds {
         value(const std::optional<datetime>& t);
         value(const datetimeoffset& dt);
         value(const std::optional<datetimeoffset>& t);
-        value(const std::vector<std::byte>& bin);
-        value(const std::optional<std::vector<std::byte>>& bin);
+
+#ifdef __cpp_concepts
+        value(const std::span<std::byte>& bin) {
+            type = sql_type::VARBINARY;
+            val.resize(bin.size());
+            memcpy(val.data(), bin.data(), bin.size());
+        }
+
+        template<typename T> requires byte_list<T>
+        value(const std::optional<T>& bin) {
+            type = sql_type::VARBINARY;
+
+            if (!bin.has_value())
+                is_null = true;
+            else {
+                const auto& s = std::span{bin.value()};
+                val.resize(s.size());
+                memcpy(val.data(), s.data(), s.size());
+            }
+        }
+#endif
+
         value(bool b);
         value(const std::optional<bool>& b);
         value(const std::chrono::time_point<std::chrono::system_clock>& chr) : value((datetime)chr) { }
-
-        template<size_t N>
-        value(const std::array<std::byte, N>& bin) : value(std::vector<std::byte>{bin.begin(), bin.end()}) { }
-
-        template<size_t N>
-        value(const std::optional<std::array<std::byte, N>>& bin) :
-            value(bin.has_value() ? std::optional<std::vector<std::byte>>{std::vector<std::byte>{bin.value().begin(), bin.value().end()}} : std::optional<std::vector<std::byte>>{std::nullopt}) { }
 
         operator const std::string() const;
         operator const std::u16string() const;
@@ -407,15 +428,6 @@ namespace tds {
             }
         }
 
-        void add_param(std::vector<std::byte>& v) {
-            params.emplace_back(v);
-        }
-
-        template<size_t N>
-        void add_param(std::array<std::byte, N>& bin) {
-            params.emplace_back(bin);
-        }
-
         template<typename T>
         void add_param(std::optional<T>& v) {
             if (!v.has_value()) {
@@ -496,15 +508,6 @@ namespace tds {
             for (const auto& t : v) {
                 params.emplace_back(t);
             }
-        }
-
-        void add_param(std::vector<std::byte>& v) {
-            params.emplace_back(v);
-        }
-
-        template<size_t N>
-        void add_param(std::array<std::byte, N>& bin) {
-            params.emplace_back(bin);
         }
 
         template<typename T>
