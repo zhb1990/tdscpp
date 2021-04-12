@@ -8,6 +8,7 @@
 #include <vector>
 #include <map>
 #include <span>
+#include <ranges>
 #include <chrono>
 #include <time.h>
 #include <nlohmann/json.hpp>
@@ -161,12 +162,10 @@ namespace tds {
         int16_t offset;
     };
 
-#ifdef __cpp_concepts
     template<typename T>
     concept byte_list = requires(T t) {
         { std::span<std::byte>{t} };
     };
-#endif
 
     class TDSCPP value {
     public:
@@ -209,7 +208,6 @@ namespace tds {
         value(const datetimeoffset& dt);
         value(const std::optional<datetimeoffset>& t);
 
-#ifdef __cpp_concepts
         value(const std::span<std::byte>& bin) {
             type = sql_type::VARBINARY;
             val.resize(bin.size());
@@ -228,7 +226,6 @@ namespace tds {
                 memcpy(val.data(), s.data(), s.size());
             }
         }
-#endif
 
         value(bool b);
         value(const std::optional<bool>& b);
@@ -503,11 +500,24 @@ namespace tds {
             params.emplace_back(t);
         }
 
-        template<typename T>
-        void add_param(std::vector<T>& v) {
+        template<typename T> requires (std::ranges::input_range<T> && !byte_list<T>)
+        void add_param(T&& v) {
             for (const auto& t : v) {
                 params.emplace_back(t);
             }
+        }
+
+        void add_param(const std::span<std::byte>& bin) {
+            params.emplace_back(bin);
+        }
+
+        template<typename T> requires byte_list<T>
+        void add_param(const std::optional<T>& bin) {
+            if (!bin.has_value()) {
+                params.emplace_back("");
+                params.back().is_null = true;
+            } else
+                params.emplace_back(bin.value());
         }
 
         template<typename T>
