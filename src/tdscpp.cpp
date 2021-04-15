@@ -43,6 +43,8 @@
 
 using namespace std;
 
+#define BROWSER_PORT 1434
+
 static const uint32_t tds_74_version = 0x4000074;
 
 template<>
@@ -9145,5 +9147,161 @@ namespace tds {
 
     uint16_t tds::spid() const {
         return impl->spid;
+    }
+
+    uint16_t get_instance_port(const std::string& server, const std::string_view& instance) {
+        struct addrinfo hints;
+        struct addrinfo* res;
+        struct addrinfo* orig_res;
+        ssize_t ret;
+        uint8_t msg_type;
+        uint16_t msg_len;
+#ifdef _WIN32
+        WSADATA wsa_data;
+        SOCKET sock = INVALID_SOCKET;
+#else
+        int sock = 0;
+#endif
+
+#ifdef _WIN32
+
+        if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
+            throw runtime_error("WSAStartup failed.");
+#endif
+
+        // connect to port 1434 via UDP
+
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = /*AF_UNSPEC*/AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_protocol = IPPROTO_UDP;
+
+        ret = getaddrinfo(server.c_str(), nullptr, &hints, &res);
+
+        if (ret != 0)
+            throw formatted_error("getaddrinfo returned {}", ret);
+
+        orig_res = res;
+#ifdef _WIN32
+        sock = INVALID_SOCKET;
+#else
+        sock = 0;
+#endif
+
+        do {
+            sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+#ifdef _WIN32
+            if (sock == INVALID_SOCKET)
+                continue;
+#else
+            if (sock < 0)
+                continue;
+#endif
+
+            if (res->ai_family == AF_INET)
+                ((struct sockaddr_in*)res->ai_addr)->sin_port = htons(BROWSER_PORT);
+            else if (res->ai_family == AF_INET6)
+                ((struct sockaddr_in6*)res->ai_addr)->sin6_port = htons(BROWSER_PORT);
+            else {
+#ifdef _WIN32
+                closesocket(sock);
+                sock = INVALID_SOCKET;
+#else
+                close(sock);
+                sock = 0;
+#endif
+                continue;
+            }
+
+            if (::connect(sock, res->ai_addr, (int)res->ai_addrlen) != 0) {
+#ifdef _WIN32
+                closesocket(sock);
+                sock = INVALID_SOCKET;
+#else
+                close(sock);
+                sock = 0;
+#endif
+                continue;
+            }
+
+            break;
+        } while ((res = res->ai_next));
+
+        freeaddrinfo(orig_res);
+
+#ifdef _WIN32
+        if (sock == INVALID_SOCKET)
+            throw formatted_error("Could not connect to {}:{}.", server, BROWSER_PORT);
+#else
+        if (sock <= 0)
+            throw formatted_error("Could not connect to {}:{}.", server, BROWSER_PORT);
+#endif
+
+        try {
+            ret = send(sock, "\x03", 1, 0);
+
+#ifdef _WIN32
+            if (ret < 0)
+                throw formatted_error("send failed (error {})", WSAGetLastError());
+#else
+            if (ret < 0)
+                throw formatted_error("send failed (error {})", errno);
+#endif
+
+            // FIXME - 1 second timeout
+
+            // wait for reply
+
+            ret = recv(sock, &msg_type, 1, 0);
+
+#ifdef _WIN32
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", WSAGetLastError());
+#else
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", errno);
+#endif
+
+            if (msg_type != 0x05)
+                throw formatted_error("response message type was {:02x}, expected 05", msg_type);
+
+            ret = recv(sock, &msg_len, sizeof(msg_len), 0);
+
+#ifdef _WIN32
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", WSAGetLastError());
+#else
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", errno);
+#endif
+
+            string resp(msg_len, 0);
+
+            ret = recv(sock, resp.data(), resp.length(), 0);
+
+#ifdef _WIN32
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", WSAGetLastError());
+#else
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", errno);
+#endif
+
+            throw formatted_error("FIXME - parse \"{}\"", resp);
+        } catch (...) {
+#ifdef _WIN32
+            closesocket(sock);
+#else
+            close(sock);
+#endif
+            throw;
+        }
+
+#ifdef _WIN32
+        closesocket(sock);
+#else
+        close(sock);
+#endif
     }
 };

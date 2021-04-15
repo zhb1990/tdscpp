@@ -644,6 +644,8 @@ namespace tds {
 
         return s;
     }
+
+    uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);
 };
 
 template<>
