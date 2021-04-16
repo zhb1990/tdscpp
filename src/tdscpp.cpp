@@ -9149,13 +9149,80 @@ namespace tds {
         return impl->spid;
     }
 
-    uint16_t get_instance_port(const std::string& server, const std::string_view& instance) {
+    static uint16_t parse_instance_string(string_view s, const string_view& instance) {
+        vector<string_view> instance_list;
+
+        while (!s.empty()) {
+            auto ds = s.find(";;");
+            string_view t;
+            bool this_instance = false;
+
+            if (ds == string::npos) {
+                t = s;
+                s = "";
+            } else {
+                t = s.substr(0, ds);
+                s = s.substr(ds + 2);
+            }
+
+            vector<string_view> el;
+
+            while (!t.empty()) {
+                auto sc = t.find(";");
+
+                if (sc == string::npos) {
+                    el.emplace_back(t.data(), t.length());
+                    break;
+                } else {
+                    el.emplace_back(t.data(), sc);
+                    t = t.substr(sc + 1);
+                }
+            }
+
+            for (unsigned int i = 0; i < el.size(); i++) {
+                if (el[i] == "InstanceName" && i < el.size() - 1) {
+                    this_instance = el[i+1] == instance; // FIXME - should be case-insensitive?
+
+                    if (!this_instance) {
+                        instance_list.push_back(el[i+1]);
+                        break;
+                    }
+                } else if (el[i] == "tcp" && i < el.size() - 1 && this_instance) {
+                    uint16_t ret;
+
+                    auto fc = from_chars(el[i+1].begin(), el[i+1].end(), ret);
+
+                    if (fc.ec == errc::invalid_argument)
+                        throw formatted_error("Could not convert port \"{}\" to integer.", el[i+1]);
+                    else if (fc.ec == errc::result_out_of_range)
+                        throw formatted_error("Port \"{}\" was too large to convert to 16-bit integer.", el[i+1]);
+
+                    return ret;
+                }
+            }
+        }
+
+        auto exc = fmt::format("{} not found in instance list (found ", instance);
+
+        for (unsigned int i = 0; i < instance_list.size(); i++) {
+            if (i > 0)
+                exc += ", ";
+
+            exc += instance_list[i];
+        }
+
+        exc += ")";
+
+        throw runtime_error(exc);
+    }
+
+    uint16_t get_instance_port(const string& server, const string_view& instance) {
         struct addrinfo hints;
         struct addrinfo* res;
         struct addrinfo* orig_res;
         ssize_t ret;
         uint8_t msg_type;
-        uint16_t msg_len;
+        uint16_t msg_len, port;
 #ifdef _WIN32
         WSADATA wsa_data;
         SOCKET sock = INVALID_SOCKET;
@@ -9288,7 +9355,7 @@ namespace tds {
                 throw formatted_error("recv failed (error {})", errno);
 #endif
 
-            throw formatted_error("FIXME - parse \"{}\"", resp);
+            port = parse_instance_string(resp, instance);
         } catch (...) {
 #ifdef _WIN32
             closesocket(sock);
@@ -9303,5 +9370,7 @@ namespace tds {
 #else
         close(sock);
 #endif
+
+        return port;
     }
 };
