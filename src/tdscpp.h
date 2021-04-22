@@ -374,29 +374,29 @@ namespace tds {
         ~rpc();
 
         template<typename... Args>
-        rpc(tds& tds, const std::u16string_view& name, Args&&... args) : conn(tds) {
+        rpc(tds& tds, const std::u16string_view& rpc_name, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
 
-            do_rpc(conn, name);
+            do_rpc(conn, rpc_name);
         }
 
-        rpc(tds& tds, const std::u16string_view& name) : conn(tds) {
-            do_rpc(conn, name);
+        rpc(tds& tds, const std::u16string_view& rpc_name) : conn(tds) {
+            do_rpc(conn, rpc_name);
         }
 
         template<typename... Args>
-        rpc(tds& tds, const std::string_view& name, Args&&... args) : conn(tds) {
+        rpc(tds& tds, const std::string_view& rpc_name, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
 
-            do_rpc(conn, name);
+            do_rpc(conn, rpc_name);
         }
 
-        rpc(tds& tds, const std::string_view& name) : conn(tds) {
-            do_rpc(conn, name);
+        rpc(tds& tds, const std::string_view& rpc_name) : conn(tds) {
+            do_rpc(conn, rpc_name);
         }
 
         uint16_t num_columns() const;
