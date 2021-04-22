@@ -2412,6 +2412,8 @@ namespace tds {
 
                                 sv = sv.substr(1 + sizeof(uint32_t) + len);
                             }
+
+                            break;
                         }
 
                         default:
