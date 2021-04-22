@@ -9220,7 +9220,6 @@ namespace tds {
         struct addrinfo hints;
         struct addrinfo* res;
         struct addrinfo* orig_res;
-        ssize_t ret;
         uint8_t msg_type;
         uint16_t msg_len, port;
 #ifdef _WIN32
@@ -9243,7 +9242,7 @@ namespace tds {
         hints.ai_socktype = SOCK_DGRAM;
         hints.ai_protocol = IPPROTO_UDP;
 
-        ret = getaddrinfo(server.c_str(), nullptr, &hints, &res);
+        auto ret = (int)getaddrinfo(server.c_str(), nullptr, &hints, &res);
 
         if (ret != 0)
             throw formatted_error("getaddrinfo returned {}", ret);
@@ -9306,7 +9305,7 @@ namespace tds {
 #endif
 
         try {
-            ret = send(sock, "\x03", 1, 0);
+            ret = (int)send(sock, "\x03", 1, 0);
 
 #ifdef _WIN32
             if (ret < 0)
@@ -9320,7 +9319,7 @@ namespace tds {
 
             // wait for reply
 
-            ret = recv(sock, &msg_type, 1, 0);
+            ret = (int)recv(sock, &msg_type, 1, 0);
 
 #ifdef _WIN32
             if (ret < 0)
@@ -9333,7 +9332,7 @@ namespace tds {
             if (msg_type != 0x05)
                 throw formatted_error("response message type was {:02x}, expected 05", msg_type);
 
-            ret = recv(sock, &msg_len, sizeof(msg_len), 0);
+            ret = (int)recv(sock, &msg_len, sizeof(msg_len), 0);
 
 #ifdef _WIN32
             if (ret < 0)
@@ -9345,7 +9344,7 @@ namespace tds {
 
             string resp(msg_len, 0);
 
-            ret = recv(sock, resp.data(), resp.length(), 0);
+            ret = (int)recv(sock, resp.data(), resp.length(), 0);
 
 #ifdef _WIN32
             if (ret < 0)
