@@ -374,7 +374,7 @@ namespace tds {
         ~rpc();
 
         template<typename... Args>
-        rpc(tds& conn, const std::u16string_view& name, Args&&... args) : conn(conn) {
+        rpc(tds& tds, const std::u16string_view& name, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -382,12 +382,12 @@ namespace tds {
             do_rpc(conn, name);
         }
 
-        rpc(tds& conn, const std::u16string_view& name) : conn(conn) {
+        rpc(tds& tds, const std::u16string_view& name) : conn(tds) {
             do_rpc(conn, name);
         }
 
         template<typename... Args>
-        rpc(tds& conn, const std::string_view& name, Args&&... args) : conn(conn) {
+        rpc(tds& tds, const std::string_view& name, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -395,7 +395,7 @@ namespace tds {
             do_rpc(conn, name);
         }
 
-        rpc(tds& conn, const std::string_view& name) : conn(conn) {
+        rpc(tds& tds, const std::string_view& name) : conn(tds) {
             do_rpc(conn, name);
         }
 
@@ -461,16 +461,16 @@ namespace tds {
 
     class TDSCPP query {
     public:
-        query(tds& conn, const std::string_view& q) : conn(conn) {
+        query(tds& tds, const std::string_view& q) : conn(tds) {
             do_query(conn, q);
         }
 
-        query(tds& conn, const std::u16string_view& q) : conn(conn) {
+        query(tds& tds, const std::u16string_view& q) : conn(tds) {
             do_query(conn, q);
         }
 
         template<typename... Args>
-        query(tds& conn, const std::string_view& q, Args&&... args) : conn(conn) {
+        query(tds& tds, const std::string_view& q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -479,7 +479,7 @@ namespace tds {
         }
 
         template<typename... Args>
-        query(tds& conn, const std::u16string_view& q, Args&&... args) : conn(conn) {
+        query(tds& tds, const std::u16string_view& q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
