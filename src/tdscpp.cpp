@@ -7185,7 +7185,7 @@ namespace tds {
         *(tds_token*)ptr = tds_token::ROW;
         ptr++;
 
-        for (unsigned int i = 0; i < cols.size(); i++) {
+        for (size_t i = 0; i < cols.size(); i++) {
             switch (cols[i].type) {
                 case sql_type::INTN:
                     if (v[i].is_null) {
@@ -9181,7 +9181,7 @@ namespace tds {
                 }
             }
 
-            for (unsigned int i = 0; i < el.size(); i++) {
+            for (size_t i = 0; i < el.size(); i++) {
                 if (el[i] == "InstanceName" && i < el.size() - 1) {
                     this_instance = el[i+1] == instance; // FIXME - should be case-insensitive?
 
