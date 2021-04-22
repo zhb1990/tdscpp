@@ -9190,7 +9190,7 @@ namespace tds {
                 } else if (el[i] == "tcp" && i < el.size() - 1 && this_instance) {
                     uint16_t ret;
 
-                    auto fc = from_chars(el[i+1].begin(), el[i+1].end(), ret);
+                    auto fc = from_chars(el[i+1].data(), el[i+1].data() + el[i+1].length() - 1, ret);
 
                     if (fc.ec == errc::invalid_argument)
                         throw formatted_error("Could not convert port \"{}\" to integer.", el[i+1]);
@@ -9319,7 +9319,7 @@ namespace tds {
 
             // wait for reply
 
-            ret = (int)recv(sock, &msg_type, 1, 0);
+            ret = (int)recv(sock, (char*)&msg_type, 1, 0);
 
 #ifdef _WIN32
             if (ret < 0)
@@ -9332,7 +9332,7 @@ namespace tds {
             if (msg_type != 0x05)
                 throw formatted_error("response message type was {:02x}, expected 05", msg_type);
 
-            ret = (int)recv(sock, &msg_len, sizeof(msg_len), 0);
+            ret = (int)recv(sock, (char*)&msg_len, sizeof(msg_len), 0);
 
 #ifdef _WIN32
             if (ret < 0)
