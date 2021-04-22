@@ -2012,7 +2012,7 @@ namespace tds {
                         sv2 = sv2.substr(name_len * sizeof(char16_t));
                     }
 
-                    auto len = sv2.data() - sv.data();
+                    auto len = (size_t)(sv2.data() - sv.data());
 
                     tokens.emplace_back(sv.substr(0, len));
                     sv = sv.substr(len);
@@ -2030,7 +2030,7 @@ namespace tds {
                             return;
                     }
 
-                    auto len = sv2.data() - sv.data();
+                    auto len = (size_t)(sv2.data() - sv.data());
 
                     tokens.emplace_back(sv.substr(0, len));
                     sv = sv.substr(len);
@@ -2059,7 +2059,7 @@ namespace tds {
                         if (i != 0) {
                             if ((i & 7) == 0) {
                                 bitset = bitset.substr(1);
-                                bsv = bitset[0];
+                                bsv = (uint8_t)bitset[0];
                             } else
                                 bsv >>= 1;
                         }
@@ -2070,7 +2070,7 @@ namespace tds {
                         }
                     }
 
-                    auto len = sv2.data() - sv.data();
+                    auto len = (size_t)(sv2.data() - sv.data());
 
                     tokens.emplace_back(sv.substr(0, len));
                     sv = sv.substr(len);
@@ -2143,7 +2143,7 @@ namespace tds {
                         sv2 = sv2.substr(len);
                     }
 
-                    auto token_len = sv2.data() - sv.data();
+                    auto token_len = (size_t)(sv2.data() - sv.data());
 
                     tokens.emplace_back(sv.substr(0, token_len));
                     sv = sv.substr(token_len);
@@ -4056,7 +4056,7 @@ namespace tds {
         } else
             return false;
 
-        s = s.substr(rm[0].length());
+        s = s.substr((size_t)rm[0].length());
 
         return true;
     }
@@ -5185,7 +5185,7 @@ namespace tds {
         auto len = ucnv_toUChars(conv, us.data(), (int32_t)us.length() / sizeof(char16_t), s.data(), (int32_t)s.length(), &status);
 
         if (us.length() > (uint32_t)len)
-            us = us.substr(0, len);
+            us = us.substr(0, (uint32_t)len);
 
         ucnv_close(conv);
 #endif
@@ -6323,7 +6323,7 @@ namespace tds {
                         if (i != 0) {
                             if ((i & 7) == 0) {
                                 bitset = bitset.substr(1);
-                                bsv = bitset[0];
+                                bsv = (uint8_t)bitset[0];
                             } else
                                 bsv >>= 1;
                         }
@@ -6926,12 +6926,12 @@ namespace tds {
         if (U_FAILURE(status))
             throw formatted_error("ucnv_open failed for code page {} ({})", cp, u_errorName(status));
 
-        ret.resize(UCNV_GET_MAX_BYTES_FOR_STRING(s.length(), ucnv_getMaxCharSize(conv)));
+        ret.resize((size_t)UCNV_GET_MAX_BYTES_FOR_STRING(s.length(), ucnv_getMaxCharSize(conv)));
 
         auto len = ucnv_fromUChars(conv, ret.data(), (int32_t)ret.length(), s.data(), (int32_t)s.length(), &status);
 
         if (ret.length() > (uint32_t)len)
-            ret = ret.substr(0, len);
+            ret = ret.substr(0, (size_t)len);
 
         ucnv_close(conv);
 #endif
@@ -7714,7 +7714,7 @@ namespace tds {
                     } else if (v[i].type == sql_type::BIT || v[i].type == sql_type::BITN) {
                         *(uint8_t*)ptr = sizeof(uint8_t);
                         ptr++;
-                        *(uint8_t*)ptr = v[i].val[0];
+                        *(uint8_t*)ptr = (uint8_t)v[i].val[0];
                         ptr += sizeof(uint8_t);
                     } else {
                         int64_t n;
@@ -7833,7 +7833,7 @@ namespace tds {
 
                 case sql_type::BIT: {
                     if (v[i].type == sql_type::BIT || v[i].type == sql_type::BITN) {
-                        *(uint8_t*)ptr = v[i].val[0];
+                        *(uint8_t*)ptr = (uint8_t)(v[i].val[0]);
                         ptr += sizeof(uint8_t);
                     } else {
                         int64_t n;
@@ -8675,7 +8675,7 @@ namespace tds {
                         if (i != 0) {
                             if ((i & 7) == 0) {
                                 bitset = bitset.substr(1);
-                                bsv = bitset[0];
+                                bsv = (uint8_t)bitset[0];
                             } else
                                 bsv >>= 1;
                         }
