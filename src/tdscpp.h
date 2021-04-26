@@ -193,14 +193,19 @@ namespace tds {
         template<typename... Args>
         void run(const std::u16string_view& s, Args&&... args);
 
+        template<string_or_u16string T = std::u16string_view>
         void bcp(const string_or_u16string auto& table, const list_of_u16string auto& np,
-                 const list_of_list_of_values auto& vp, const std::u16string_view& db = u"") {
+                 const list_of_list_of_values auto& vp, const T& db = u"") {
             std::vector<col_info> cols;
 
-            if constexpr (is_u16string<decltype(table)>)
+            if constexpr (is_u16string<decltype(table)> && is_u16string<decltype(db)>)
                 cols = bcp_start(table, np, db);
-            else
+            else if constexpr (is_u16string<decltype(table)>)
+                cols = bcp_start(table, np, utf8_to_utf16(db));
+            else if constexpr (is_u16string<decltype(db)>)
                 cols = bcp_start(utf8_to_utf16(table), np, db);
+            else
+                cols = bcp_start(utf8_to_utf16(table), np, utf8_to_utf16(db));
 
             // send COLMETADATA for rows
             auto buf = bcp_colmetadata(np, cols);
@@ -218,8 +223,9 @@ namespace tds {
             bcp_sendmsg(std::string_view((char*)buf.data(), buf.size()));
         }
 
+        template<string_or_u16string T = std::u16string_view>
         void bcp(const string_or_u16string auto& table, const list_of_string auto& np,
-                 const list_of_list_of_values auto& vp, const std::u16string_view& db = u"") {
+                 const list_of_list_of_values auto& vp, const T& db = u"") {
             std::vector<std::u16string> np2;
 
             for (const auto& s : np) {
@@ -227,11 +233,6 @@ namespace tds {
             }
 
             bcp(table, np2, vp, db);
-        }
-
-        void bcp(const string_or_u16string auto& table, const list_of_string_or_u16string auto& np,
-                 const list_of_list_of_values auto& vp, const std::string_view& db) {
-            bcp(table, np, vp, utf8_to_utf16(db));
         }
 
         uint16_t spid() const;
