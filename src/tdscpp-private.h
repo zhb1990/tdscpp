@@ -146,32 +146,6 @@ struct tds_login_msg {
 
 static_assert(sizeof(tds_login_msg) == 94, "tds_login_msg has wrong size");
 
-enum class tds_token : uint8_t {
-    OFFSET = 0x78,
-    RETURNSTATUS = 0x79,
-    COLMETADATA = 0x81,
-    ALTMETADATA = 0x88,
-    DATACLASSIFICATION = 0xa3,
-    TABNAME = 0xa4,
-    COLINFO = 0xa5,
-    ORDER = 0xa9,
-    TDS_ERROR = 0xaa,
-    INFO = 0xab,
-    RETURNVALUE = 0xac,
-    LOGINACK = 0xad,
-    FEATUREEXTACK = 0xae,
-    ROW = 0xd1,
-    NBCROW = 0xd2,
-    ALTROW = 0xd3,
-    ENVCHANGE = 0xe3,
-    SESSIONSTATE = 0xe4,
-    SSPI = 0xed,
-    FEDAUTHINFO = 0xee,
-    DONE = 0xfd,
-    DONEPROC = 0xfe,
-    DONEINPROC = 0xff
-};
-
 #pragma pack(push,1)
 
 struct tds_done_msg {
@@ -354,7 +328,7 @@ enum class tds_envchange_type : uint8_t {
 };
 
 struct tds_envchange {
-    enum tds_token token;
+    enum tds::token token;
     uint16_t length;
     enum tds_envchange_type type;
 };

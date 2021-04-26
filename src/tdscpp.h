@@ -80,6 +80,32 @@ namespace tds {
         XML = 0xF1,
     };
 
+    enum class token : uint8_t {
+        OFFSET = 0x78,
+        RETURNSTATUS = 0x79,
+        COLMETADATA = 0x81,
+        ALTMETADATA = 0x88,
+        DATACLASSIFICATION = 0xa3,
+        TABNAME = 0xa4,
+        COLINFO = 0xa5,
+        ORDER = 0xa9,
+        TDS_ERROR = 0xaa,
+        INFO = 0xab,
+        RETURNVALUE = 0xac,
+        LOGINACK = 0xad,
+        FEATUREEXTACK = 0xae,
+        ROW = 0xd1,
+        NBCROW = 0xd2,
+        ALTROW = 0xd3,
+        ENVCHANGE = 0xe3,
+        SESSIONSTATE = 0xe4,
+        SSPI = 0xed,
+        FEDAUTHINFO = 0xee,
+        DONE = 0xfd,
+        DONEPROC = 0xfe,
+        DONEINPROC = 0xff
+    };
+
     using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
     using func_count_handler = std::function<void(uint64_t count, uint16_t curcmd)>;
@@ -103,6 +129,8 @@ namespace tds {
         bool nullable;
         unsigned int codepage;
     };
+
+    std::string TDSCPP utf16_to_utf8(const std::u16string_view& sv);
 
     class TDSCPP tds {
     public:
@@ -155,6 +183,7 @@ namespace tds {
         std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
         void bcp_sendmsg(const std::string_view& msg);
         size_t bcp_row_size(const col_info& col, const value& vv);
+        void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const std::u16string_view& col_name);
     };
 
     class TDSCPP date {
@@ -690,6 +719,38 @@ namespace tds {
     }
 
     uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);
+
+    std::vector<uint8_t> tds::bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols) {
+        size_t bufsize = sizeof(uint8_t);
+
+        for (unsigned int i = 0; i < cols.size(); i++) {
+            const auto& col = cols[i];
+            const auto& vv = v[i];
+
+            if (i >= v.size())
+                throw std::runtime_error("Trying to send " + std::to_string(v.size()) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
+
+            if (vv.is_null && !col.nullable)
+                throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(np[i]) + " marked NOT NULL.");
+
+            bufsize += bcp_row_size(col, vv);
+        }
+
+        std::vector<uint8_t> buf(bufsize);
+        uint8_t* ptr = buf.data();
+
+        *(token*)ptr = token::ROW;
+        ptr++;
+
+        for (size_t i = 0; i < cols.size(); i++) {
+            const auto& col = cols[i];
+            const auto& vv = v[i];
+
+            bcp_row_data(ptr, col, vv, np[i]);
+        }
+
+        return buf;
+    }
 };
 
 template<>

@@ -48,7 +48,7 @@ using namespace std;
 static const uint32_t tds_74_version = 0x4000074;
 
 template<>
-struct fmt::formatter<enum tds_token> {
+struct fmt::formatter<enum tds::token> {
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin();
 
@@ -59,75 +59,75 @@ struct fmt::formatter<enum tds_token> {
     }
 
     template<typename format_context>
-    auto format(enum tds_token t, format_context& ctx) {
+    auto format(enum tds::token t, format_context& ctx) {
         switch (t) {
-            case tds_token::OFFSET:
+            case tds::token::OFFSET:
                 return format_to(ctx.out(), "OFFSET");
 
-            case tds_token::RETURNSTATUS:
+            case tds::token::RETURNSTATUS:
                 return format_to(ctx.out(), "RETURNSTATUS");
 
-            case tds_token::COLMETADATA:
+            case tds::token::COLMETADATA:
                 return format_to(ctx.out(), "COLMETADATA");
 
-            case tds_token::ALTMETADATA:
+            case tds::token::ALTMETADATA:
                 return format_to(ctx.out(), "ALTMETADATA");
 
-            case tds_token::DATACLASSIFICATION:
+            case tds::token::DATACLASSIFICATION:
                 return format_to(ctx.out(), "DATACLASSIFICATION");
 
-            case tds_token::TABNAME:
+            case tds::token::TABNAME:
                 return format_to(ctx.out(), "TABNAME");
 
-            case tds_token::COLINFO:
+            case tds::token::COLINFO:
                 return format_to(ctx.out(), "COLINFO");
 
-            case tds_token::ORDER:
+            case tds::token::ORDER:
                 return format_to(ctx.out(), "ORDER");
 
-            case tds_token::TDS_ERROR:
+            case tds::token::TDS_ERROR:
                 return format_to(ctx.out(), "ERROR");
 
-            case tds_token::INFO:
+            case tds::token::INFO:
                 return format_to(ctx.out(), "INFO");
 
-            case tds_token::RETURNVALUE:
+            case tds::token::RETURNVALUE:
                 return format_to(ctx.out(), "RETURNVALUE");
 
-            case tds_token::LOGINACK:
+            case tds::token::LOGINACK:
                 return format_to(ctx.out(), "LOGINACK");
 
-            case tds_token::FEATUREEXTACK:
+            case tds::token::FEATUREEXTACK:
                 return format_to(ctx.out(), "FEATUREEXTACK");
 
-            case tds_token::ROW:
+            case tds::token::ROW:
                 return format_to(ctx.out(), "ROW");
 
-            case tds_token::NBCROW:
+            case tds::token::NBCROW:
                 return format_to(ctx.out(), "NBCROW");
 
-            case tds_token::ALTROW:
+            case tds::token::ALTROW:
                 return format_to(ctx.out(), "ALTROW");
 
-            case tds_token::ENVCHANGE:
+            case tds::token::ENVCHANGE:
                 return format_to(ctx.out(), "ENVCHANGE");
 
-            case tds_token::SESSIONSTATE:
+            case tds::token::SESSIONSTATE:
                 return format_to(ctx.out(), "SESSIONSTATE");
 
-            case tds_token::SSPI:
+            case tds::token::SSPI:
                 return format_to(ctx.out(), "SSPI");
 
-            case tds_token::FEDAUTHINFO:
+            case tds::token::FEDAUTHINFO:
                 return format_to(ctx.out(), "FEDAUTHINFO");
 
-            case tds_token::DONE:
+            case tds::token::DONE:
                 return format_to(ctx.out(), "DONE");
 
-            case tds_token::DONEPROC:
+            case tds::token::DONEPROC:
                 return format_to(ctx.out(), "DONEPROC");
 
-            case tds_token::DONEINPROC:
+            case tds::token::DONEINPROC:
                 return format_to(ctx.out(), "DONEINPROC");
 
             default:
@@ -163,33 +163,35 @@ static u16string utf8_to_utf16(const string_view& sv) {
 #endif
 }
 
-static string utf16_to_utf8(const u16string_view& sv) {
+namespace tds {
+    string utf16_to_utf8(const u16string_view& sv) {
 #ifdef _WIN32
-    string ret;
+        string ret;
 
-    if (sv.empty())
-        return "";
+        if (sv.empty())
+            return "";
 
-    auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), nullptr, 0,
-                                   nullptr, nullptr);
+        auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), nullptr, 0,
+                                    nullptr, nullptr);
 
-    if (len == 0)
-        throw runtime_error("WideCharToMultiByte 1 failed.");
+        if (len == 0)
+            throw runtime_error("WideCharToMultiByte 1 failed.");
 
-    ret.resize(len);
+        ret.resize(len);
 
-    len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), ret.data(), len,
-                              nullptr, nullptr);
+        len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), ret.data(), len,
+                                nullptr, nullptr);
 
-    if (len == 0)
-        throw runtime_error("WideCharToMultiByte 2 failed.");
+        if (len == 0)
+            throw runtime_error("WideCharToMultiByte 2 failed.");
 
-    return ret;
+        return ret;
 #else
-    wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
+        wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
 
-    return convert.to_bytes(sv.data(), sv.data() + sv.length());
+        return convert.to_bytes(sv.data(), sv.data() + sv.length());
 #endif
+    }
 }
 
 #ifdef _WIN32
@@ -1796,17 +1798,17 @@ namespace tds {
 
     static void parse_tokens(string_view& sv, list<string>& tokens, vector<column>& buf_columns) {
         while (!sv.empty()) {
-            auto type = (tds_token)sv[0];
+            auto type = (token)sv[0];
 
             switch (type) {
-                case tds_token::TABNAME:
-                case tds_token::COLINFO:
-                case tds_token::ORDER:
-                case tds_token::TDS_ERROR:
-                case tds_token::INFO:
-                case tds_token::LOGINACK:
-                case tds_token::ENVCHANGE:
-                case tds_token::SSPI: {
+                case token::TABNAME:
+                case token::COLINFO:
+                case token::ORDER:
+                case token::TDS_ERROR:
+                case token::INFO:
+                case token::LOGINACK:
+                case token::ENVCHANGE:
+                case token::SSPI: {
                     if (sv.length() < 1 + sizeof(uint16_t))
                         return;
 
@@ -1821,9 +1823,9 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::DONE:
-                case tds_token::DONEPROC:
-                case tds_token::DONEINPROC:
+                case token::DONE:
+                case token::DONEPROC:
+                case token::DONEINPROC:
                     if (sv.length() < 1 + sizeof(tds_done_msg))
                         return;
 
@@ -1831,7 +1833,7 @@ namespace tds {
                     sv = sv.substr(1 + sizeof(tds_done_msg));
                 break;
 
-                case tds_token::COLMETADATA: {
+                case token::COLMETADATA: {
                     if (sv.length() < 5)
                         return;
 
@@ -2022,7 +2024,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::ROW: {
+                case token::ROW: {
                     auto sv2 = sv.substr(1);
 
                     for (unsigned int i = 0; i < buf_columns.size(); i++) {
@@ -2038,7 +2040,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::NBCROW:
+                case token::NBCROW:
                 {
                     if (buf_columns.empty())
                         break;
@@ -2078,7 +2080,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::RETURNSTATUS:
+                case token::RETURNSTATUS:
                 {
                     if (sv.length() < 1 + sizeof(int32_t))
                         return;
@@ -2089,7 +2091,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::RETURNVALUE:
+                case token::RETURNVALUE:
                 {
                     auto h = (tds_return_value*)&sv[1];
 
@@ -2117,7 +2119,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::FEATUREEXTACK:
+                case token::FEATUREEXTACK:
                 {
                     auto sv2 = sv.substr(1);
 
@@ -2329,23 +2331,23 @@ namespace tds {
 
                     tokens.pop_front();
 
-                    auto type = (tds_token)t[0];
+                    auto type = (token)t[0];
 
                     auto sv = string_view(t).substr(1);
 
                     switch (type) {
-                        case tds_token::DONE:
-                        case tds_token::DONEINPROC:
-                        case tds_token::DONEPROC:
+                        case token::DONE:
+                        case token::DONEINPROC:
+                        case token::DONEPROC:
                             if (sv.length() < sizeof(tds_done_msg))
                                 throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                             break;
 
-                        case tds_token::LOGINACK:
-                        case tds_token::INFO:
-                        case tds_token::TDS_ERROR:
-                        case tds_token::ENVCHANGE:
+                        case token::LOGINACK:
+                        case token::INFO:
+                        case token::TDS_ERROR:
+                        case token::ENVCHANGE:
                         {
                             if (sv.length() < sizeof(uint16_t))
                                 throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -2357,25 +2359,25 @@ namespace tds {
                             if (sv.length() < len)
                                 throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
-                            if (type == tds_token::LOGINACK) {
+                            if (type == token::LOGINACK) {
                                 handle_loginack_msg(sv.substr(0, len));
                                 received_loginack = true;
-                            } else if (type == tds_token::INFO) {
+                            } else if (type == token::INFO) {
                                 if (message_handler)
                                     handle_info_msg(sv.substr(0, len), false);
-                            } else if (type == tds_token::TDS_ERROR) {
+                            } else if (type == token::TDS_ERROR) {
                                 if (message_handler)
                                     handle_info_msg(sv.substr(0, len), true);
 
                                 throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
-                            } else if (type == tds_token::ENVCHANGE)
+                            } else if (type == token::ENVCHANGE)
                                 handle_envchange_msg(sv.substr(0, len));
 
                             break;
                         }
 
 #ifdef _WIN32
-                        case tds_token::SSPI: // FIXME - handle doing this with GSSAPI
+                        case token::SSPI: // FIXME - handle doing this with GSSAPI
                         {
                             if (sv.length() < sizeof(uint16_t))
                                 throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -2397,7 +2399,7 @@ namespace tds {
                         }
 #endif
 
-                        case tds_token::FEATUREEXTACK:
+                        case token::FEATUREEXTACK:
                         {
                             while (true) {
                                 auto feature = (enum tds_feature)sv[0];
@@ -5933,12 +5935,12 @@ namespace tds {
 
                     tokens.pop_front();
 
-                    auto type = (tds_token)t[0];
+                    auto type = (token)t[0];
 
                     switch (type) {
-                        case tds_token::DONE:
-                        case tds_token::DONEINPROC:
-                        case tds_token::DONEPROC: {
+                        case token::DONE:
+                        case token::DONEINPROC:
+                        case token::DONEPROC: {
                             auto m = (tds_done_msg*)&t[1];
 
                             if (m->status & 0x20)
@@ -5988,13 +5990,13 @@ namespace tds {
 
             string_view sv = t;
 
-            auto type = (tds_token)sv[0];
+            auto type = (token)sv[0];
             sv = sv.substr(1);
 
             switch (type) {
-                case tds_token::DONE:
-                case tds_token::DONEINPROC:
-                case tds_token::DONEPROC:
+                case token::DONE:
+                case token::DONEINPROC:
+                case token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
@@ -6008,9 +6010,9 @@ namespace tds {
                     // FIXME - handle RPCs that return multiple row sets?
                 break;
 
-                case tds_token::INFO:
-                case tds_token::TDS_ERROR:
-                case tds_token::ENVCHANGE:
+                case token::INFO:
+                case token::TDS_ERROR:
+                case token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
                         throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -6022,21 +6024,21 @@ namespace tds {
                     if (sv.length() < len)
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
-                    if (type == tds_token::INFO) {
+                    if (type == token::INFO) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::TDS_ERROR) {
+                    } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
                         else
                             throw formatted_error("RPC {} failed: {}", utf16_to_utf8(name), utf16_to_utf8(extract_message(sv.substr(0, len))));
-                    } else if (type == tds_token::ENVCHANGE)
+                    } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     break;
                 }
 
-                case tds_token::RETURNSTATUS:
+                case token::RETURNSTATUS:
                 {
                     if (sv.length() < sizeof(int32_t))
                         throw formatted_error("Short RETURNSTATUS message ({} bytes, expected 4).", sv.length());
@@ -6046,7 +6048,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::COLMETADATA:
+                case token::COLMETADATA:
                 {
                     if (sv.length() < 4)
                         throw formatted_error("Short COLMETADATA message ({} bytes, expected at least 4).", sv.length());
@@ -6243,7 +6245,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::RETURNVALUE:
+                case token::RETURNVALUE:
                 {
                     auto h = (tds_return_value*)&sv[0];
 
@@ -6283,7 +6285,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::ROW:
+                case token::ROW:
                 {
                     vector<value> row;
 
@@ -6300,7 +6302,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::NBCROW:
+                case token::NBCROW:
                 {
                     if (cols.empty())
                         break;
@@ -6341,7 +6343,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::ORDER:
+                case token::ORDER:
                 {
                     if (sv.length() < sizeof(uint16_t))
                         throw formatted_error("Short ORDER message ({} bytes, expected at least {}).", sv.length(), sizeof(uint16_t));
@@ -7161,7 +7163,7 @@ namespace tds {
         return bufsize;
     }
 
-    void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const u16string_view& col_name) {
+    void tds::bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const u16string_view& col_name) {
         switch (col.type) {
             case sql_type::INTN:
                 if (vv.is_null) {
@@ -7990,38 +7992,6 @@ namespace tds {
         }
     }
 
-    vector<uint8_t> tds::bcp_row(const vector<value>& v, const vector<u16string>& np, const vector<col_info>& cols) {
-        size_t bufsize = sizeof(uint8_t);
-
-        for (unsigned int i = 0; i < cols.size(); i++) {
-            const auto& col = cols[i];
-            const auto& vv = v[i];
-
-            if (i >= v.size())
-                throw formatted_error("Trying to send {} columns in a BCP row, expected {}.", v.size(), cols.size());
-
-            if (vv.is_null && !col.nullable)
-                throw formatted_error("Cannot insert NULL into column {} marked NOT NULL.", utf16_to_utf8(np[i]));
-
-            bufsize += bcp_row_size(col, vv);
-        }
-
-        vector<uint8_t> buf(bufsize);
-        uint8_t* ptr = buf.data();
-
-        *(tds_token*)ptr = tds_token::ROW;
-        ptr++;
-
-        for (size_t i = 0; i < cols.size(); i++) {
-            const auto& col = cols[i];
-            const auto& vv = v[i];
-
-            bcp_row_data(ptr, col, vv, np[i]);
-        }
-
-        return buf;
-    }
-
     void tds::bcp_sendmsg(const string_view& data) {
         impl->send_msg(tds_msg::bulk_load_data, data);
 
@@ -8037,15 +8007,15 @@ namespace tds {
         string_view sv = payload;
 
         while (!sv.empty()) {
-            auto type = (tds_token)sv[0];
+            auto type = (token)sv[0];
             sv = sv.substr(1);
 
             // FIXME - parse unknowns according to numeric value of type
 
             switch (type) {
-                case tds_token::DONE:
-                case tds_token::DONEINPROC:
-                case tds_token::DONEPROC:
+                case token::DONE:
+                case token::DONEINPROC:
+                case token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
@@ -8060,9 +8030,9 @@ namespace tds {
 
                     break;
 
-                case tds_token::INFO:
-                case tds_token::TDS_ERROR:
-                case tds_token::ENVCHANGE:
+                case token::INFO:
+                case token::TDS_ERROR:
+                case token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
                         throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -8074,15 +8044,15 @@ namespace tds {
                     if (sv.length() < len)
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
-                    if (type == tds_token::INFO) {
+                    if (type == token::INFO) {
                         if (impl->message_handler)
                             impl->handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::TDS_ERROR) {
+                    } else if (type == token::TDS_ERROR) {
                         if (impl->message_handler)
                             impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
-                    } else if (type == tds_token::ENVCHANGE)
+                    } else if (type == token::ENVCHANGE)
                         impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
@@ -8158,7 +8128,7 @@ namespace tds {
         vector<uint8_t> buf(bufsize);
         auto ptr = (uint8_t*)buf.data();
 
-        *(tds_token*)ptr = tds_token::COLMETADATA; ptr++;
+        *(token*)ptr = token::COLMETADATA; ptr++;
         *(uint16_t*)ptr = (uint16_t)cols.size(); ptr += sizeof(uint16_t);
 
         for (unsigned int i = 0; i < cols.size(); i++) {
@@ -8346,12 +8316,12 @@ namespace tds {
 
                     tokens.pop_front();
 
-                    auto type = (tds_token)t[0];
+                    auto type = (token)t[0];
 
                     switch (type) {
-                        case tds_token::DONE:
-                        case tds_token::DONEINPROC:
-                        case tds_token::DONEPROC: {
+                        case token::DONE:
+                        case token::DONEINPROC:
+                        case token::DONEPROC: {
                             auto m = (tds_done_msg*)&t[1];
 
                             if (m->status & 0x20)
@@ -8401,13 +8371,13 @@ namespace tds {
 
             string_view sv = t;
 
-            auto type = (tds_token)sv[0];
+            auto type = (token)sv[0];
             sv = sv.substr(1);
 
             switch (type) {
-                case tds_token::DONE:
-                case tds_token::DONEINPROC:
-                case tds_token::DONEPROC:
+                case token::DONE:
+                case token::DONEINPROC:
+                case token::DONEPROC:
                     if (conn.impl->count_handler) {
                         auto msg = (tds_done_msg*)sv.data();
 
@@ -8417,9 +8387,9 @@ namespace tds {
 
                     break;
 
-                case tds_token::INFO:
-                case tds_token::TDS_ERROR:
-                case tds_token::ENVCHANGE:
+                case token::INFO:
+                case token::TDS_ERROR:
+                case token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
                         throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -8431,21 +8401,21 @@ namespace tds {
                     if (sv.length() < len)
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
-                    if (type == tds_token::INFO) {
+                    if (type == token::INFO) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::TDS_ERROR) {
+                    } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
                         else
                             throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
-                    } else if (type == tds_token::ENVCHANGE)
+                    } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     break;
                 }
 
-                case tds_token::COLMETADATA:
+                case token::COLMETADATA:
                 {
                     if (sv.length() < 4)
                         throw formatted_error("Short COLMETADATA message ({} bytes, expected at least 4).", sv.length());
@@ -8640,7 +8610,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::ROW:
+                case token::ROW:
                 {
                     vector<value> row;
 
@@ -8657,7 +8627,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::NBCROW:
+                case token::NBCROW:
                 {
                     if (cols.empty())
                         break;
@@ -8698,7 +8668,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::ORDER:
+                case token::ORDER:
                 {
                     if (sv.length() < sizeof(uint16_t))
                         throw formatted_error("Short ORDER message ({} bytes, expected at least {}).", sv.length(), sizeof(uint16_t));
@@ -8712,7 +8682,7 @@ namespace tds {
                     break;
                 }
 
-                case tds_token::RETURNSTATUS:
+                case token::RETURNSTATUS:
                 {
                     if (sv.length() < sizeof(int32_t))
                         throw formatted_error("Short RETURNSTATUS message ({} bytes, expected 4).", sv.length());
@@ -8876,22 +8846,22 @@ namespace tds {
         string_view sv = payload;
 
         while (!sv.empty()) {
-            auto type = (tds_token)sv[0];
+            auto type = (token)sv[0];
             sv = sv.substr(1);
 
             switch (type) {
-                case tds_token::DONE:
-                case tds_token::DONEINPROC:
-                case tds_token::DONEPROC:
+                case token::DONE:
+                case token::DONEINPROC:
+                case token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                     sv = sv.substr(sizeof(tds_done_msg));
                 break;
 
-                case tds_token::INFO:
-                case tds_token::TDS_ERROR:
-                case tds_token::ENVCHANGE:
+                case token::INFO:
+                case token::TDS_ERROR:
+                case token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
                         throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -8903,15 +8873,15 @@ namespace tds {
                     if (sv.length() < len)
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
-                    if (type == tds_token::INFO) {
+                    if (type == token::INFO) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::TDS_ERROR) {
+                    } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
-                    } else if (type == tds_token::ENVCHANGE)
+                    } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
@@ -8958,22 +8928,22 @@ namespace tds {
             string_view sv = payload;
 
             while (!sv.empty()) {
-                auto type = (tds_token)sv[0];
+                auto type = (token)sv[0];
                 sv = sv.substr(1);
 
                 switch (type) {
-                    case tds_token::DONE:
-                    case tds_token::DONEINPROC:
-                    case tds_token::DONEPROC:
+                    case token::DONE:
+                    case token::DONEINPROC:
+                    case token::DONEPROC:
                         if (sv.length() < sizeof(tds_done_msg))
                             throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                         sv = sv.substr(sizeof(tds_done_msg));
                         break;
 
-                    case tds_token::INFO:
-                    case tds_token::TDS_ERROR:
-                    case tds_token::ENVCHANGE:
+                    case token::INFO:
+                    case token::TDS_ERROR:
+                    case token::ENVCHANGE:
                     {
                         if (sv.length() < sizeof(uint16_t))
                             throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -8985,7 +8955,7 @@ namespace tds {
                         if (sv.length() < len)
                             throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
-                        if (type == tds_token::INFO) {
+                        if (type == token::INFO) {
                             if (conn.impl->message_handler) {
                                 try {
                                     conn.impl->handle_info_msg(sv.substr(0, len), false);
@@ -8993,7 +8963,7 @@ namespace tds {
                                 }
                             }
 
-                        } else if (type == tds_token::TDS_ERROR) {
+                        } else if (type == token::TDS_ERROR) {
                             if (conn.impl->message_handler) {
                                 try {
                                     conn.impl->handle_info_msg(sv.substr(0, len), true);
@@ -9002,7 +8972,7 @@ namespace tds {
                             }
 
                             throw formatted_error("TM_ROLLBACK_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
-                        } else if (type == tds_token::ENVCHANGE)
+                        } else if (type == token::ENVCHANGE)
                             conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                         sv = sv.substr(len);
@@ -9045,22 +9015,22 @@ namespace tds {
         string_view sv = payload;
 
         while (!sv.empty()) {
-            auto type = (tds_token)sv[0];
+            auto type = (token)sv[0];
             sv = sv.substr(1);
 
             switch (type) {
-                case tds_token::DONE:
-                case tds_token::DONEINPROC:
-                case tds_token::DONEPROC:
+                case token::DONE:
+                case token::DONEINPROC:
+                case token::DONEPROC:
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
                     sv = sv.substr(sizeof(tds_done_msg));
                 break;
 
-                case tds_token::INFO:
-                case tds_token::TDS_ERROR:
-                case tds_token::ENVCHANGE:
+                case token::INFO:
+                case token::TDS_ERROR:
+                case token::ENVCHANGE:
                 {
                     if (sv.length() < sizeof(uint16_t))
                         throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
@@ -9072,15 +9042,15 @@ namespace tds {
                     if (sv.length() < len)
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
-                    if (type == tds_token::INFO) {
+                    if (type == token::INFO) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), false);
-                    } else if (type == tds_token::TDS_ERROR) {
+                    } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw formatted_error("TM_COMMIT_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
-                    } else if (type == tds_token::ENVCHANGE)
+                    } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
