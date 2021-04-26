@@ -6483,7 +6483,7 @@ namespace tds {
         }
     }
 
-    static u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, const u16string_view& collation) {
+    u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, const u16string_view& collation) {
         switch (type) {
             case sql_type::TINYINT:
                 return u"TINYINT";
@@ -6662,7 +6662,7 @@ namespace tds {
         return s;
     }
 
-    static u16string sql_escape(const u16string_view& sv) {
+    u16string sql_escape(const u16string_view& sv) {
         u16string s;
 
         s.reserve(sv.length() + 2);
@@ -6681,9 +6681,8 @@ namespace tds {
         return s;
     }
 
-    static vector<col_info> get_col_info(tds& tds, const u16string_view& table, const vector<u16string>& np, const u16string_view& db) {
+    map<u16string, col_info> get_col_info(tds& tds, const u16string_view& table, const u16string_view& db) {
         map<u16string, col_info> info;
-        vector<col_info> ret;
 
         {
             unique_ptr<query> sq2;
@@ -6734,48 +6733,7 @@ namespace tds {
             }
         }
 
-        ret.reserve(np.size());
-
-        for (const auto& n : np) {
-            if (info.count(n) == 0)
-                throw formatted_error("Column {} not found in table {}.", utf16_to_utf8(n), utf16_to_utf8(table));
-
-            ret.emplace_back(info.at(n));
-        }
-
-        return ret;
-    }
-
-    vector<col_info> tds::bcp_start(const u16string_view& table, const vector<u16string>& np, const u16string_view& db) {
-        if (np.empty())
-            throw runtime_error("List of columns not supplied.");
-
-        // FIXME - do we need to make sure no duplicates in np?
-
-        auto cols = get_col_info(*this, table, np, db);
-
-        {
-            u16string q = u"INSERT BULK " + (!db.empty() ? (u16string(db) + u".") : u"") + u16string(table) + u"(";
-            bool first = true;
-
-            for (unsigned int i = 0; i < cols.size(); i++) {
-                if (!first)
-                    q += u", ";
-
-                q += sql_escape(np[i]) + u" ";
-                q += type_to_string(cols[i].type, cols[i].max_length, cols[i].precision, cols[i].scale, cols[i].collation);
-
-                first = false;
-            }
-
-            q += u") WITH (TABLOCK)";
-
-            batch b(*this, q);
-        }
-
-        // FIXME - handle INT NULLs and VARCHAR NULLs
-
-        return cols;
+        return info;
     }
 
     template<unsigned N>

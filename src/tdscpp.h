@@ -236,7 +236,7 @@ namespace tds {
         tds_impl* impl;
 
     private:
-        std::vector<col_info> bcp_start(const std::u16string_view& table, const std::vector<std::u16string>& np,
+        std::vector<col_info> bcp_start(const std::u16string_view& table, const list_of_u16string auto& np,
                                         const std::u16string_view& db);
         std::vector<uint8_t> bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols);
         std::vector<uint8_t> bcp_row(const list_of_values auto& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
@@ -846,6 +846,59 @@ namespace tds {
         }
 
         return buf;
+    }
+
+    std::map<std::u16string, col_info> TDSCPP get_col_info(tds& tds, const std::u16string_view& table, const std::u16string_view& db);
+    std::u16string TDSCPP sql_escape(const std::u16string_view& sv);
+    std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, const std::u16string_view& collation);
+
+    std::vector<col_info> tds::bcp_start(const std::u16string_view& table, const list_of_u16string auto& np, const std::u16string_view& db) {
+        if (np.empty())
+            throw std::runtime_error("List of columns not supplied.");
+
+        // FIXME - do we need to make sure no duplicates in np?
+
+        std::vector<col_info> cols;
+
+        {
+            auto col_info = get_col_info(*this, table, db);
+
+            cols.reserve(np.size());
+
+            for (const auto& n : np) {
+                if (col_info.count(n) == 0)
+                    throw std::runtime_error("Column " + utf16_to_utf8(n) + " not found in table " + utf16_to_utf8(table) + ".");
+
+                cols.emplace_back(col_info.at(n));
+            }
+        }
+
+        {
+            std::u16string q = u"INSERT BULK " + (!db.empty() ? (std::u16string(db) + u".") : u"") + std::u16string(table) + u"(";
+            bool first = true;
+
+            auto it = np.begin();
+
+            for (const auto& col : cols) {
+                if (!first)
+                    q += u", ";
+
+                q += sql_escape(*it) + u" ";
+                q += type_to_string(col.type, col.max_length, col.precision, col.scale, col.collation);
+
+                first = false;
+
+                it++;
+            }
+
+            q += u") WITH (TABLOCK)";
+
+            batch b(*this, q);
+        }
+
+        // FIXME - handle INT NULLs and VARCHAR NULLs
+
+        return cols;
     }
 };
 
