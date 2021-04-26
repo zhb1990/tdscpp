@@ -104,7 +104,6 @@ namespace tds {
         unsigned int codepage;
     };
 
-
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -121,8 +120,27 @@ namespace tds {
         template<typename... Args>
         void run(const std::u16string_view& s, Args&&... args);
 
-        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp,
-                 const std::u16string_view& db = u"");
+        template<typename T> requires (std::ranges::input_range<T>)
+        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const T& vp,
+                 const std::u16string_view& db = u"") {
+            auto cols = bcp_start(table, np, db);
+
+            // send COLMETADATA for rows
+            auto buf = bcp_colmetadata(np, cols);
+
+            for (const auto& v : vp) {
+                auto buf2 = bcp_row(v, np, cols);
+
+                // FIXME - if buf full, send packet (maximum packet size is 4096?)
+
+                auto oldlen = buf.size();
+                buf.resize(oldlen + buf2.size());
+                memcpy(&buf[oldlen], buf2.data(), buf2.size());
+            }
+
+            bcp_sendmsg(std::string_view((char*)buf.data(), buf.size()));
+        }
+
         void bcp(const std::string_view& table, const std::vector<std::string>& np, const std::vector<std::vector<value>>& vp,
                  const std::string_view& db = "");
 
@@ -671,26 +689,6 @@ namespace tds {
     }
 
     uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);
-
-    void tds::bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp,
-                  const std::u16string_view& db) {
-        auto cols = bcp_start(table, np, db);
-
-        // send COLMETADATA for rows
-        auto buf = bcp_colmetadata(np, cols);
-
-        for (const auto& v : vp) {
-            auto buf2 = bcp_row(v, np, cols);
-
-            // FIXME - if buf full, send packet (maximum packet size is 4096?)
-
-            auto oldlen = buf.size();
-            buf.resize(oldlen + buf2.size());
-            memcpy(&buf[oldlen], buf2.data(), buf2.size());
-        }
-
-        bcp_sendmsg(std::string_view((char*)buf.data(), buf.size()));
-    }
 };
 
 template<>
