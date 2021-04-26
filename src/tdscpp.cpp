@@ -6928,242 +6928,253 @@ namespace tds {
         return ret;
     }
 
+    size_t tds::bcp_row_size(const col_info& col, const value& vv) {
+        size_t bufsize;
+
+        switch (col.type) {
+            case sql_type::INTN:
+                bufsize = 1;
+
+                if (!vv.is_null)
+                    bufsize += col.max_length;
+            break;
+
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+                bufsize = sizeof(uint16_t);
+
+                if (vv.is_null) {
+                    if (col.max_length == -1) // MAX
+                        bufsize += sizeof(uint64_t) - sizeof(uint16_t);
+                } else {
+                    if (col.max_length == -1) // MAX
+                        bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
+
+                    if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
+                        bufsize += vv.val.length();
+
+                        if (col.max_length == -1 && !vv.val.empty())
+                            bufsize += sizeof(uint32_t);
+                    } else if (col.codepage == CP_UTF8) {
+                        auto s = (string)vv;
+                        bufsize += s.length();
+
+                        if (col.max_length == -1 && !s.empty())
+                            bufsize += sizeof(uint32_t);
+                    } else {
+                        auto s = encode_charset((u16string)vv, col.codepage);
+                        bufsize += s.length();
+
+                        if (col.max_length == -1 && !s.empty())
+                            bufsize += sizeof(uint32_t);
+                    }
+                }
+            break;
+
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
+                bufsize = sizeof(uint16_t);
+
+                if (vv.is_null) {
+                    if (col.max_length == -1) // MAX
+                        bufsize += sizeof(uint64_t) - sizeof(uint16_t);
+                } else {
+                    if (col.max_length == -1) // MAX
+                        bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
+
+                    if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
+                        bufsize += vv.val.length();
+
+                        if (col.max_length == -1 && !vv.val.empty())
+                            bufsize += sizeof(uint32_t);
+                    } else {
+                        auto s = (u16string)vv;
+                        bufsize += s.length() * sizeof(char16_t);
+
+                        if (col.max_length == -1 && !s.empty())
+                            bufsize += sizeof(uint32_t);
+                    }
+                }
+            break;
+
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
+                bufsize = sizeof(uint16_t);
+
+                if (vv.is_null) {
+                    if (col.max_length == -1) // MAX
+                        bufsize += sizeof(uint64_t) - sizeof(uint16_t);
+                } else {
+                    if (col.max_length == -1) // MAX
+                        bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
+
+                    if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
+                        bufsize += vv.val.length();
+
+                        if (col.max_length == -1 && !vv.val.empty())
+                            bufsize += sizeof(uint32_t);
+                    } else
+                        throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
+                }
+            break;
+
+            case sql_type::DATE:
+                bufsize = 1;
+
+                if (!vv.is_null)
+                    bufsize += 3;
+            break;
+
+            case sql_type::TIME:
+                bufsize = 1;
+
+                if (!vv.is_null) {
+                    if (col.scale <= 2)
+                        bufsize += 3;
+                    else if (col.scale <= 4)
+                        bufsize += 4;
+                    else
+                        bufsize += 5;
+                }
+            break;
+
+            case sql_type::DATETIME2:
+                bufsize = 1;
+
+                if (!vv.is_null) {
+                    bufsize += 3;
+
+                    if (col.scale <= 2)
+                        bufsize += 3;
+                    else if (col.scale <= 4)
+                        bufsize += 4;
+                    else
+                        bufsize += 5;
+                }
+            break;
+
+            case sql_type::DATETIMEOFFSET:
+                bufsize = 1;
+
+                if (!vv.is_null) {
+                    bufsize += 5;
+
+                    if (col.scale <= 2)
+                        bufsize += 3;
+                    else if (col.scale <= 4)
+                        bufsize += 4;
+                    else
+                        bufsize += 5;
+                }
+            break;
+
+            case sql_type::DATETIME:
+                bufsize = sizeof(int32_t) + sizeof(uint32_t);
+            break;
+
+            case sql_type::DATETIMN:
+                bufsize = 1;
+
+                if (!vv.is_null)
+                    bufsize += col.max_length;
+            break;
+
+            case sql_type::FLTN:
+                bufsize = 1;
+
+                if (!vv.is_null)
+                    bufsize += col.max_length;
+            break;
+
+            case sql_type::BITN:
+                bufsize = 1;
+
+                if (!vv.is_null)
+                    bufsize += sizeof(uint8_t);
+            break;
+
+            case sql_type::TINYINT:
+                bufsize = sizeof(uint8_t);
+            break;
+
+            case sql_type::SMALLINT:
+                bufsize = sizeof(int16_t);
+            break;
+
+            case sql_type::INT:
+                bufsize = sizeof(int32_t);
+            break;
+
+            case sql_type::BIGINT:
+                bufsize = sizeof(int64_t);
+            break;
+
+            case sql_type::FLOAT:
+                bufsize = sizeof(double);
+            break;
+
+            case sql_type::REAL:
+                bufsize = sizeof(float);
+            break;
+
+            case sql_type::BIT:
+                bufsize = sizeof(uint8_t);
+            break;
+
+            case sql_type::NUMERIC:
+            case sql_type::DECIMAL:
+                bufsize = sizeof(uint8_t);
+
+                if (!vv.is_null) {
+                    bufsize += sizeof(uint8_t);
+
+                    if (col.precision >= 29)
+                        bufsize += 16;
+                    else if (col.precision >= 20)
+                        bufsize += 12;
+                    else if (col.precision >= 10)
+                        bufsize += 8;
+                    else
+                        bufsize += 4;
+                }
+            break;
+
+            case sql_type::MONEYN:
+                bufsize = sizeof(uint8_t);
+
+                if (!vv.is_null)
+                    bufsize += col.max_length;
+            break;
+
+            case sql_type::MONEY:
+                bufsize = sizeof(int64_t);
+            break;
+
+            case sql_type::SMALLMONEY:
+                bufsize = sizeof(int32_t);
+            break;
+
+            default:
+                throw formatted_error("Unable to send {} in BCP row.", col.type);
+        }
+
+        return bufsize;
+    }
+
     vector<uint8_t> tds::bcp_row(const vector<value>& v, const vector<u16string>& np, const vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
         for (unsigned int i = 0; i < cols.size(); i++) {
+            const auto& col = cols[i];
+            const auto& vv = v[i];
+
             if (i >= v.size())
                 throw formatted_error("Trying to send {} columns in a BCP row, expected {}.", v.size(), cols.size());
 
-            if (v[i].is_null && !cols[i].nullable)
+            if (vv.is_null && !col.nullable)
                 throw formatted_error("Cannot insert NULL into column {} marked NOT NULL.", utf16_to_utf8(np[i]));
 
-            switch (cols[i].type) {
-                case sql_type::INTN:
-                    bufsize++;
-
-                    if (!v[i].is_null)
-                        bufsize += cols[i].max_length;
-                break;
-
-                case sql_type::VARCHAR:
-                case sql_type::CHAR:
-                    bufsize += sizeof(uint16_t);
-
-                    if (v[i].is_null) {
-                        if (cols[i].max_length == -1) // MAX
-                            bufsize += sizeof(uint64_t) - sizeof(uint16_t);
-                    } else {
-                        if (cols[i].max_length == -1) // MAX
-                            bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
-
-                        if ((v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) && cols[i].codepage == CP_UTF8) {
-                            bufsize += v[i].val.length();
-
-                            if (cols[i].max_length == -1 && !v[i].val.empty())
-                                bufsize += sizeof(uint32_t);
-                        } else if (cols[i].codepage == CP_UTF8) {
-                            auto s = (string)v[i];
-                            bufsize += s.length();
-
-                            if (cols[i].max_length == -1 && !s.empty())
-                                bufsize += sizeof(uint32_t);
-                        } else {
-                            auto s = encode_charset((u16string)v[i], cols[i].codepage);
-                            bufsize += s.length();
-
-                            if (cols[i].max_length == -1 && !s.empty())
-                                bufsize += sizeof(uint32_t);
-                        }
-                    }
-                break;
-
-                case sql_type::NVARCHAR:
-                case sql_type::NCHAR:
-                    bufsize += sizeof(uint16_t);
-
-                    if (v[i].is_null) {
-                        if (cols[i].max_length == -1) // MAX
-                            bufsize += sizeof(uint64_t) - sizeof(uint16_t);
-                    } else {
-                        if (cols[i].max_length == -1) // MAX
-                            bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
-
-                        if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
-                            bufsize += v[i].val.length();
-
-                            if (cols[i].max_length == -1 && !v[i].val.empty())
-                                bufsize += sizeof(uint32_t);
-                        } else {
-                            auto s = (u16string)v[i];
-                            bufsize += s.length() * sizeof(char16_t);
-
-                            if (cols[i].max_length == -1 && !s.empty())
-                                bufsize += sizeof(uint32_t);
-                        }
-                    }
-                break;
-
-                case sql_type::VARBINARY:
-                case sql_type::BINARY:
-                    bufsize += sizeof(uint16_t);
-
-                    if (v[i].is_null) {
-                        if (cols[i].max_length == -1) // MAX
-                            bufsize += sizeof(uint64_t) - sizeof(uint16_t);
-                    } else {
-                        if (cols[i].max_length == -1) // MAX
-                            bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
-
-                        if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
-                            bufsize += v[i].val.length();
-
-                            if (cols[i].max_length == -1 && !v[i].val.empty())
-                                bufsize += sizeof(uint32_t);
-                        } else
-                            throw formatted_error("Could not convert {} to {}.", v[i].type, cols[i].type);
-                    }
-                break;
-
-                case sql_type::DATE:
-                    bufsize++;
-
-                    if (!v[i].is_null)
-                        bufsize += 3;
-                break;
-
-                case sql_type::TIME:
-                    bufsize++;
-
-                    if (!v[i].is_null) {
-                        if (cols[i].scale <= 2)
-                            bufsize += 3;
-                        else if (cols[i].scale <= 4)
-                            bufsize += 4;
-                        else
-                            bufsize += 5;
-                    }
-                break;
-
-                case sql_type::DATETIME2:
-                    bufsize++;
-
-                    if (!v[i].is_null) {
-                        bufsize += 3;
-
-                        if (cols[i].scale <= 2)
-                            bufsize += 3;
-                        else if (cols[i].scale <= 4)
-                            bufsize += 4;
-                        else
-                            bufsize += 5;
-                    }
-                break;
-
-                case sql_type::DATETIMEOFFSET:
-                    bufsize++;
-
-                    if (!v[i].is_null) {
-                        bufsize += 5;
-
-                        if (cols[i].scale <= 2)
-                            bufsize += 3;
-                        else if (cols[i].scale <= 4)
-                            bufsize += 4;
-                        else
-                            bufsize += 5;
-                    }
-                break;
-
-                case sql_type::DATETIME:
-                    bufsize += sizeof(int32_t) + sizeof(uint32_t);
-                break;
-
-                case sql_type::DATETIMN:
-                    bufsize++;
-
-                    if (!v[i].is_null)
-                        bufsize += cols[i].max_length;
-                break;
-
-                case sql_type::FLTN:
-                    bufsize++;
-
-                    if (!v[i].is_null)
-                        bufsize += cols[i].max_length;
-                break;
-
-                case sql_type::BITN:
-                    bufsize++;
-
-                    if (!v[i].is_null)
-                        bufsize += sizeof(uint8_t);
-                break;
-
-                case sql_type::TINYINT:
-                    bufsize += sizeof(uint8_t);
-                break;
-
-                case sql_type::SMALLINT:
-                    bufsize += sizeof(int16_t);
-                break;
-
-                case sql_type::INT:
-                    bufsize += sizeof(int32_t);
-                break;
-
-                case sql_type::BIGINT:
-                    bufsize += sizeof(int64_t);
-                break;
-
-                case sql_type::FLOAT:
-                    bufsize += sizeof(double);
-                break;
-
-                case sql_type::REAL:
-                    bufsize += sizeof(float);
-                break;
-
-                case sql_type::BIT:
-                    bufsize += sizeof(uint8_t);
-                break;
-
-                case sql_type::NUMERIC:
-                case sql_type::DECIMAL:
-                    bufsize += sizeof(uint8_t);
-
-                    if (!v[i].is_null) {
-                        bufsize += sizeof(uint8_t);
-
-                        if (cols[i].precision >= 29)
-                            bufsize += 16;
-                        else if (cols[i].precision >= 20)
-                            bufsize += 12;
-                        else if (cols[i].precision >= 10)
-                            bufsize += 8;
-                        else
-                            bufsize += 4;
-                    }
-                break;
-
-                case sql_type::MONEYN:
-                    bufsize += sizeof(uint8_t);
-
-                    if (!v[i].is_null)
-                        bufsize += cols[i].max_length;
-                break;
-
-                case sql_type::MONEY:
-                    bufsize += sizeof(int64_t);
-                break;
-
-                case sql_type::SMALLMONEY:
-                    bufsize += sizeof(int32_t);
-                break;
-
-                default:
-                    throw formatted_error("Unable to send {} in BCP row.", cols[i].type);
-            }
+            bufsize += bcp_row_size(col, vv);
         }
 
         vector<uint8_t> buf(bufsize);
@@ -7173,24 +7184,27 @@ namespace tds {
         ptr++;
 
         for (size_t i = 0; i < cols.size(); i++) {
-            switch (cols[i].type) {
+            const auto& col = cols[i];
+            const auto& vv = v[i];
+
+            switch (col.type) {
                 case sql_type::INTN:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *ptr = 0;
                         ptr++;
                     } else {
-                        *ptr = (uint8_t)cols[i].max_length;
+                        *ptr = (uint8_t)col.max_length;
                         ptr++;
 
                         int64_t n;
 
                         try {
-                            n = (int64_t)v[i];
+                            n = (int64_t)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
-                        switch (cols[i].max_length) {
+                        switch (col.max_length) {
                             case sizeof(uint8_t):
                                 if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
                                     throw formatted_error("{} is out of bounds for TINYINT column {}.", n, utf16_to_utf8(np[i]));
@@ -7221,33 +7235,33 @@ namespace tds {
                             break;
 
                             default:
-                                throw formatted_error("Invalid INTN size {}.", cols[i].max_length);
+                                throw formatted_error("Invalid INTN size {}.", col.max_length);
                         }
                     }
                 break;
 
                 case sql_type::VARCHAR:
                 case sql_type::CHAR:
-                    if (cols[i].max_length == -1) {
-                        if (v[i].is_null) {
+                    if (col.max_length == -1) {
+                        if (vv.is_null) {
                             *(uint64_t*)ptr = 0xffffffffffffffff;
                             ptr += sizeof(uint64_t);
-                        } else if ((v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) && cols[i].codepage == CP_UTF8) {
+                        } else if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
 
-                            if (!v[i].val.empty()) {
-                                *(uint32_t*)ptr = (uint32_t)v[i].val.length();
+                            if (!vv.val.empty()) {
+                                *(uint32_t*)ptr = (uint32_t)vv.val.length();
                                 ptr += sizeof(uint32_t);
 
-                                memcpy(ptr, v[i].val.data(), v[i].val.length());
-                                ptr += v[i].val.length();
+                                memcpy(ptr, vv.val.data(), vv.val.length());
+                                ptr += vv.val.length();
                             }
 
                             *(uint32_t*)ptr = 0;
                             ptr += sizeof(uint32_t);
-                        } else if (cols[i].codepage == CP_UTF8) {
-                            auto s = (string)v[i];
+                        } else if (col.codepage == CP_UTF8) {
+                            auto s = (string)vv;
 
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
@@ -7263,7 +7277,7 @@ namespace tds {
                             *(uint32_t*)ptr = 0;
                             ptr += sizeof(uint32_t);
                         } else {
-                            auto s = encode_charset((u16string)v[i], cols[i].codepage);
+                            auto s = encode_charset((u16string)vv, col.codepage);
 
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
@@ -7280,23 +7294,23 @@ namespace tds {
                             ptr += sizeof(uint32_t);
                         }
                     } else {
-                        if (v[i].is_null) {
+                        if (vv.is_null) {
                             *(uint16_t*)ptr = 0xffff;
                             ptr += sizeof(uint16_t);
-                        } else if ((v[i].type == sql_type::VARCHAR || v[i].type == sql_type::CHAR) && cols[i].codepage == CP_UTF8) {
-                            if (v[i].val.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", v[i].val, utf16_to_utf8(np[i]), cols[i].max_length);
+                        } else if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
+                            if (vv.val.length() > (uint16_t)col.max_length)
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", vv.val, utf16_to_utf8(np[i]), col.max_length);
 
-                            *(uint16_t*)ptr = (uint16_t)v[i].val.length();
+                            *(uint16_t*)ptr = (uint16_t)vv.val.length();
                             ptr += sizeof(uint16_t);
 
-                            memcpy(ptr, v[i].val.data(), v[i].val.length());
-                            ptr += v[i].val.length();
-                        } else if (cols[i].codepage == CP_UTF8) {
-                            auto s = (string)v[i];
+                            memcpy(ptr, vv.val.data(), vv.val.length());
+                            ptr += vv.val.length();
+                        } else if (col.codepage == CP_UTF8) {
+                            auto s = (string)vv;
 
-                            if (s.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", s, utf16_to_utf8(np[i]), cols[i].max_length);
+                            if (s.length() > (uint16_t)col.max_length)
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", s, utf16_to_utf8(np[i]), col.max_length);
 
                             *(uint16_t*)ptr = (uint16_t)s.length();
                             ptr += sizeof(uint16_t);
@@ -7304,10 +7318,10 @@ namespace tds {
                             memcpy(ptr, s.data(), s.length());
                             ptr += s.length();
                         } else {
-                            auto s = encode_charset((u16string)v[i], cols[i].codepage);
+                            auto s = encode_charset((u16string)vv, col.codepage);
 
-                            if (s.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", (string)v[i], utf16_to_utf8(np[i]), cols[i].max_length);
+                            if (s.length() > (uint16_t)col.max_length)
+                                throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", (string)vv, utf16_to_utf8(np[i]), col.max_length);
 
                             *(uint16_t*)ptr = (uint16_t)s.length();
                             ptr += sizeof(uint16_t);
@@ -7320,26 +7334,26 @@ namespace tds {
 
                 case sql_type::NVARCHAR:
                 case sql_type::NCHAR:
-                    if (cols[i].max_length == -1) {
-                        if (v[i].is_null) {
+                    if (col.max_length == -1) {
+                        if (vv.is_null) {
                             *(uint64_t*)ptr = 0xffffffffffffffff;
                             ptr += sizeof(uint64_t);
-                        } else if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
+                        } else if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
 
-                            if (!v[i].val.empty()) {
-                                *(uint32_t*)ptr = (uint32_t)v[i].val.length();
+                            if (!vv.val.empty()) {
+                                *(uint32_t*)ptr = (uint32_t)vv.val.length();
                                 ptr += sizeof(uint32_t);
 
-                                memcpy(ptr, v[i].val.data(), v[i].val.length());
-                                ptr += v[i].val.length();
+                                memcpy(ptr, vv.val.data(), vv.val.length());
+                                ptr += vv.val.length();
                             }
 
                             *(uint32_t*)ptr = 0;
                             ptr += sizeof(uint32_t);
                         } else {
-                            auto s = (u16string)v[i];
+                            auto s = (u16string)vv;
 
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
@@ -7356,28 +7370,28 @@ namespace tds {
                             ptr += sizeof(uint32_t);
                         }
                     } else {
-                        if (v[i].is_null) {
+                        if (vv.is_null) {
                             *(uint16_t*)ptr = 0xffff;
                             ptr += sizeof(uint16_t);
-                        } else if (v[i].type == sql_type::NVARCHAR || v[i].type == sql_type::NCHAR) {
-                            if (v[i].val.length() > (uint16_t)cols[i].max_length) {
+                        } else if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
+                            if (vv.val.length() > (uint16_t)col.max_length) {
                                 throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
-                                                      utf16_to_utf8(u16string_view((char16_t*)v[i].val.data(), v[i].val.length() / sizeof(char16_t))),
-                                                      utf16_to_utf8(np[i]), cols[i].max_length / sizeof(char16_t));
+                                                      utf16_to_utf8(u16string_view((char16_t*)vv.val.data(), vv.val.length() / sizeof(char16_t))),
+                                                      utf16_to_utf8(np[i]), col.max_length / sizeof(char16_t));
                             }
 
-                            *(uint16_t*)ptr = (uint16_t)v[i].val.length();
+                            *(uint16_t*)ptr = (uint16_t)vv.val.length();
                             ptr += sizeof(uint16_t);
 
-                            memcpy(ptr, v[i].val.data(), v[i].val.length());
-                            ptr += v[i].val.length();
+                            memcpy(ptr, vv.val.data(), vv.val.length());
+                            ptr += vv.val.length();
                         } else {
-                            auto s = (u16string)v[i];
+                            auto s = (u16string)vv;
 
-                            if (s.length() > (uint16_t)cols[i].max_length) {
+                            if (s.length() > (uint16_t)col.max_length) {
                                 throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
                                                       utf16_to_utf8(u16string_view((char16_t*)s.data(), s.length() / sizeof(char16_t))),
-                                                      utf16_to_utf8(np[i]), cols[i].max_length / sizeof(char16_t));
+                                                      utf16_to_utf8(np[i]), col.max_length / sizeof(char16_t));
                             }
 
                             *(uint16_t*)ptr = (uint16_t)(s.length() * sizeof(char16_t));
@@ -7391,53 +7405,53 @@ namespace tds {
 
                 case sql_type::VARBINARY:
                 case sql_type::BINARY:
-                    if (cols[i].max_length == -1) {
-                        if (v[i].is_null) {
+                    if (col.max_length == -1) {
+                        if (vv.is_null) {
                             *(uint64_t*)ptr = 0xffffffffffffffff;
                             ptr += sizeof(uint64_t);
-                        } else if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
+                        } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
                             *(uint64_t*)ptr = 0xfffffffffffffffe;
                             ptr += sizeof(uint64_t);
 
-                            if (!v[i].val.empty()) {
-                                *(uint32_t*)ptr = (uint32_t)v[i].val.length();
+                            if (!vv.val.empty()) {
+                                *(uint32_t*)ptr = (uint32_t)vv.val.length();
                                 ptr += sizeof(uint32_t);
 
-                                memcpy(ptr, v[i].val.data(), v[i].val.length());
-                                ptr += v[i].val.length();
+                                memcpy(ptr, vv.val.data(), vv.val.length());
+                                ptr += vv.val.length();
                             }
 
                             *(uint32_t*)ptr = 0;
                             ptr += sizeof(uint32_t);
                         } else
-                            throw formatted_error("Could not convert {} to {}.", v[i].type, cols[i].type);
+                            throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
                     } else {
-                        if (v[i].is_null) {
+                        if (vv.is_null) {
                             *(uint16_t*)ptr = 0xffff;
                             ptr += sizeof(uint16_t);
-                        } else if (v[i].type == sql_type::VARBINARY || v[i].type == sql_type::BINARY) {
-                            if (v[i].val.length() > (uint16_t)cols[i].max_length)
-                                throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(np[i]), v[i].val.length(), cols[i].max_length);
+                        } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
+                            if (vv.val.length() > (uint16_t)col.max_length)
+                                throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(np[i]), vv.val.length(), col.max_length);
 
-                            *(uint16_t*)ptr = (uint16_t)v[i].val.length();
+                            *(uint16_t*)ptr = (uint16_t)vv.val.length();
                             ptr += sizeof(uint16_t);
 
-                            memcpy(ptr, v[i].val.data(), v[i].val.length());
-                            ptr += v[i].val.length();
+                            memcpy(ptr, vv.val.data(), vv.val.length());
+                            ptr += vv.val.length();
                         } else
-                            throw formatted_error("Could not convert {} to {}.", v[i].type, cols[i].type);
+                            throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
                     }
                 break;
 
                 case sql_type::DATE:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
                         date d;
 
                         try {
-                            d = (date)v[i];
+                            d = (date)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
@@ -7453,31 +7467,31 @@ namespace tds {
                 break;
 
                 case sql_type::TIME:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
                         time t;
 
                         try {
-                            t = (time)v[i];
+                            t = (time)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         uint64_t secs = (t.hour * 3600) + (t.minute * 60) + t.second;
 
-                        for (unsigned int j = 0; j < cols[i].scale; j++) {
+                        for (unsigned int j = 0; j < col.scale; j++) {
                             secs *= 10;
                         }
 
-                        if (cols[i].scale <= 2) {
+                        if (col.scale <= 2) {
                             *(uint8_t*)ptr = 3;
                             ptr++;
 
                             memcpy(ptr, &secs, 3);
                             ptr += 3;
-                        } else if (cols[i].scale <= 4) {
+                        } else if (col.scale <= 4) {
                             *(uint8_t*)ptr = 4;
                             ptr++;
 
@@ -7494,14 +7508,14 @@ namespace tds {
                 break;
 
                 case sql_type::DATETIME2:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
                         datetime dt;
 
                         try {
-                            dt = (datetime)v[i];
+                            dt = (datetime)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
@@ -7509,17 +7523,17 @@ namespace tds {
                         uint32_t n = dt.d.num + 693595;
                         uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
-                        for (unsigned int j = 0; j < cols[i].scale; j++) {
+                        for (unsigned int j = 0; j < col.scale; j++) {
                             secs *= 10;
                         }
 
-                        if (cols[i].scale <= 2) {
+                        if (col.scale <= 2) {
                             *(uint8_t*)ptr = 6;
                             ptr++;
 
                             memcpy(ptr, &secs, 3);
                             ptr += 3;
-                        } else if (cols[i].scale <= 4) {
+                        } else if (col.scale <= 4) {
                             *(uint8_t*)ptr = 7;
                             ptr++;
 
@@ -7539,14 +7553,14 @@ namespace tds {
                 break;
 
                 case sql_type::DATETIMEOFFSET:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
                         datetime dto;
 
                         try {
-                            dto = (datetime)v[i];
+                            dto = (datetime)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
@@ -7554,17 +7568,17 @@ namespace tds {
                         uint32_t n = dto.d.num + 693595;
                         uint64_t secs = (dto.t.hour * 3600) + (dto.t.minute * 60) + dto.t.second;
 
-                        for (unsigned int j = 0; j < cols[i].scale; j++) {
+                        for (unsigned int j = 0; j < col.scale; j++) {
                             secs *= 10;
                         }
 
-                        if (cols[i].scale <= 2) {
+                        if (col.scale <= 2) {
                             *(uint8_t*)ptr = 8;
                             ptr++;
 
                             memcpy(ptr, &secs, 3);
                             ptr += 3;
-                        } else if (cols[i].scale <= 4) {
+                        } else if (col.scale <= 4) {
                             *(uint8_t*)ptr = 9;
                             ptr++;
 
@@ -7592,7 +7606,7 @@ namespace tds {
                     datetime dt;
 
                     try {
-                        dt = (datetime)v[i];
+                        dt = (datetime)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7609,26 +7623,26 @@ namespace tds {
                 }
 
                 case sql_type::DATETIMN:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
                         datetime dt;
 
                         try {
-                            dt = (datetime)v[i];
+                            dt = (datetime)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
-                        switch (cols[i].max_length) {
+                        switch (col.max_length) {
                             case 4: {
                                 if (dt.d.num < 0)
                                     throw formatted_error("Datetime \"{}\" too early for SMALLDATETIME column {}.", dt, utf16_to_utf8(np[i]));
                                 else if (dt.d.num > numeric_limits<uint16_t>::max())
                                     throw formatted_error("Datetime \"{}\" too late for SMALLDATETIME column {}.", dt, utf16_to_utf8(np[i]));
 
-                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                                *(uint8_t*)ptr = (uint8_t)col.max_length;
                                 ptr++;
 
                                 *(uint16_t*)ptr = (uint16_t)dt.d.num;
@@ -7643,7 +7657,7 @@ namespace tds {
                             case 8: {
                                 uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
 
-                                *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                                *(uint8_t*)ptr = (uint8_t)col.max_length;
                                 ptr++;
 
                                 *(int32_t*)ptr = dt.d.num;
@@ -7656,28 +7670,28 @@ namespace tds {
                             }
 
                             default:
-                                throw formatted_error("DATETIMN has invalid length {}.", cols[i].max_length);
+                                throw formatted_error("DATETIMN has invalid length {}.", col.max_length);
                         }
                     }
                 break;
 
                 case sql_type::FLTN:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
                     } else {
                         double d;
 
                         try {
-                            d = (double)v[i];
+                            d = (double)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
-                        *(uint8_t*)ptr = (uint8_t)cols[i].max_length;
+                        *(uint8_t*)ptr = (uint8_t)col.max_length;
                         ptr++;
 
-                        switch (cols[i].max_length) {
+                        switch (col.max_length) {
                             case sizeof(float): {
                                 auto f = (float)d;
                                 memcpy(ptr, &f, sizeof(float));
@@ -7691,25 +7705,25 @@ namespace tds {
                             break;
 
                             default:
-                                throw formatted_error("FLTN has invalid length {}.", cols[i].max_length);
+                                throw formatted_error("FLTN has invalid length {}.", col.max_length);
                         }
                     }
                 break;
 
                 case sql_type::BITN:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *(uint8_t*)ptr = 0;
                         ptr++;
-                    } else if (v[i].type == sql_type::BIT || v[i].type == sql_type::BITN) {
+                    } else if (vv.type == sql_type::BIT || vv.type == sql_type::BITN) {
                         *(uint8_t*)ptr = sizeof(uint8_t);
                         ptr++;
-                        *(uint8_t*)ptr = (uint8_t)v[i].val[0];
+                        *(uint8_t*)ptr = (uint8_t)vv.val[0];
                         ptr += sizeof(uint8_t);
                     } else {
                         int64_t n;
 
                         try {
-                            n = (int64_t)v[i];
+                            n = (int64_t)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
@@ -7725,7 +7739,7 @@ namespace tds {
                     int64_t n;
 
                     try {
-                        n = (int64_t)v[i];
+                        n = (int64_t)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7743,7 +7757,7 @@ namespace tds {
                     int64_t n;
 
                     try {
-                        n = (int64_t)v[i];
+                        n = (int64_t)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7761,7 +7775,7 @@ namespace tds {
                     int64_t n;
 
                     try {
-                        n = (int64_t)v[i];
+                        n = (int64_t)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7779,7 +7793,7 @@ namespace tds {
                     int64_t n;
 
                     try {
-                        n = (int64_t)v[i];
+                        n = (int64_t)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7794,7 +7808,7 @@ namespace tds {
                     double n;
 
                     try {
-                        n = (double)v[i];
+                        n = (double)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7809,7 +7823,7 @@ namespace tds {
                     double n;
 
                     try {
-                        n = (double)v[i];
+                        n = (double)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7821,14 +7835,14 @@ namespace tds {
                 }
 
                 case sql_type::BIT: {
-                    if (v[i].type == sql_type::BIT || v[i].type == sql_type::BITN) {
-                        *(uint8_t*)ptr = (uint8_t)(v[i].val[0]);
+                    if (vv.type == sql_type::BIT || vv.type == sql_type::BITN) {
+                        *(uint8_t*)ptr = (uint8_t)(vv.val[0]);
                         ptr += sizeof(uint8_t);
                     } else {
                         int64_t n;
 
                         try {
-                            n = (int64_t)v[i];
+                            n = (int64_t)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
@@ -7842,7 +7856,7 @@ namespace tds {
 
                 case sql_type::NUMERIC:
                 case sql_type::DECIMAL:
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *ptr = 0;
                         ptr++;
                     } else {
@@ -7850,7 +7864,7 @@ namespace tds {
                         double d;
 
                         try {
-                            d = (double)v[i];
+                            d = (double)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
@@ -7860,23 +7874,23 @@ namespace tds {
                             d = -d;
                         }
 
-                        for (unsigned int j = 0; j < cols[i].scale; j++) {
+                        for (unsigned int j = 0; j < col.scale; j++) {
                             d *= 10;
                         }
 
                         // FIXME - avoid doing pow every time?
 
-                        if (d > pow(10, cols[i].precision)) {
+                        if (d > pow(10, col.precision)) {
                             if (neg) {
-                                throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", v[i], cols[i].precision,
-                                                      cols[i].scale, utf16_to_utf8(np[i]));
+                                throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                      col.scale, utf16_to_utf8(np[i]));
                             } else {
-                                throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", v[i], cols[i].precision,
-                                                      cols[i].scale, utf16_to_utf8(np[i]));
+                                throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                      col.scale, utf16_to_utf8(np[i]));
                             }
                         }
 
-                        if (cols[i].precision < 10) { // 4 bytes
+                        if (col.precision < 10) { // 4 bytes
                             *ptr = 5;
                             ptr++;
 
@@ -7885,7 +7899,7 @@ namespace tds {
 
                             *(uint32_t*)ptr = (uint32_t)d;
                             ptr += sizeof(uint32_t);
-                        } else if (cols[i].precision < 20) { // 8 bytes
+                        } else if (col.precision < 20) { // 8 bytes
                             *ptr = 9;
                             ptr++;
 
@@ -7894,7 +7908,7 @@ namespace tds {
 
                             *(uint64_t*)ptr = (uint64_t)d;
                             ptr += sizeof(uint64_t);
-                        } else if (cols[i].precision < 29) { // 12 bytes
+                        } else if (col.precision < 29) { // 12 bytes
                             *ptr = 13;
                             ptr++;
 
@@ -7917,24 +7931,24 @@ namespace tds {
                 break;
 
                 case sql_type::MONEYN: {
-                    if (v[i].is_null) {
+                    if (vv.is_null) {
                         *ptr = 0;
                         ptr++;
                     } else {
-                        *ptr = (uint8_t)cols[i].max_length;
+                        *ptr = (uint8_t)col.max_length;
                         ptr++;
 
                         double val;
 
                         try {
-                            val = (double)v[i];
+                            val = (double)vv;
                         } catch (const exception& e) {
                             throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                         }
 
                         val *= 10000.0;
 
-                        switch (cols[i].max_length) {
+                        switch (col.max_length) {
                             case sizeof(int64_t): {
                                 auto v = (int64_t)val;
 
@@ -7948,11 +7962,11 @@ namespace tds {
                             break;
 
                             default:
-                                throw formatted_error("MONEYN column {} had invalid size {}.", utf16_to_utf8(np[i]), cols[i].max_length);
+                                throw formatted_error("MONEYN column {} had invalid size {}.", utf16_to_utf8(np[i]), col.max_length);
 
                         }
 
-                        ptr += cols[i].max_length;
+                        ptr += col.max_length;
                     }
 
                     break;
@@ -7962,7 +7976,7 @@ namespace tds {
                     double val;
 
                     try {
-                        val = (double)v[i];
+                        val = (double)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7983,7 +7997,7 @@ namespace tds {
                     double val;
 
                     try {
-                        val = (double)v[i];
+                        val = (double)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(np[i]));
                     }
@@ -7997,7 +8011,7 @@ namespace tds {
                 }
 
                 default:
-                    throw formatted_error("Unable to send {} in BCP row.", cols[i].type);
+                    throw formatted_error("Unable to send {} in BCP row.", col.type);
             }
         }
 

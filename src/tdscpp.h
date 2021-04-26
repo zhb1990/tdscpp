@@ -154,6 +154,7 @@ namespace tds {
         std::vector<uint8_t> bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
         std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
         void bcp_sendmsg(const std::string_view& msg);
+        size_t bcp_row_size(const col_info& col, const value& vv);
     };
 
     class TDSCPP date {
