@@ -134,7 +134,7 @@ namespace tds {
     std::string TDSCPP utf16_to_utf8(const std::u16string_view& sv);
 
     template<typename T>
-    concept list_of_values = std::ranges::contiguous_range<T> && std::is_same_v<std::ranges::range_value_t<T>, value>;
+    concept list_of_values = std::ranges::input_range<T> && std::is_same_v<std::ranges::range_value_t<T>, value>;
 
     template<typename T>
     concept list_of_list_of_values = std::ranges::input_range<T> && list_of_values<std::ranges::range_value_t<T>>;
@@ -754,17 +754,21 @@ namespace tds {
     std::vector<uint8_t> tds::bcp_row(const list_of_values auto& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
-        for (unsigned int i = 0; i < cols.size(); i++) {
-            const auto& col = cols[i];
-            const auto& vv = v[i];
+        auto it = v.begin();
+        auto it2 = np.begin();
 
-            if (i >= v.size())
+        for (const auto& col : cols) {
+            const auto& vv = *it;
+
+            if (it == v.end())
                 throw std::runtime_error("Trying to send " + std::to_string(v.size()) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
 
             if (vv.is_null && !col.nullable)
-                throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(np[i]) + " marked NOT NULL.");
+                throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(*it2) + " marked NOT NULL.");
 
             bufsize += bcp_row_size(col, vv);
+            it++;
+            it2++;
         }
 
         std::vector<uint8_t> buf(bufsize);
@@ -773,11 +777,16 @@ namespace tds {
         *(token*)ptr = token::ROW;
         ptr++;
 
-        for (size_t i = 0; i < cols.size(); i++) {
-            const auto& col = cols[i];
-            const auto& vv = v[i];
+        it = v.begin();
+        it2 = np.begin();
 
-            bcp_row_data(ptr, col, vv, np[i]);
+        for (const auto& col : cols) {
+            const auto& vv = *it;
+
+            bcp_row_data(ptr, col, vv, *it2);
+
+            it++;
+            it2++;
         }
 
         return buf;
