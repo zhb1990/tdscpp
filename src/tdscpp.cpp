@@ -6743,13 +6743,13 @@ namespace tds {
         return ret;
     }
 
-    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp, const u16string_view& db) {
+    vector<col_info> tds_impl::bcp_start(tds& tds, const u16string_view& table, const vector<u16string>& np, const u16string_view& db) {
         if (np.empty())
             throw runtime_error("List of columns not supplied.");
 
         // FIXME - do we need to make sure no duplicates in np?
 
-        auto cols = get_col_info(*this, table, np, db);
+        auto cols = get_col_info(tds, table, np, db);
 
         {
             u16string q = u"INSERT BULK " + (!db.empty() ? (u16string(db) + u".") : u"") + u16string(table) + u"(";
@@ -6767,10 +6767,16 @@ namespace tds {
 
             q += u") WITH (TABLOCK)";
 
-            batch b(*this, q);
+            batch b(tds, q);
         }
 
         // FIXME - handle INT NULLs and VARCHAR NULLs
+
+        return cols;
+    }
+
+    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp, const u16string_view& db) {
+        auto cols = impl->bcp_start(*this, table, np, db);
 
         // send COLMETADATA for rows
         auto buf = impl->bcp_colmetadata(np, cols);

@@ -467,6 +467,8 @@ namespace tds {
         std::vector<uint8_t> bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
         std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
         void bcp_sendmsg(const std::string_view& msg);
+        std::vector<col_info> bcp_start(tds& tds, const std::u16string_view& table, const std::vector<std::u16string>& np,
+                                        const std::u16string_view& db);
 #ifdef _WIN32
         void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, const std::string_view& sspi);
 #endif
