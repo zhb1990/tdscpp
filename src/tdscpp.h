@@ -87,6 +87,24 @@ namespace tds {
     class value;
     class tds_impl;
 
+    class col_info {
+    public:
+        col_info(sql_type type, int16_t max_length, uint8_t precision, uint8_t scale,
+                const std::u16string_view& collation, bool nullable, unsigned int codepage) :
+                type(type), max_length(max_length), precision(precision), scale(scale),
+                collation(collation), nullable(nullable), codepage(codepage) {
+        }
+
+        sql_type type;
+        int16_t max_length;
+        uint8_t precision;
+        uint8_t scale;
+        std::u16string collation;
+        bool nullable;
+        unsigned int codepage;
+    };
+
+
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -111,6 +129,13 @@ namespace tds {
         uint16_t spid() const;
 
         tds_impl* impl;
+
+    private:
+        std::vector<col_info> bcp_start(const std::u16string_view& table, const std::vector<std::u16string>& np,
+                                        const std::u16string_view& db);
+        std::vector<uint8_t> bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
+        std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
+        void bcp_sendmsg(const std::string_view& msg);
     };
 
     class TDSCPP date {
@@ -646,6 +671,26 @@ namespace tds {
     }
 
     uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);
+
+    void tds::bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp,
+                  const std::u16string_view& db) {
+        auto cols = bcp_start(table, np, db);
+
+        // send COLMETADATA for rows
+        auto buf = bcp_colmetadata(np, cols);
+
+        for (const auto& v : vp) {
+            auto buf2 = bcp_row(v, np, cols);
+
+            // FIXME - if buf full, send packet (maximum packet size is 4096?)
+
+            auto oldlen = buf.size();
+            buf.resize(oldlen + buf2.size());
+            memcpy(&buf[oldlen], buf2.data(), buf2.size());
+        }
+
+        bcp_sendmsg(std::string_view((char*)buf.data(), buf.size()));
+    }
 };
 
 template<>

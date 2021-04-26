@@ -6743,13 +6743,13 @@ namespace tds {
         return ret;
     }
 
-    vector<col_info> tds_impl::bcp_start(tds& tds, const u16string_view& table, const vector<u16string>& np, const u16string_view& db) {
+    vector<col_info> tds::bcp_start(const u16string_view& table, const vector<u16string>& np, const u16string_view& db) {
         if (np.empty())
             throw runtime_error("List of columns not supplied.");
 
         // FIXME - do we need to make sure no duplicates in np?
 
-        auto cols = get_col_info(tds, table, np, db);
+        auto cols = get_col_info(*this, table, np, db);
 
         {
             u16string q = u"INSERT BULK " + (!db.empty() ? (u16string(db) + u".") : u"") + u16string(table) + u"(";
@@ -6767,31 +6767,12 @@ namespace tds {
 
             q += u") WITH (TABLOCK)";
 
-            batch b(tds, q);
+            batch b(*this, q);
         }
 
         // FIXME - handle INT NULLs and VARCHAR NULLs
 
         return cols;
-    }
-
-    void tds::bcp(const u16string_view& table, const vector<u16string>& np, const vector<vector<value>>& vp, const u16string_view& db) {
-        auto cols = impl->bcp_start(*this, table, np, db);
-
-        // send COLMETADATA for rows
-        auto buf = impl->bcp_colmetadata(np, cols);
-
-        for (const auto& v : vp) {
-            auto buf2 = impl->bcp_row(v, np, cols);
-
-            // FIXME - if buf full, send packet (maximum packet size is 4096?)
-
-            auto oldlen = buf.size();
-            buf.resize(oldlen + buf2.size());
-            memcpy(&buf[oldlen], buf2.data(), buf2.size());
-        }
-
-        impl->bcp_sendmsg(string_view((char*)buf.data(), buf.size()));
     }
 
     void tds::bcp(const string_view& table, const vector<string>& np, const vector<vector<value>>& vp, const string_view& db) {
@@ -6947,7 +6928,7 @@ namespace tds {
         return ret;
     }
 
-    vector<uint8_t> tds_impl::bcp_row(const vector<value>& v, const vector<u16string>& np, const vector<col_info>& cols) {
+    vector<uint8_t> tds::bcp_row(const vector<value>& v, const vector<u16string>& np, const vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
         for (unsigned int i = 0; i < cols.size(); i++) {
@@ -8023,13 +8004,13 @@ namespace tds {
         return buf;
     }
 
-    void tds_impl::bcp_sendmsg(const string_view& data) {
-        send_msg(tds_msg::bulk_load_data, data);
+    void tds::bcp_sendmsg(const string_view& data) {
+        impl->send_msg(tds_msg::bulk_load_data, data);
 
         enum tds_msg type;
         string payload;
 
-        wait_for_msg(type, payload);
+        impl->wait_for_msg(type, payload);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -8050,11 +8031,11 @@ namespace tds {
                     if (sv.length() < sizeof(tds_done_msg))
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
 
-                    if (count_handler) {
+                    if (impl->count_handler) {
                         auto msg = (tds_done_msg*)sv.data();
 
                         if (msg->status & 0x10) // row count valid
-                            count_handler(msg->rowcount, msg->curcmd);
+                            impl->count_handler(msg->rowcount, msg->curcmd);
                     }
 
                     sv = sv.substr(sizeof(tds_done_msg));
@@ -8076,15 +8057,15 @@ namespace tds {
                         throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
 
                     if (type == tds_token::INFO) {
-                        if (message_handler)
-                            handle_info_msg(sv.substr(0, len), false);
+                        if (impl->message_handler)
+                            impl->handle_info_msg(sv.substr(0, len), false);
                     } else if (type == tds_token::TDS_ERROR) {
-                        if (message_handler)
-                            handle_info_msg(sv.substr(0, len), true);
+                        if (impl->message_handler)
+                            impl->handle_info_msg(sv.substr(0, len), true);
 
                         throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == tds_token::ENVCHANGE)
-                        handle_envchange_msg(sv.substr(0, len));
+                        impl->handle_envchange_msg(sv.substr(0, len));
 
                     sv = sv.substr(len);
 
@@ -8097,7 +8078,7 @@ namespace tds {
         }
     }
 
-    vector<uint8_t> tds_impl::bcp_colmetadata(const vector<u16string>& np, const vector<col_info>& cols) {
+    vector<uint8_t> tds::bcp_colmetadata(const vector<u16string>& np, const vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
 
         for (unsigned int i = 0; i < cols.size(); i++) {
