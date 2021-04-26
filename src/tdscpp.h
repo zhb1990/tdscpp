@@ -154,6 +154,9 @@ namespace tds {
     template<typename T>
     concept vector_of_string_or_u16string = std::is_same_v<std::vector<std::string>, T> || std::is_same_v<std::vector<std::u16string>, T>;
 
+    template<typename T>
+    concept has_size = requires(T t) { { t.size() }; };
+
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -756,12 +759,17 @@ namespace tds {
 
         auto it = v.begin();
         auto it2 = np.begin();
+        unsigned int num_cols = 0;
 
         for (const auto& col : cols) {
             const auto& vv = *it;
 
-            if (it == v.end())
-                throw std::runtime_error("Trying to send " + std::to_string(v.size()) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
+            if (it == v.end()) {
+                if constexpr (has_size<decltype(v)>)
+                    throw std::runtime_error("Trying to send " + std::to_string(v.size()) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
+                else
+                    throw std::runtime_error("Trying to send " + std::to_string(num_cols) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
+            }
 
             if (vv.is_null && !col.nullable)
                 throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(*it2) + " marked NOT NULL.");
@@ -769,6 +777,7 @@ namespace tds {
             bufsize += bcp_row_size(col, vv);
             it++;
             it2++;
+            num_cols++;
         }
 
         std::vector<uint8_t> buf(bufsize);
