@@ -130,6 +130,7 @@ namespace tds {
         unsigned int codepage;
     };
 
+    std::u16string TDSCPP utf8_to_utf16(const std::string_view& sv);
     std::string TDSCPP utf16_to_utf8(const std::u16string_view& sv);
 
     template<typename T>
@@ -137,6 +138,18 @@ namespace tds {
 
     template<typename T>
     concept list_of_list_of_values = std::ranges::input_range<T> && list_of_values<std::ranges::range_value_t<T>>;
+
+    template<typename T>
+    concept is_string = requires(T t) { { std::string_view{t} }; };
+
+    template<typename T>
+    concept is_u16string = requires(T t) { { std::u16string_view{t} }; };
+
+    template<typename T>
+    concept is_u8string = requires(T t) { { std::u8string_view{t} }; };
+
+    template<typename T>
+    concept string_or_u16string = is_string<T> || is_u16string<T>;
 
     class TDSCPP tds {
     public:
@@ -154,9 +167,14 @@ namespace tds {
         template<typename... Args>
         void run(const std::u16string_view& s, Args&&... args);
 
-        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const list_of_list_of_values auto& vp,
-                 const std::u16string_view& db = u"") {
-            auto cols = bcp_start(table, np, db);
+        void bcp(const string_or_u16string auto& table, const std::vector<std::u16string>& np,
+                 const list_of_list_of_values auto& vp, const std::u16string_view& db = u"") {
+            std::vector<col_info> cols;
+
+            if constexpr (is_u16string<decltype(table)>)
+                cols = bcp_start(table, np, db);
+            else
+                cols = bcp_start(utf8_to_utf16(table), np, db);
 
             // send COLMETADATA for rows
             auto buf = bcp_colmetadata(np, cols);
@@ -173,9 +191,6 @@ namespace tds {
 
             bcp_sendmsg(std::string_view((char*)buf.data(), buf.size()));
         }
-
-        void bcp(const std::string_view& table, const std::vector<std::string>& np, const std::vector<std::vector<value>>& vp,
-                 const std::string_view& db = "");
 
         uint16_t spid() const;
 
@@ -372,15 +387,6 @@ namespace tds {
     static_assert(sizeof(collation) == 5, "tds::collation has wrong size");
 
 #pragma pack(pop)
-
-    template<typename T>
-    concept is_string = requires(T t) { { std::string_view{t} }; };
-
-    template<typename T>
-    concept is_u16string = requires(T t) { { std::u16string_view{t} }; };
-
-    template<typename T>
-    concept is_u8string = requires(T t) { { std::u8string_view{t} }; };
 
     class TDSCPP column : public value {
     public:

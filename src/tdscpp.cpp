@@ -136,34 +136,35 @@ struct fmt::formatter<enum tds::token> {
     }
 };
 
-static u16string utf8_to_utf16(const string_view& sv) {
-#ifdef _WIN32
-    u16string ret;
-
-    if (sv.empty())
-        return u"";
-
-    auto len = MultiByteToWideChar(CP_UTF8, 0, sv.data(), (int)sv.length(), nullptr, 0);
-
-    if (len == 0)
-        throw runtime_error("MultiByteToWideChar 1 failed.");
-
-    ret.resize(len);
-
-    len = MultiByteToWideChar(CP_UTF8, 0, sv.data(), (int)sv.length(), (wchar_t*)ret.data(), len);
-
-    if (len == 0)
-        throw runtime_error("MultiByteToWideChar 2 failed.");
-
-    return ret;
-#else
-    wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
-
-    return convert.from_bytes(sv.data(), sv.data() + sv.length());
-#endif
-}
 
 namespace tds {
+    u16string utf8_to_utf16(const string_view& sv) {
+#ifdef _WIN32
+        u16string ret;
+
+        if (sv.empty())
+            return u"";
+
+        auto len = MultiByteToWideChar(CP_UTF8, 0, sv.data(), (int)sv.length(), nullptr, 0);
+
+        if (len == 0)
+            throw runtime_error("MultiByteToWideChar 1 failed.");
+
+        ret.resize(len);
+
+        len = MultiByteToWideChar(CP_UTF8, 0, sv.data(), (int)sv.length(), (wchar_t*)ret.data(), len);
+
+        if (len == 0)
+            throw runtime_error("MultiByteToWideChar 2 failed.");
+
+        return ret;
+#else
+        wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
+
+        return convert.from_bytes(sv.data(), sv.data() + sv.length());
+#endif
+    }
+
     string utf16_to_utf8(const u16string_view& sv) {
 #ifdef _WIN32
         string ret;
@@ -6775,16 +6776,6 @@ namespace tds {
         // FIXME - handle INT NULLs and VARCHAR NULLs
 
         return cols;
-    }
-
-    void tds::bcp(const string_view& table, const vector<string>& np, const vector<vector<value>>& vp, const string_view& db) {
-        vector<u16string> np2;
-
-        for (const auto& s : np) {
-            np2.emplace_back(utf8_to_utf16(s));
-        }
-
-        bcp(utf8_to_utf16(table), np2, vp, utf8_to_utf16(db));
     }
 
     template<unsigned N>
