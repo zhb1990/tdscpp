@@ -132,6 +132,12 @@ namespace tds {
 
     std::string TDSCPP utf16_to_utf8(const std::u16string_view& sv);
 
+    template<typename T>
+    concept list_of_values = std::ranges::contiguous_range<T> && std::is_same_v<std::ranges::range_value_t<T>, value>;
+
+    template<typename T>
+    concept list_of_list_of_values = std::ranges::input_range<T> && list_of_values<std::ranges::range_value_t<T>>;
+
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -148,8 +154,7 @@ namespace tds {
         template<typename... Args>
         void run(const std::u16string_view& s, Args&&... args);
 
-        template<typename T> requires (std::ranges::input_range<T>)
-        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const T& vp,
+        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const list_of_list_of_values auto& vp,
                  const std::u16string_view& db = u"") {
             auto cols = bcp_start(table, np, db);
 
@@ -180,7 +185,8 @@ namespace tds {
         std::vector<col_info> bcp_start(const std::u16string_view& table, const std::vector<std::u16string>& np,
                                         const std::u16string_view& db);
         std::vector<uint8_t> bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
-        std::vector<uint8_t> bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
+        std::vector<uint8_t> bcp_row(const list_of_values auto& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
+
         void bcp_sendmsg(const std::string_view& msg);
         size_t bcp_row_size(const col_info& col, const value& vv);
         void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const std::u16string_view& col_name);
@@ -720,7 +726,7 @@ namespace tds {
 
     uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);
 
-    std::vector<uint8_t> tds::bcp_row(const std::vector<value>& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols) {
+    std::vector<uint8_t> tds::bcp_row(const list_of_values auto& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
         for (unsigned int i = 0; i < cols.size(); i++) {
