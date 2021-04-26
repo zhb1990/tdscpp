@@ -171,6 +171,9 @@ namespace tds {
     template<typename T>
     concept has_size = requires(T t) { { t.size() }; };
 
+    template<typename T>
+    concept list_of_u16string = std::ranges::input_range<T> && is_u16string<std::ranges::range_value_t<T>>;
+
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -235,7 +238,7 @@ namespace tds {
     private:
         std::vector<col_info> bcp_start(const std::u16string_view& table, const std::vector<std::u16string>& np,
                                         const std::u16string_view& db);
-        std::vector<uint8_t> bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
+        std::vector<uint8_t> bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols);
         std::vector<uint8_t> bcp_row(const list_of_values auto& v, const std::vector<std::u16string>& np, const std::vector<col_info>& cols);
 
         void bcp_sendmsg(const std::string_view& msg);
@@ -815,7 +818,7 @@ namespace tds {
         return buf;
     }
 
-    std::vector<uint8_t> tds::bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols) {
+    std::vector<uint8_t> tds::bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
 
         for (const auto& col : cols) {
