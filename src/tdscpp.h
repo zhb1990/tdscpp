@@ -151,6 +151,9 @@ namespace tds {
     template<typename T>
     concept string_or_u16string = is_string<T> || is_u16string<T>;
 
+    template<typename T>
+    concept vector_of_string_or_u16string = std::is_same_v<std::vector<std::string>, T> || std::is_same_v<std::vector<std::u16string>, T>;
+
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -201,6 +204,11 @@ namespace tds {
             }
 
             bcp(table, np2, vp, db);
+        }
+
+        void bcp(const string_or_u16string auto& table, const vector_of_string_or_u16string auto& np,
+                 const list_of_list_of_values auto& vp, const std::string_view& db) {
+            bcp(table, np, vp, utf8_to_utf16(db));
         }
 
         uint16_t spid() const;
