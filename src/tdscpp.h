@@ -106,6 +106,18 @@ namespace tds {
         DONEINPROC = 0xff
     };
 
+#pragma pack(push, 1)
+
+    struct tds_colmetadata_col {
+        uint32_t user_type;
+        uint16_t flags;
+        tds::sql_type type;
+    };
+
+#pragma pack(pop)
+
+    static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong size");
+
     using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
     using func_count_handler = std::function<void(uint64_t count, uint16_t curcmd)>;
@@ -132,6 +144,8 @@ namespace tds {
 
     std::u16string TDSCPP utf8_to_utf16(const std::string_view& sv);
     std::string TDSCPP utf16_to_utf8(const std::u16string_view& sv);
+    size_t TDSCPP bcp_colmetadata_size(const col_info& col);
+    void TDSCPP bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, const std::u16string_view& name);
 
     template<typename T>
     concept list_of_values = std::ranges::input_range<T> && std::is_same_v<std::ranges::range_value_t<T>, value>;
@@ -796,6 +810,36 @@ namespace tds {
 
             it++;
             it2++;
+        }
+
+        return buf;
+    }
+
+    std::vector<uint8_t> tds::bcp_colmetadata(const std::vector<std::u16string>& np, const std::vector<col_info>& cols) {
+        size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
+
+        for (const auto& col : cols) {
+            bufsize += bcp_colmetadata_size(col) + sizeof(uint8_t);
+        }
+
+        for (const auto& n : np) {
+            bufsize += n.length() * sizeof(char16_t);
+        }
+
+        std::vector<uint8_t> buf(bufsize);
+        auto ptr = (uint8_t*)buf.data();
+
+        *(token*)ptr = token::COLMETADATA; ptr++;
+        *(uint16_t*)ptr = (uint16_t)cols.size(); ptr += sizeof(uint16_t);
+
+        auto it = np.begin();
+
+        for (unsigned int i = 0; i < cols.size(); i++) {
+            const auto& col = cols[i];
+
+            bcp_colmetadata_data(ptr, col, *it);
+
+            it++;
         }
 
         return buf;

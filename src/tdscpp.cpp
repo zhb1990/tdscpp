@@ -8057,185 +8057,163 @@ namespace tds {
         }
     }
 
-    vector<uint8_t> tds::bcp_colmetadata(const vector<u16string>& np, const vector<col_info>& cols) {
-        size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
+    size_t bcp_colmetadata_size(const col_info& col) {
+        switch (col.type) {
+            case sql_type::SQL_NULL:
+            case sql_type::TINYINT:
+            case sql_type::BIT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::DATETIM4:
+            case sql_type::REAL:
+            case sql_type::MONEY:
+            case sql_type::DATETIME:
+            case sql_type::FLOAT:
+            case sql_type::SMALLMONEY:
+            case sql_type::BIGINT:
+            case sql_type::UNIQUEIDENTIFIER:
+            case sql_type::DATE:
+                return 0;
 
-        for (unsigned int i = 0; i < cols.size(); i++) {
-            const auto& col = cols[i];
+            case sql_type::INTN:
+            case sql_type::FLTN:
+            case sql_type::TIME:
+            case sql_type::DATETIME2:
+            case sql_type::DATETIMN:
+            case sql_type::DATETIMEOFFSET:
+            case sql_type::BITN:
+            case sql_type::MONEYN:
+                return 1;
 
-            switch (col.type) {
-                case sql_type::SQL_NULL:
-                case sql_type::TINYINT:
-                case sql_type::BIT:
-                case sql_type::SMALLINT:
-                case sql_type::INT:
-                case sql_type::DATETIM4:
-                case sql_type::REAL:
-                case sql_type::MONEY:
-                case sql_type::DATETIME:
-                case sql_type::FLOAT:
-                case sql_type::SMALLMONEY:
-                case sql_type::BIGINT:
-                case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::DATE:
-                    // nop
-                    break;
+            case sql_type::VARCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::CHAR:
+            case sql_type::NCHAR:
+                return sizeof(uint16_t) + sizeof(collation);
 
-                case sql_type::INTN:
-                case sql_type::FLTN:
-                case sql_type::TIME:
-                case sql_type::DATETIME2:
-                case sql_type::DATETIMN:
-                case sql_type::DATETIMEOFFSET:
-                case sql_type::BITN:
-                case sql_type::MONEYN:
-                    bufsize++;
-                    break;
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
+                return sizeof(uint16_t);
 
-                case sql_type::VARCHAR:
-                case sql_type::NVARCHAR:
-                case sql_type::CHAR:
-                case sql_type::NCHAR:
-                    bufsize += sizeof(uint16_t) + sizeof(collation);
-                    break;
+            case sql_type::DECIMAL:
+            case sql_type::NUMERIC:
+                return 3;
 
-                case sql_type::VARBINARY:
-                case sql_type::BINARY:
-                    bufsize += sizeof(uint16_t);
-                    break;
+            default:
+                throw formatted_error("Unhandled type {} when creating COLMETADATA token.", col.type);
+        }
+    }
 
-                case sql_type::DECIMAL:
-                case sql_type::NUMERIC:
-                    bufsize += 3;
-                    break;
+    void bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, const u16string_view& name) {
+        auto c = (tds_colmetadata_col*)ptr;
 
-                default:
-                    throw formatted_error("Unhandled type {} when creating COLMETADATA token.", col.type);
+        c->user_type = 0;
+        c->flags = 8; // read/write
+
+        if (col.nullable)
+            c->flags |= 1;
+
+        c->type = col.type;
+
+        ptr += sizeof(tds_colmetadata_col);
+
+        switch (col.type) {
+            case sql_type::SQL_NULL:
+            case sql_type::TINYINT:
+            case sql_type::BIT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::DATETIM4:
+            case sql_type::REAL:
+            case sql_type::MONEY:
+            case sql_type::DATETIME:
+            case sql_type::FLOAT:
+            case sql_type::SMALLMONEY:
+            case sql_type::BIGINT:
+            case sql_type::UNIQUEIDENTIFIER:
+            case sql_type::DATE:
+                // nop
+            break;
+
+            case sql_type::INTN:
+            case sql_type::FLTN:
+            case sql_type::BITN:
+            case sql_type::MONEYN:
+                *(uint8_t*)ptr = (uint8_t)col.max_length;
+                ptr++;
+            break;
+
+            case sql_type::TIME:
+            case sql_type::DATETIME2:
+            case sql_type::DATETIMN:
+            case sql_type::DATETIMEOFFSET:
+                *(uint8_t*)ptr = col.scale;
+                ptr++;
+            break;
+
+            case sql_type::VARCHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::CHAR:
+            case sql_type::NCHAR: {
+                *(uint16_t*)ptr = (uint16_t)col.max_length;
+                ptr += sizeof(uint16_t);
+
+                auto c = (collation*)ptr;
+
+                // collation seems to be ignored, depends on what INSERT BULK says
+
+                c->lcid = 0;
+                c->ignore_case = 0;
+                c->ignore_accent = 0;
+                c->ignore_width = 0;
+                c->ignore_kana = 0;
+                c->binary = 0;
+                c->binary2 = 0;
+                c->utf8 = 0;
+                c->reserved = 0;
+                c->version = 0;
+                c->sort_id = 0;
+
+                ptr += sizeof(collation);
+
+                break;
             }
 
-            bufsize += sizeof(uint8_t) + (np[i].length() * sizeof(char16_t));
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
+                *(uint16_t*)ptr = (uint16_t)col.max_length;
+                ptr += sizeof(uint16_t);
+            break;
+
+            case sql_type::DECIMAL:
+            case sql_type::NUMERIC:
+                if (col.precision >= 29)
+                    *(uint8_t*)ptr = 17;
+                else if (col.precision >= 20)
+                    *(uint8_t*)ptr = 13;
+                else if (col.precision >= 10)
+                    *(uint8_t*)ptr = 9;
+                else
+                    *(uint8_t*)ptr = 5;
+
+                ptr++;
+
+                *(uint8_t*)ptr = col.precision;
+                ptr++;
+
+                *(uint8_t*)ptr = col.scale;
+                ptr++;
+            break;
+
+            default:
+                throw formatted_error("Unhandled type {} when creating COLMETADATA token.", col.type);
         }
 
-        vector<uint8_t> buf(bufsize);
-        auto ptr = (uint8_t*)buf.data();
+        *(uint8_t*)ptr = (uint8_t)name.length();
+        ptr++;
 
-        *(token*)ptr = token::COLMETADATA; ptr++;
-        *(uint16_t*)ptr = (uint16_t)cols.size(); ptr += sizeof(uint16_t);
-
-        for (unsigned int i = 0; i < cols.size(); i++) {
-            const auto& col = cols[i];
-            auto c = (tds_colmetadata_col*)ptr;
-
-            c->user_type = 0;
-            c->flags = 8; // read/write
-
-            if (col.nullable)
-                c->flags |= 1;
-
-            c->type = col.type;
-
-            ptr += sizeof(tds_colmetadata_col);
-
-            switch (col.type) {
-                case sql_type::SQL_NULL:
-                case sql_type::TINYINT:
-                case sql_type::BIT:
-                case sql_type::SMALLINT:
-                case sql_type::INT:
-                case sql_type::DATETIM4:
-                case sql_type::REAL:
-                case sql_type::MONEY:
-                case sql_type::DATETIME:
-                case sql_type::FLOAT:
-                case sql_type::SMALLMONEY:
-                case sql_type::BIGINT:
-                case sql_type::UNIQUEIDENTIFIER:
-                case sql_type::DATE:
-                    // nop
-                break;
-
-                case sql_type::INTN:
-                case sql_type::FLTN:
-                case sql_type::BITN:
-                case sql_type::MONEYN:
-                    *(uint8_t*)ptr = (uint8_t)col.max_length;
-                    ptr++;
-                break;
-
-                case sql_type::TIME:
-                case sql_type::DATETIME2:
-                case sql_type::DATETIMN:
-                case sql_type::DATETIMEOFFSET:
-                    *(uint8_t*)ptr = col.scale;
-                    ptr++;
-                break;
-
-                case sql_type::VARCHAR:
-                case sql_type::NVARCHAR:
-                case sql_type::CHAR:
-                case sql_type::NCHAR: {
-                    *(uint16_t*)ptr = (uint16_t)col.max_length;
-                    ptr += sizeof(uint16_t);
-
-                    auto c = (collation*)ptr;
-
-                    // collation seems to be ignored, depends on what INSERT BULK says
-
-                    c->lcid = 0;
-                    c->ignore_case = 0;
-                    c->ignore_accent = 0;
-                    c->ignore_width = 0;
-                    c->ignore_kana = 0;
-                    c->binary = 0;
-                    c->binary2 = 0;
-                    c->utf8 = 0;
-                    c->reserved = 0;
-                    c->version = 0;
-                    c->sort_id = 0;
-
-                    ptr += sizeof(collation);
-
-                    break;
-                }
-
-                case sql_type::VARBINARY:
-                case sql_type::BINARY:
-                    *(uint16_t*)ptr = (uint16_t)col.max_length;
-                    ptr += sizeof(uint16_t);
-                break;
-
-                case sql_type::DECIMAL:
-                case sql_type::NUMERIC:
-                    if (col.precision >= 29)
-                        *(uint8_t*)ptr = 17;
-                    else if (col.precision >= 20)
-                        *(uint8_t*)ptr = 13;
-                    else if (col.precision >= 10)
-                        *(uint8_t*)ptr = 9;
-                    else
-                        *(uint8_t*)ptr = 5;
-
-                    ptr++;
-
-                    *(uint8_t*)ptr = col.precision;
-                    ptr++;
-
-                    *(uint8_t*)ptr = col.scale;
-                    ptr++;
-                break;
-
-                default:
-                    throw formatted_error("Unhandled type {} when creating COLMETADATA token.", col.type);
-            }
-
-            *(uint8_t*)ptr = (uint8_t)np[i].length();
-            ptr++;
-
-            memcpy(ptr, np[i].data(), np[i].length() * sizeof(char16_t));
-            ptr += np[i].length() * sizeof(char16_t);
-        }
-
-        return buf;
+        memcpy(ptr, name.data(), name.length() * sizeof(char16_t));
+        ptr += name.length() * sizeof(char16_t);
     }
 
     batch::batch(tds& conn, const u16string_view& q) {

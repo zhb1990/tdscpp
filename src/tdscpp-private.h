@@ -256,14 +256,6 @@ struct tds_return_value {
 
 static_assert(sizeof(tds_return_value) == 11, "tds_return_value has wrong size");
 
-struct tds_colmetadata_col {
-    uint32_t user_type;
-    uint16_t flags;
-    tds::sql_type type;
-};
-
-static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong size");
-
 enum class tds_tm_type : uint16_t {
     TM_GET_DTC_ADDRESS = 0,
     TM_PROPAGATE_XACT = 1,
