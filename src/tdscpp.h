@@ -866,7 +866,8 @@ namespace tds {
         {
             auto col_info = get_col_info(*this, table, db);
 
-            cols.reserve(np.size());
+            if constexpr (has_size<decltype(np)>)
+                cols.reserve(np.size());
 
             for (const auto& n : np) {
                 if (col_info.count(n) == 0)
