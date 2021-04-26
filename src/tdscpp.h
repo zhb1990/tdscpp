@@ -192,6 +192,17 @@ namespace tds {
             bcp_sendmsg(std::string_view((char*)buf.data(), buf.size()));
         }
 
+        void bcp(const string_or_u16string auto& table, const std::vector<std::string>& np,
+                 const list_of_list_of_values auto& vp, const std::u16string_view& db = u"") {
+            std::vector<std::u16string> np2;
+
+            for (const auto& s : np) {
+                np2.emplace_back(utf8_to_utf16(s));
+            }
+
+            bcp(table, np2, vp, db);
+        }
+
         uint16_t spid() const;
 
         tds_impl* impl;
