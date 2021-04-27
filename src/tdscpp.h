@@ -213,8 +213,6 @@ namespace tds {
             for (const auto& v : vp) {
                 auto buf2 = bcp_row(v, np, cols);
 
-                // FIXME - if buf full, send packet (maximum packet size is 4096?)
-
                 auto oldlen = buf.size();
                 buf.resize(oldlen + buf2.size());
                 memcpy(&buf[oldlen], buf2.data(), buf2.size());
