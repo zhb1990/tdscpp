@@ -6738,7 +6738,10 @@ namespace tds {
 
     template<unsigned N>
     static void double_to_int(double d, uint8_t* scratch) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
         auto v = *(uint64_t*)&d;
+#pragma GCC diagnostic pop
         uint64_t exp = v >> 52;
         uint64_t frac = v & 0xfffffffffffff;
 
