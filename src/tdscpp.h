@@ -825,7 +825,7 @@ namespace tds {
         }
 
         for (const auto& n : np) {
-            bufsize += n.length() * sizeof(char16_t);
+            bufsize += std::u16string_view{n}.length() * sizeof(char16_t);
         }
 
         std::vector<uint8_t> buf(bufsize);
