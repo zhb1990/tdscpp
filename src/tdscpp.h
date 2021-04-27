@@ -166,9 +166,6 @@ namespace tds {
     concept string_or_u16string = is_string<T> || is_u16string<T>;
 
     template<typename T>
-    concept has_size = requires(T t) { { t.size() }; };
-
-    template<typename T>
     concept list_of_u16string = std::ranges::input_range<T> && is_u16string<std::ranges::range_value_t<T>>;
 
     template<typename T>
@@ -784,7 +781,7 @@ namespace tds {
             const auto& vv = *it;
 
             if (it == v.end()) {
-                if constexpr (has_size<decltype(v)>)
+                if constexpr (std::ranges::sized_range<decltype(v)>)
                     throw std::runtime_error("Trying to send " + std::to_string(v.size()) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
                 else
                     throw std::runtime_error("Trying to send " + std::to_string(num_cols) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
@@ -865,7 +862,7 @@ namespace tds {
         {
             auto col_info = get_col_info(*this, table, db);
 
-            if constexpr (has_size<decltype(np)>)
+            if constexpr (std::ranges::sized_range<decltype(np)>)
                 cols.reserve(np.size());
 
             for (const auto& n : np) {
