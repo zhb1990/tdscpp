@@ -127,7 +127,7 @@ int main(int argc, char* argv[]) {
 
         n.run("DROP TABLE IF EXISTS dbo.test;");
         n.run("CREATE TABLE dbo.test(a VARCHAR(10));");
-        n.bcp(u"dbo.test", {u"a"}, {{"1"}, {true}, {nullptr}});
+        n.bcp(u"dbo.test", vector{u"a"}, vector<vector<tds::value>>{{"1"}, {true}, {nullptr}});
     } catch (const exception& e) {
         fmt::print(stderr, FMT_STRING("Exception: {}\n"), e.what());
         return 1;
