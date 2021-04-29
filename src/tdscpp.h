@@ -154,13 +154,13 @@ namespace tds {
     concept list_of_list_of_values = std::ranges::input_range<T> && list_of_values<std::ranges::range_value_t<T>>;
 
     template<typename T>
-    concept is_string = requires(T t) { { std::string_view{t} }; };
+    concept is_string = std::is_convertible_v<T, std::string_view>;
 
     template<typename T>
-    concept is_u16string = requires(T t) { { std::u16string_view{t} }; };
+    concept is_u16string = std::is_convertible_v<T, std::u16string_view>;
 
     template<typename T>
-    concept is_u8string = requires(T t) { { std::u8string_view{t} }; };
+    concept is_u8string = std::is_convertible_v<T, std::u8string_view>;
 
     template<typename T>
     concept string_or_u16string = is_string<T> || is_u16string<T>;
