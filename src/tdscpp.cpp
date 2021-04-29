@@ -9251,7 +9251,7 @@ namespace tds {
 
             string resp(msg_len, 0);
 
-            ret = (int)recv(sock, resp.data(), resp.length(), 0);
+            ret = (int)recv(sock, resp.data(), (int)resp.length(), 0);
 
 #ifdef _WIN32
             if (ret < 0)
