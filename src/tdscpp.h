@@ -148,7 +148,7 @@ namespace tds {
     void TDSCPP bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, const std::u16string_view& name);
 
     template<typename T>
-    concept list_of_values = std::ranges::input_range<T> && std::is_same_v<std::ranges::range_value_t<T>, value>;
+    concept list_of_values = std::ranges::input_range<T> && std::is_convertible_v<std::ranges::range_value_t<T>, value>;
 
     template<typename T>
     concept list_of_list_of_values = std::ranges::input_range<T> && list_of_values<std::ranges::range_value_t<T>>;
@@ -787,8 +787,10 @@ namespace tds {
                     throw std::runtime_error("Trying to send " + std::to_string(num_cols) + " columns in a BCP row, expected " + std::to_string(cols.size()) + ".");
             }
 
-            if (vv.is_null && !col.nullable)
-                throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(*it2) + " marked NOT NULL.");
+            if constexpr (std::is_same_v<std::ranges::range_value_t<decltype(v)>, value>) {
+                if (vv.is_null && !col.nullable)
+                    throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(*it2) + " marked NOT NULL.");
+            }
 
             bufsize += bcp_row_size(col, vv);
             it++;
