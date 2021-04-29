@@ -4718,7 +4718,7 @@ namespace tds {
                 if (d.empty())
                     return 0.0;
 
-                // from_chars not implemented for double yet on gcc
+                // from_chars not implemented for double yet as of mingw gcc 11.1
 #if 0
                 double res;
 
@@ -4755,7 +4755,7 @@ namespace tds {
                     s += (char)c;
                 }
 
-                // from_chars not implemented for double yet on gcc
+                // from_chars not implemented for double yet as of mingw gcc 11.1
 #if 0
                 double res;
 
