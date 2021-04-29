@@ -174,6 +174,9 @@ namespace tds {
     template<typename T>
     concept list_of_string_or_u16string = list_of_string<T> || list_of_u16string<T>;
 
+    template<typename T>
+    concept is_optional = std::is_convertible_v<std::nullopt_t, T>;
+
     class TDSCPP tds {
     public:
         tds(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -789,6 +792,9 @@ namespace tds {
 
             if constexpr (std::is_same_v<std::ranges::range_value_t<decltype(v)>, value>) {
                 if (vv.is_null && !col.nullable)
+                    throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(*it2) + " marked NOT NULL.");
+            } else if constexpr (is_optional<std::ranges::range_value_t<decltype(v)>>) {
+                if (!vv.has_value() && !col.nullable)
                     throw std::runtime_error("Cannot insert NULL into column " + utf16_to_utf8(*it2) + " marked NOT NULL.");
             }
 
