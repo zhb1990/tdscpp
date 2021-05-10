@@ -2742,22 +2742,29 @@ namespace tds {
 
     void tds_impl::wait_for_msg(enum tds_msg& type, string& payload, bool* last_packet) {
         tds_header h;
+        auto ptr = (uint8_t*)&h;
+        int left = sizeof(tds_header);
 
-        auto ret = recv(sock, (char*)&h, sizeof(tds_header), MSG_WAITALL);
+        do {
+            auto ret = recv(sock, (char*)ptr, left, 0);
 
 #ifdef _WIN32
-        if (ret < 0)
-            throw formatted_error("recv failed (error {})", WSAGetLastError());
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", WSAGetLastError());
 #else
-        if (ret < 0)
-            throw formatted_error("recv failed (error {})", errno);
+            if (ret < 0)
+                throw formatted_error("recv failed (error {})", errno);
 #endif
 
-        if (ret == 0)
-            throw formatted_error("Disconnected.");
+            if (ret == 0)
+                throw formatted_error("Disconnected.");
 
-        if ((size_t)ret < sizeof(h))
-            throw formatted_error("recv received {} bytes, expected {}", ret, sizeof(h));
+            if (ret == left)
+                break;
+
+            ptr += ret;
+            left -= (int)ret;
+        } while (true);
 
         if (htons(h.length) < sizeof(tds_header)) {
             throw formatted_error("message length was {}, expected at least {}",
@@ -2767,20 +2774,27 @@ namespace tds {
         type = h.type;
 
         if (htons(h.length) > sizeof(tds_header)) {
-            auto len = htons(h.length) - sizeof(tds_header);
+            left = (int)(htons(h.length) - sizeof(tds_header));
 
-            payload.resize(len);
+            payload.resize(left);
 
-            ret = recv(sock, payload.data(), (int)len, MSG_WAITALL);
+            ptr = (uint8_t*)&payload[0];
 
-            if (ret < 0)
-                throw formatted_error("recv failed (error {})", errno);
+            do {
+                auto ret = recv(sock, (char*)ptr, (int)left, 0);
 
-            if (ret == 0)
-                throw formatted_error("Disconnected.");
+                if (ret < 0)
+                    throw formatted_error("recv failed (error {})", errno);
 
-            if ((unsigned int)ret < len)
-                throw formatted_error("recv received {} bytes, expected {}", ret, len);
+                if (ret == 0)
+                    throw formatted_error("Disconnected.");
+
+                if (ret == left)
+                    break;
+
+                ptr += ret;
+                left -= (int)ret;
+            } while (true);
         } else
             payload.clear();
 
