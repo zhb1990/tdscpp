@@ -2720,18 +2720,26 @@ namespace tds {
             if (!sv2.empty())
                 memcpy(payload.data() + sizeof(tds_header), sv2.data(), sv2.size());
 
-            auto ret = send(sock, payload.data(), (int)payload.length(), 0);
+            auto ptr = (uint8_t*)payload.data();
+            auto left = (int)payload.length();
+
+            do {
+                auto ret = send(sock, (char*)ptr, left, 0);
 
 #ifdef _WIN32
-            if (ret < 0)
-                throw formatted_error("send failed (error {})", WSAGetLastError());
+                if (ret < 0)
+                    throw formatted_error("send failed (error {})", WSAGetLastError());
 #else
-            if (ret < 0)
-                throw formatted_error("send failed (error {})", errno);
+                if (ret < 0)
+                    throw formatted_error("send failed (error {})", errno);
 #endif
 
-            if ((size_t)ret < payload.length())
-                throw formatted_error("send sent {} bytes, expected {}", ret, payload.length());
+                if (ret == left)
+                    break;
+
+                ptr += left;
+                ret -= left;
+            } while (true);
 
             if (sv2.length() == sv.length())
                 return;
