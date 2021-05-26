@@ -436,6 +436,12 @@ namespace tds {
     public:
         output_param() : value(std::optional<T>(std::nullopt)) {
         }
+
+        template<typename U>
+        requires std::is_convertible_v<U, value>
+        operator U() const {
+            return (U)static_cast<value>(*this);
+        }
     };
 
     class TDSCPP rpc {
