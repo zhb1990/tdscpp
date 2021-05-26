@@ -374,6 +374,7 @@ namespace tds {
         operator int64_t() const;
         operator double() const;
         operator const date() const;
+        operator std::chrono::year_month_day() const;
         operator const time() const;
         operator const datetime() const;
 
@@ -455,6 +456,10 @@ namespace tds {
 
         operator const date() const {
             return (date)static_cast<value>(*this);
+        }
+
+        operator std::chrono::year_month_day() const {
+            return (std::chrono::year_month_day)static_cast<value>(*this);
         }
 
         operator const time() const {

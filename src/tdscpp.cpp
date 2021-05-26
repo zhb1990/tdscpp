@@ -4405,6 +4405,153 @@ namespace tds {
         }
     }
 
+    value::operator chrono::year_month_day() const {
+        auto type2 = type;
+        string_view d = val;
+
+        if (is_null)
+            return chrono::year_month_day{1900y, chrono::January, 1d};
+
+        if (type2 == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)d[0];
+
+            d = d.substr(1);
+
+            auto propbytes = (uint8_t)d[0];
+
+            d = d.substr(1 + propbytes);
+        }
+
+        switch (type2) {
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+            case sql_type::TEXT:
+            {
+                uint16_t y;
+                uint8_t mon, day, h, min, s;
+
+                auto t = d;
+
+                // remove leading whitespace
+
+                while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
+                    t = t.substr(1);
+                }
+
+                // remove trailing whitespace
+
+                while (!t.empty() && (t.back() == ' ' || t.back() == '\t')) {
+                    t = t.substr(0, t.length() - 1);
+                }
+
+                if (t.empty())
+                    return chrono::year_month_day{1900y, chrono::January, 1d};
+
+                if (!parse_datetime(t, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
+                    throw formatted_error("Cannot convert string \"{}\" to date", d);
+
+                return chrono::year_month_day{chrono::year{y}, chrono::month{mon}, chrono::day{day}};
+            }
+
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
+            case sql_type::NTEXT:
+            {
+                uint16_t y;
+                uint8_t mon, day, h, min, s;
+
+                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
+
+                // remove leading whitespace
+
+                while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
+                    t = t.substr(1);
+                }
+
+                // remove trailing whitespace
+
+                while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
+                    t = t.substr(0, t.length() - 1);
+                }
+
+                if (t.empty())
+                    return chrono::year_month_day{1900y, chrono::January, 1d};
+
+                string t2;
+
+                t2.reserve(t.length());
+
+                for (auto c : t) {
+                    t2 += (char)c;
+                }
+
+                auto sv = string_view(t2);
+
+                if (!parse_datetime(sv, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
+                    throw formatted_error("Cannot convert string \"{}\" to date", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+
+                return chrono::year_month_day{chrono::year{y}, chrono::month{mon}, chrono::day{day}};
+            }
+
+            case sql_type::DATE: {
+                uint32_t n = 0;
+
+                memcpy(&n, d.data(), 3);
+
+                return num_to_ymd(n - jan1900);
+            }
+
+            case sql_type::DATETIME:
+                return num_to_ymd(*(int32_t*)d.data());
+
+            case sql_type::DATETIMN:
+                switch (d.length()) {
+                    case 4:
+                        return num_to_ymd(*(uint16_t*)d.data());
+
+                    case 8:
+                        return num_to_ymd(*(int32_t*)d.data());
+
+                    default:
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
+                }
+
+            case sql_type::DATETIM4:
+                return num_to_ymd(*(uint16_t*)d.data());
+
+            case sql_type::DATETIME2: {
+                uint32_t n = 0;
+
+                memcpy(&n, d.data() + d.length() - 3, 3);
+
+                return num_to_ymd((int32_t)n - jan1900);
+            }
+
+            case sql_type::DATETIMEOFFSET: {
+                uint32_t n = 0;
+
+                memcpy(&n, d.data() + d.length() - 5, 3);
+
+                return num_to_ymd((int32_t)n - jan1900);
+            }
+
+            // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
+
+            case sql_type::TINYINT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::BIGINT:
+            case sql_type::INTN: {
+                auto n = (int64_t)*this;
+
+                throw formatted_error("Cannot convert integer {} to std::chrono::year_month_day", n);
+            }
+
+            default:
+                throw formatted_error("Cannot convert {} to std::chrono::year_month_day", type2);
+        }
+    }
+
     value::operator const time() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
