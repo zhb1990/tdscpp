@@ -248,6 +248,8 @@ namespace tds {
         void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const std::u16string_view& col_name);
     };
 
+    using time_t = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
+
     class TDSCPP time {
     public:
         time() = default;
@@ -363,6 +365,16 @@ namespace tds {
         operator std::chrono::year_month_day() const;
         operator const time() const;
         operator const datetime() const;
+
+        operator std::chrono::hh_mm_ss<time_t>() const;
+
+        template<typename T, typename U>
+        operator std::chrono::hh_mm_ss<std::chrono::duration<T, U>>() const {
+            auto dur = static_cast<std::chrono::hh_mm_ss<time_t>>(*this);
+            auto dur2 = std::chrono::duration_cast<std::chrono::duration<T, U>>(dur.to_duration());
+
+            return std::chrono::hh_mm_ss{dur2};
+        }
 
         operator uint32_t() const {
             return static_cast<uint32_t>(static_cast<int64_t>(*this));

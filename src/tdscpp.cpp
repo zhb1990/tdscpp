@@ -4510,6 +4510,187 @@ namespace tds {
         }
     }
 
+    value::operator chrono::hh_mm_ss<time_t>() const {
+        auto type2 = type;
+        unsigned int max_length2 = max_length;
+        string_view d = val;
+
+        if (is_null)
+            return chrono::hh_mm_ss{time_t::zero()};
+
+        if (type2 == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)d[0];
+
+            d = d.substr(1);
+
+            auto propbytes = (uint8_t)d[0];
+
+            d = d.substr(1);
+
+            switch (type2) {
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMEOFFSET:
+                    max_length2 = d[0];
+                    break;
+
+                default:
+                    break;
+            }
+
+            d = d.substr(propbytes);
+        }
+
+        switch (type2) {
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+            case sql_type::TEXT:
+            {
+                uint16_t y;
+                uint8_t mon, day, h, min, s;
+
+                auto t = d;
+
+                // remove leading whitespace
+
+                while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
+                    t = t.substr(1, t.length() - 1);
+                }
+
+                // remove trailing whitespace
+
+                while (!t.empty() && (t.back() == ' ' || t.back() == '\t')) {
+                    t = t.substr(0, t.length() - 1);
+                }
+
+                if (t.empty())
+                    return chrono::hh_mm_ss{time_t::zero()};
+
+                if (!parse_datetime(t, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+                    throw formatted_error("Cannot convert string \"{}\" to time", d);
+
+                auto dur = chrono::seconds((h * 3600) + (min * 60) + s);
+
+                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+            }
+
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
+            case sql_type::NTEXT:
+            {
+                uint16_t y;
+                uint8_t mon, day, h, min, s;
+
+                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
+
+                // remove leading whitespace
+
+                while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
+                    t = t.substr(1, t.length() - 1);
+                }
+
+                // remove trailing whitespace
+
+                while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
+                    t = t.substr(0, t.length() - 1);
+                }
+
+                if (t.empty())
+                    return chrono::hh_mm_ss{time_t::zero()};
+
+                string t2;
+
+                t2.reserve(t.length());
+
+                for (auto c : t) {
+                    t2 += (char)c;
+                }
+
+                if (!parse_datetime(t2, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+                    throw formatted_error("Cannot convert string \"{}\" to time", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+
+                auto dur = chrono::seconds((h * 3600) + (min * 60) + s);
+
+                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+            }
+
+            case sql_type::TIME: {
+                uint64_t ticks = 0;
+
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length()));
+
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
+                }
+
+                return chrono::hh_mm_ss{time_t(ticks)};
+            }
+
+            case sql_type::DATETIME: {
+                auto v = *(uint32_t*)(d.data() + sizeof(int32_t));
+                auto dur = chrono::duration<int64_t, std::ratio<1, 300>>(v);
+
+                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+            }
+
+            case sql_type::DATETIMN:
+                switch (d.length()) {
+                    case 4: {
+                        auto v = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                        auto dur = chrono::minutes(v);
+
+                        return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                    }
+
+                    case 8: {
+                        auto v = *(uint32_t*)(d.data() + sizeof(int32_t));
+                        auto dur = chrono::duration<int64_t, std::ratio<1, 300>>(v);
+
+                        return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                    }
+
+                    default:
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
+                }
+
+            case sql_type::DATETIM4: {
+                auto v = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                auto dur = chrono::minutes(v);
+
+                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+            }
+
+            case sql_type::DATETIME2: {
+                uint64_t ticks = 0;
+
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 3));
+
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
+                }
+
+                return chrono::hh_mm_ss{time_t(ticks)};
+            }
+
+            case sql_type::DATETIMEOFFSET: {
+                uint64_t ticks = 0;
+
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 5));
+
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
+                }
+
+                return chrono::hh_mm_ss{time_t(ticks)};
+            }
+
+            // MSSQL doesn't allow conversion to TIME for integers, floats, BITs, or DATE
+
+            default:
+                throw formatted_error("Cannot convert {} to std::chrono::hh_mm_ss", type2);
+        }
+    }
+
     value::operator const datetime() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
