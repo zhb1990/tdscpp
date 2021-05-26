@@ -424,56 +424,10 @@ namespace tds {
         bool nullable;
         collation coll;
 
-        operator const std::string() const {
-            return (std::string)static_cast<value>(*this);
-        }
-
-        operator const std::u16string() const {
-            return (std::u16string)static_cast<value>(*this);
-        }
-
-        operator int64_t() const {
-            return (int64_t)static_cast<value>(*this);
-        }
-
-        operator double() const {
-            return (double)static_cast<value>(*this);
-        }
-
-        operator std::chrono::year_month_day() const {
-            return (std::chrono::year_month_day)static_cast<value>(*this);
-        }
-
-        operator const time() const {
-            return (time)static_cast<value>(*this);
-        }
-
-        operator const datetime() const {
-            return (datetime)static_cast<value>(*this);
-        }
-
-        operator uint32_t() const {
-            return (uint32_t)static_cast<value>(*this);
-        }
-
-        operator int32_t() const {
-            return (int32_t)static_cast<value>(*this);
-        }
-
-        operator uint64_t() const {
-            return (uint64_t)static_cast<value>(*this);
-        }
-
-        operator int16_t() const {
-            return (int16_t)static_cast<value>(*this);
-        }
-
-        operator uint8_t() const {
-            return (uint8_t)static_cast<value>(*this);
-        }
-
-        operator float() const {
-            return (float)static_cast<value>(*this);
+        template<typename T>
+        requires std::is_convertible_v<T, value>
+        operator T() const {
+            return (T)static_cast<value>(*this);
         }
     };
 
