@@ -3143,6 +3143,40 @@ namespace tds {
         }
     }
 
+    static int ymd_to_num(const chrono::year_month_day& d) noexcept {
+        int m2 = ((int)(unsigned int)d.month() - 14) / 12;
+        long long n;
+
+        n = (1461 * ((int)d.year() + 4800 + m2)) / 4;
+        n += (367 * ((int)(unsigned int)d.month() - 2 - (12 * m2))) / 12;
+        n -= (3 * (((int)d.year() + 4900 + m2)/100)) / 4;
+        n += (unsigned int)d.day();
+        n -= 1753501;
+
+        return static_cast<int>(n);
+    }
+
+    value::value(const chrono::year_month_day& d) noexcept {
+        int32_t n = ymd_to_num(d);
+
+        type = sql_type::DATE;
+        val.resize(3);
+
+        memcpy(val.data(), &n, 3);
+    }
+
+    value::value(const optional<chrono::year_month_day>& d) noexcept {
+        type = sql_type::DATE;
+
+        if (!d.has_value())
+            is_null = true;
+        else {
+            int32_t n = ymd_to_num(d.value());
+            val.resize(3);
+            memcpy(val.data(), &n, 3);
+        }
+    }
+
     value::value(const time& t) {
         uint32_t secs;
 
