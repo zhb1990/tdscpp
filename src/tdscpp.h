@@ -271,28 +271,28 @@ namespace tds {
     class TDSCPP datetime {
     public:
         datetime() = default;
-        datetime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second) :
+        datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second) :
             d(year, month, day), t(hour, minute, second) { }
-        datetime(int32_t num, uint32_t secs) : d(num), t(secs) { }
+        datetime(const std::chrono::year_month_day& d, uint32_t secs) : d(d), t(secs) { }
 
         datetime(const std::chrono::time_point<std::chrono::system_clock>& chr) {
             auto tt = std::chrono::system_clock::to_time_t(chr);
             auto s = localtime(&tt);
 
-            d = date((uint16_t)(s->tm_year + 1900), (uint8_t)(s->tm_mon + 1), (uint8_t)s->tm_mday);
+            d = std::chrono::floor<std::chrono::days>(chr);
             t = time((uint8_t)s->tm_hour, (uint8_t)s->tm_min, (uint8_t)s->tm_sec);
         }
 
-        date d;
+        std::chrono::year_month_day d;
         time t;
     };
 
     class TDSCPP datetimeoffset : public datetime {
     public:
         datetimeoffset() = default;
-        datetimeoffset(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
+        datetimeoffset(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
             datetime(year, month, day, hour, minute, second), offset(offset) { }
-        datetimeoffset(int32_t num, uint32_t secs, int16_t offset) : datetime(num, secs), offset(offset) { }
+        datetimeoffset(const std::chrono::year_month_day& d, uint32_t secs, int16_t offset) : datetime(d, secs), offset(offset) { }
 
         int16_t offset;
     };
@@ -1087,7 +1087,7 @@ struct fmt::formatter<tds::datetime> {
 
     template<typename format_context>
     auto format(const tds::datetime& dt, format_context& ctx) {
-        return format_to(ctx.out(), "{} {}", dt.d, dt.t);
+        return format_to(ctx.out(), "{:04}-{:02}-{:02} {}", (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(), dt.t);
     }
 };
 
@@ -1106,7 +1106,9 @@ struct fmt::formatter<tds::datetimeoffset> {
     auto format(const tds::datetimeoffset& dto, format_context& ctx) {
         auto absoff = abs(dto.offset);
 
-        return format_to(ctx.out(), "{} {} {}{:02}:{:02}", dto.d, dto.t,
+        return format_to(ctx.out(), "{:04}-{:02}-{:02} {} {}{:02}:{:02}",
+                        (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
+                        dto.t,
                         dto.offset < 0 ? '-' : '+',
                         absoff / 60, absoff % 60);
     }
