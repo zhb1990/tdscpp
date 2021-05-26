@@ -2911,40 +2911,6 @@ namespace tds {
                         tim->state, tim->severity, error);
     }
 
-    date::date(int32_t num) : num(num) {
-        signed long long j, e, f, g, h;
-
-        j = num + 2415021;
-
-        f = (4 * j) + 274277;
-        f /= 146097;
-        f *= 3;
-        f /= 4;
-        f += j;
-        f += 1363;
-
-        e = (4 * f) + 3;
-        g = (e % 1461) / 4;
-        h = (5 * g) + 2;
-
-        day = (uint8_t)(((h % 153) / 5) + 1);
-        month = (uint8_t)(((h / 153) + 2) % 12 + 1);
-        year = static_cast<uint16_t>((e / 1461) - 4716 + ((14 - month) / 12));
-    }
-
-    date::date(uint16_t year, uint8_t month, uint8_t day) : year(year), month(month), day(day) {
-        int m2 = ((int)month - 14) / 12;
-        long long n;
-
-        n = (1461 * ((int)year + 4800 + m2)) / 4;
-        n += (367 * ((int)month - 2 - (12 * m2))) / 12;
-        n -= (3 * (((int)year + 4900 + m2)/100)) / 4;
-        n += day;
-        n -= 2447096;
-
-        num = static_cast<int>(n);
-    }
-
     value::value() {
         type = (sql_type)0;
     }
@@ -3118,28 +3084,6 @@ namespace tds {
             auto v = d.value();
 
             memcpy(val.data(), &v, sizeof(double));
-        }
-    }
-
-    value::value(const date& d) {
-        int32_t n;
-
-        type = sql_type::DATE;
-        val.resize(3);
-
-        n = d.num + 693595;
-        memcpy(val.data(), &n, 3);
-    }
-
-    value::value(const optional<date>& d) {
-        type = sql_type::DATE;
-
-        if (!d.has_value())
-            is_null = true;
-        else {
-            int32_t n = d.value().num + 693595;
-            val.resize(3);
-            memcpy(val.data(), &n, 3);
         }
     }
 
@@ -4256,153 +4200,6 @@ namespace tds {
         d = 1;
 
         return true;
-    }
-
-    value::operator const date() const {
-        auto type2 = type;
-        string_view d = val;
-
-        if (is_null)
-            return date{1900, 1, 1};
-
-        if (type2 == sql_type::SQL_VARIANT) {
-            type2 = (sql_type)d[0];
-
-            d = d.substr(1);
-
-            auto propbytes = (uint8_t)d[0];
-
-            d = d.substr(1 + propbytes);
-        }
-
-        switch (type2) {
-            case sql_type::VARCHAR:
-            case sql_type::CHAR:
-            case sql_type::TEXT:
-            {
-                uint16_t y;
-                uint8_t mon, day, h, min, s;
-
-                auto t = d;
-
-                // remove leading whitespace
-
-                while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
-                    t = t.substr(1);
-                }
-
-                // remove trailing whitespace
-
-                while (!t.empty() && (t.back() == ' ' || t.back() == '\t')) {
-                    t = t.substr(0, t.length() - 1);
-                }
-
-                if (t.empty())
-                    return date{1900, 1, 1};
-
-                if (!parse_datetime(t, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
-                    throw formatted_error("Cannot convert string \"{}\" to date", d);
-
-                return date{y, mon, day};
-            }
-
-            case sql_type::NVARCHAR:
-            case sql_type::NCHAR:
-            case sql_type::NTEXT:
-            {
-                uint16_t y;
-                uint8_t mon, day, h, min, s;
-
-                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
-
-                // remove leading whitespace
-
-                while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
-                    t = t.substr(1);
-                }
-
-                // remove trailing whitespace
-
-                while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
-                    t = t.substr(0, t.length() - 1);
-                }
-
-                if (t.empty())
-                    return date{1900, 1, 1};
-
-                string t2;
-
-                t2.reserve(t.length());
-
-                for (auto c : t) {
-                    t2 += (char)c;
-                }
-
-                auto sv = string_view(t2);
-
-                if (!parse_datetime(sv, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
-                    throw formatted_error("Cannot convert string \"{}\" to date", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
-
-                return date{y, mon, day};
-            }
-
-            case sql_type::DATE: {
-                uint32_t n = 0;
-
-                memcpy(&n, d.data(), 3);
-
-                return date{(int32_t)n - jan1900};
-            }
-
-            case sql_type::DATETIME:
-                return date{*(int32_t*)d.data()};
-
-            case sql_type::DATETIMN:
-                switch (d.length()) {
-                    case 4:
-                        return date{*(uint16_t*)d.data()};
-
-                    case 8:
-                        return date{*(int32_t*)d.data()};
-
-                    default:
-                        throw formatted_error("DATETIMN has invalid length {}", d.length());
-                }
-
-            case sql_type::DATETIM4:
-                return date{*(uint16_t*)d.data()};
-
-            case sql_type::DATETIME2: {
-                uint32_t n = 0;
-
-                memcpy(&n, d.data() + d.length() - 3, 3);
-
-                return date{(int32_t)n - jan1900};
-            }
-
-            case sql_type::DATETIMEOFFSET: {
-                uint32_t n = 0;
-
-                memcpy(&n, d.data() + d.length() - 5, 3);
-
-                return date{(int32_t)n - jan1900};
-            }
-
-            // MSSQL doesn't allow conversion to DATE for integers, floats, BITs, or TIME
-
-            case sql_type::TINYINT:
-            case sql_type::SMALLINT:
-            case sql_type::INT:
-            case sql_type::BIGINT:
-            case sql_type::INTN: {
-                auto n = (int64_t)*this;
-
-                throw formatted_error("Cannot convert integer {} to date", n);
-            }
-
-            default:
-                throw formatted_error("Cannot convert {} to date", type2);
-        }
     }
 
     value::operator chrono::year_month_day() const {
@@ -7613,15 +7410,15 @@ namespace tds {
                     *(uint8_t*)ptr = 0;
                     ptr++;
                 } else {
-                    date d;
+                    chrono::year_month_day d;
 
                     try {
-                        d = (date)vv;
+                        d = (chrono::year_month_day)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
                     }
 
-                    uint32_t n = d.num + jan1900;
+                    uint32_t n = ymd_to_num(d) + jan1900;
 
                     *(uint8_t*)ptr = 3;
                     ptr++;

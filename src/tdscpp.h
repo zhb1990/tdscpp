@@ -248,17 +248,6 @@ namespace tds {
         void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const std::u16string_view& col_name);
     };
 
-    class TDSCPP date {
-    public:
-        date() = default;
-        date(int32_t num);
-        date(uint16_t year, uint8_t month, uint8_t day);
-
-        int32_t num;
-        uint16_t year;
-        uint8_t month, day;
-    };
-
     class TDSCPP time {
     public:
         time() = default;
@@ -335,8 +324,6 @@ namespace tds {
         value(const std::optional<float>& f);
         value(double d);
         value(const std::optional<double>& d);
-        value(const date& d);
-        value(const std::optional<date>& d);
         value(const time& t);
         value(const std::chrono::year_month_day& d) noexcept;
         value(const std::optional<std::chrono::year_month_day>& d) noexcept;
@@ -373,7 +360,6 @@ namespace tds {
         operator const std::u16string() const;
         operator int64_t() const;
         operator double() const;
-        operator const date() const;
         operator std::chrono::year_month_day() const;
         operator const time() const;
         operator const datetime() const;
@@ -452,10 +438,6 @@ namespace tds {
 
         operator double() const {
             return (double)static_cast<value>(*this);
-        }
-
-        operator const date() const {
-            return (date)static_cast<value>(*this);
         }
 
         operator std::chrono::year_month_day() const {
@@ -1042,23 +1024,6 @@ struct fmt::formatter<enum tds::sql_type> {
             default:
                 return format_to(ctx.out(), "{:x}", (uint8_t)t);
         }
-    }
-};
-
-template<>
-struct fmt::formatter<tds::date> {
-    constexpr auto parse(format_parse_context& ctx) {
-        auto it = ctx.begin();
-
-        if (it != ctx.end() && *it != '}')
-            throw format_error("invalid format");
-
-        return it;
-    }
-
-    template<typename format_context>
-    auto format(const tds::date& d, format_context& ctx) {
-        return format_to(ctx.out(), "{:04}-{:02}-{:02}", d.year, d.month, d.day);
     }
 };
 
