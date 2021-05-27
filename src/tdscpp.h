@@ -267,24 +267,22 @@ namespace tds {
             d(year, month, day) {
             auto secs = std::chrono::seconds((hour * 3600) + (minute * 60) + second);
 
-            t = std::chrono::hh_mm_ss{std::chrono::duration_cast<time_t>(secs)};
+            t = std::chrono::duration_cast<time_t>(secs);
         }
 
         datetime(const std::chrono::year_month_day& d, time_t t) : d(d), t(t) { }
 
         template<typename T, typename U>
-        datetime(const std::chrono::year_month_day& d, std::chrono::duration<T, U> t2) : d(d) {
-            t = std::chrono::hh_mm_ss{std::chrono::duration_cast<time_t>(t2)};
-        }
+        datetime(const std::chrono::year_month_day& d, std::chrono::duration<T, U> t) : d(d), t{std::chrono::duration_cast<time_t>(t)} { }
 
         template<typename T>
         datetime(const std::chrono::time_point<T>& chr) {
             d = std::chrono::floor<std::chrono::days>(chr);
-            t = std::chrono::hh_mm_ss{std::chrono::floor<time_t>(chr - std::chrono::floor<std::chrono::days>(chr))};
+            t = std::chrono::floor<time_t>(chr - std::chrono::floor<std::chrono::days>(chr));
         }
 
         std::chrono::year_month_day d;
-        std::chrono::hh_mm_ss<time_t> t;
+        time_t t;
     };
 
     class TDSCPP datetimeoffset : public datetime {
@@ -1044,9 +1042,11 @@ struct fmt::formatter<tds::datetime> {
 
     template<typename format_context>
     auto format(const tds::datetime& dt, format_context& ctx) {
+        auto hms = std::chrono::hh_mm_ss{dt.t};
+
         return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
-                         dt.t.hours().count(), dt.t.minutes().count(), dt.t.seconds().count());
+                         hms.hours().count(), hms.minutes().count(), hms.seconds().count());
     }
 };
 
@@ -1063,11 +1063,12 @@ struct fmt::formatter<tds::datetimeoffset> {
 
     template<typename format_context>
     auto format(const tds::datetimeoffset& dto, format_context& ctx) {
+        auto hms = std::chrono::hh_mm_ss{dto.t};
         auto absoff = abs(dto.offset);
 
         return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {}{:02}:{:02}",
                         (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
-                        dto.t.hours().count(), dto.t.minutes().count(), dto.t.seconds().count(),
+                        hms.hours().count(), hms.minutes().count(), hms.seconds().count(),
                         dto.offset < 0 ? '-' : '+',
                         absoff / 60, absoff % 60);
     }

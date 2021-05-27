@@ -3196,7 +3196,7 @@ namespace tds {
         val.resize(6);
         max_length = 0; // DATETIME2(0)
 
-        auto dur = chrono::duration_cast<chrono::seconds>(dt.t.to_duration());
+        auto dur = chrono::duration_cast<chrono::seconds>(dt.t);
         auto secs = static_cast<uint32_t>(dur.count());
 
         memcpy(val.data(), &secs, 3);
@@ -3216,7 +3216,7 @@ namespace tds {
         else {
             int32_t n;
 
-            auto dur = chrono::duration_cast<chrono::seconds>(dt.value().t.to_duration());
+            auto dur = chrono::duration_cast<chrono::seconds>(dt.value().t);
             auto secs = static_cast<uint32_t>(dur.count());
 
             memcpy(val.data(), &secs, 3);
@@ -3234,7 +3234,7 @@ namespace tds {
         val.resize(8);
         max_length = 0; // DATETIMEOFFSET(0)
 
-        auto dur = chrono::duration_cast<chrono::seconds>(dto.t.to_duration());
+        auto dur = chrono::duration_cast<chrono::seconds>(dto.t);
         auto secs = static_cast<uint32_t>(dur.count());
 
         memcpy(val.data(), &secs, 3);
@@ -3256,7 +3256,7 @@ namespace tds {
         else {
             int32_t n;
 
-            auto dur = chrono::duration_cast<chrono::seconds>(dto.value().t.to_duration());
+            auto dur = chrono::duration_cast<chrono::seconds>(dto.value().t);
             auto secs = static_cast<uint32_t>(dur.count());
 
             memcpy(val.data(), &secs, 3);
@@ -7676,7 +7676,7 @@ namespace tds {
                     }
 
                     uint32_t n = ymd_to_num(dt.d) + jan1900;
-                    auto ticks = dt.t.to_duration().count();
+                    auto ticks = dt.t.count();
 
                     for (int j = 0; j < 7 - col.scale; j++) {
                         ticks /= 10;
@@ -7721,7 +7721,7 @@ namespace tds {
                     }
 
                     uint32_t n = ymd_to_num(dto.d) + jan1900;
-                    auto ticks = dto.t.to_duration().count();
+                    auto ticks = dto.t.count();
 
                     for (int j = 0; j < 7 - col.scale; j++) {
                         ticks /= 10;
@@ -7766,7 +7766,7 @@ namespace tds {
                     throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
                 }
 
-                auto ticks = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t.to_duration());
+                auto ticks = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t);
 
                 *(int32_t*)ptr = ymd_to_num(dt.d);
                 ptr += sizeof(int32_t);
@@ -7803,14 +7803,14 @@ namespace tds {
                             *(uint16_t*)ptr = (uint16_t)ymd_to_num(dt.d);
                             ptr += sizeof(uint16_t);
 
-                            *(uint16_t*)ptr = (uint16_t)chrono::duration_cast<chrono::minutes>(dt.t.to_duration()).count();
+                            *(uint16_t*)ptr = (uint16_t)chrono::duration_cast<chrono::minutes>(dt.t).count();
                             ptr += sizeof(uint16_t);
 
                             break;
                         }
 
                         case 8: {
-                            auto dur = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t.to_duration());
+                            auto dur = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t);
 
                             *(uint8_t*)ptr = (uint8_t)col.max_length;
                             ptr++;
