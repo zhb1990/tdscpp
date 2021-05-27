@@ -3190,16 +3190,14 @@ namespace tds {
 
     value::value(const datetime& dt) {
         int32_t n;
-        uint32_t secs;
 
         type = sql_type::DATETIME2;
         scale = 0;
         val.resize(6);
         max_length = 0; // DATETIME2(0)
 
-        secs = (unsigned int)dt.t.hour * 3600;
-        secs += (unsigned int)dt.t.minute * 60;
-        secs += dt.t.second;
+        auto dur = chrono::duration_cast<chrono::seconds>(dt.t.to_duration());
+        auto secs = static_cast<uint32_t>(dur.count());
 
         memcpy(val.data(), &secs, 3);
 
@@ -3217,11 +3215,9 @@ namespace tds {
             is_null = true;
         else {
             int32_t n;
-            uint32_t secs;
 
-            secs = (unsigned int)dt.value().t.hour * 3600;
-            secs += (unsigned int)dt.value().t.minute * 60;
-            secs += dt.value().t.second;
+            auto dur = chrono::duration_cast<chrono::seconds>(dt.value().t.to_duration());
+            auto secs = static_cast<uint32_t>(dur.count());
 
             memcpy(val.data(), &secs, 3);
 
@@ -3232,16 +3228,14 @@ namespace tds {
 
     value::value(const datetimeoffset& dto) {
         int32_t n;
-        uint32_t secs;
 
         type = sql_type::DATETIMEOFFSET;
         scale = 0;
         val.resize(8);
         max_length = 0; // DATETIMEOFFSET(0)
 
-        secs = (unsigned int)dto.t.hour * 3600;
-        secs += (unsigned int)dto.t.minute * 60;
-        secs += dto.t.second;
+        auto dur = chrono::duration_cast<chrono::seconds>(dto.t.to_duration());
+        auto secs = static_cast<uint32_t>(dur.count());
 
         memcpy(val.data(), &secs, 3);
 
@@ -3261,11 +3255,9 @@ namespace tds {
             is_null = true;
         else {
             int32_t n;
-            uint32_t secs;
 
-            secs = (unsigned int)dto.value().t.hour * 3600;
-            secs += (unsigned int)dto.value().t.minute * 60;
-            secs += dto.value().t.second;
+            auto dur = chrono::duration_cast<chrono::seconds>(dto.value().t.to_duration());
+            auto secs = static_cast<uint32_t>(dur.count());
 
             memcpy(val.data(), &secs, 3);
 
@@ -3462,30 +3454,29 @@ namespace tds {
             }
 
             case sql_type::DATETIME2: {
-                uint64_t secs = 0;
+                uint64_t ticks = 0;
                 uint32_t v;
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 3));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 3));
 
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
                 }
 
                 memcpy(&v, d.data() + d.length() - 3, 3);
                 v &= 0xffffff;
 
-                datetime dt(num_to_ymd(v - jan1900), (uint32_t)secs);
+                datetime dt(num_to_ymd(v - jan1900), time_t(ticks));
 
                 return fmt::format(FMT_STRING("{}"), dt);
             }
 
             case sql_type::DATETIME: {
                 auto v = *(int32_t*)d.data();
-                auto secs = *(uint32_t*)(d.data() + sizeof(int32_t));
+                auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
+                auto dur = chrono::duration<int64_t, ratio<1, 300>>(t);
 
-                secs /= 300;
-
-                datetime dt(num_to_ymd(v), secs);
+                datetime dt(num_to_ymd(v), dur);
 
                 return fmt::format(FMT_STRING("{}"), dt);
             }
@@ -3494,20 +3485,20 @@ namespace tds {
                 switch (d.length()) {
                     case 4: {
                         auto v = *(uint16_t*)d.data();
-                        auto mins = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                        auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                        auto dur = chrono::minutes(t);
 
-                        datetime dt(num_to_ymd(v), mins * 60);
+                        datetime dt(num_to_ymd(v), dur);
 
                         return fmt::format(FMT_STRING("{}"), dt);
                     }
 
                     case 8: {
                         auto v = *(int32_t*)d.data();
-                        auto secs = *(uint32_t*)(d.data() + sizeof(int32_t));
+                        auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
+                        auto dur = chrono::duration<int64_t, ratio<1, 300>>(t);
 
-                        secs /= 300;
-
-                        datetime dt(num_to_ymd(v), secs);
+                        datetime dt(num_to_ymd(v), dur);
 
                         return fmt::format(FMT_STRING("{}"), dt);
                     }
@@ -3518,27 +3509,28 @@ namespace tds {
 
             case sql_type::DATETIM4: {
                 auto v = *(uint16_t*)d.data();
-                auto mins = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                auto dur = chrono::minutes(t);
 
-                datetime dt(num_to_ymd(v), mins * 60);
+                datetime dt(num_to_ymd(v), dur);
 
                 return fmt::format(FMT_STRING("{}"), dt);
             }
 
             case sql_type::DATETIMEOFFSET: {
-                uint64_t secs = 0;
+                uint64_t ticks = 0;
                 uint32_t v;
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 5));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 5));
 
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
                 }
 
                 memcpy(&v, d.data() + d.length() - 5, 3);
                 v &= 0xffffff;
 
-                datetimeoffset dto(num_to_ymd(v - jan1900), (uint32_t)secs, *(int16_t*)(d.data() + d.length() - sizeof(int16_t)));
+                datetimeoffset dto(num_to_ymd(v - jan1900), (time_t)ticks, *(int16_t*)(d.data() + d.length() - sizeof(int16_t)));
 
                 return fmt::format(FMT_STRING("{}"), dto);
             }
@@ -4628,7 +4620,7 @@ namespace tds {
 
             case sql_type::DATETIME: {
                 auto v = *(uint32_t*)(d.data() + sizeof(int32_t));
-                auto dur = chrono::duration<int64_t, std::ratio<1, 300>>(v);
+                auto dur = chrono::duration<int64_t, ratio<1, 300>>(v);
 
                 return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
             }
@@ -4644,7 +4636,7 @@ namespace tds {
 
                     case 8: {
                         auto v = *(uint32_t*)(d.data() + sizeof(int32_t));
-                        auto dur = chrono::duration<int64_t, std::ratio<1, 300>>(v);
+                        auto dur = chrono::duration<int64_t, ratio<1, 300>>(v);
 
                         return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
                     }
@@ -4796,67 +4788,87 @@ namespace tds {
 
                 memcpy(&n, d.data(), 3);
 
-                return datetime{num_to_ymd(n - jan1900), 0};
+                return datetime{num_to_ymd(n - jan1900), time_t(0)};
             }
 
             case sql_type::TIME: {
-                uint64_t secs = 0;
+                uint64_t ticks = 0;
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length()));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length()));
 
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
                 }
 
-                return datetime{chrono::year_month_day{1900y, chrono::January, 1d}, (uint32_t)secs};
+                return datetime{chrono::year_month_day{1900y, chrono::January, 1d}, time_t(ticks)};
             }
 
-            case sql_type::DATETIME:
-                return datetime{num_to_ymd(*(int32_t*)d.data()), *(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
+            case sql_type::DATETIME: {
+                auto v = *(int32_t*)d.data();
+                auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
+                auto dur = chrono::duration<int64_t, ratio<1, 300>>(t);
+
+                return datetime{num_to_ymd(v), dur};
+            }
 
             case sql_type::DATETIMN:
                 switch (d.length()) {
-                    case 4:
-                        return datetime{num_to_ymd(*(uint16_t*)d.data()), (uint32_t)(*(uint16_t*)(d.data() + sizeof(uint16_t)) * 60)};
+                    case 4: {
+                        auto v = *(uint16_t*)d.data();
+                        auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                        auto dur = chrono::minutes(t);
 
-                    case 8:
-                        return datetime{num_to_ymd(*(int32_t*)d.data()), *(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
+                        return datetime{num_to_ymd(v), dur};
+                    }
+
+                    case 8: {
+                        auto v = *(int32_t*)d.data();
+                        auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
+                        auto dur = chrono::duration<int64_t, ratio<1, 300>>(t);
+
+                        return datetime{num_to_ymd(v), dur};
+                    }
 
                     default:
                         throw formatted_error("DATETIMN has invalid length {}", d.length());
                 }
 
-            case sql_type::DATETIM4:
-                return datetime{num_to_ymd(*(uint16_t*)d.data()), (uint32_t)(*(uint16_t*)(d.data() + sizeof(uint16_t)) * 60)};
+            case sql_type::DATETIM4: {
+                auto v = *(uint16_t*)d.data();
+                auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                auto dur = chrono::minutes(t);
+
+                return datetime{num_to_ymd(v), dur};
+            }
 
             case sql_type::DATETIME2: {
                 uint32_t n = 0;
-                uint64_t secs = 0;
+                uint64_t ticks = 0;
 
                 memcpy(&n, d.data() + d.length() - 3, 3);
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 3));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 3));
 
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
                 }
 
-                return datetime{num_to_ymd((int32_t)n - jan1900), (uint32_t)secs};
+                return datetime{num_to_ymd((int32_t)n - jan1900), time_t(ticks)};
             }
 
             case sql_type::DATETIMEOFFSET: {
                 uint32_t n = 0;
-                uint64_t secs = 0;
+                uint64_t ticks = 0;
 
                 memcpy(&n, d.data() + d.length() - 5, 3);
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 5));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 5));
 
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
                 }
 
-                return datetime{num_to_ymd((int32_t)n - jan1900), (uint32_t)secs};
+                return datetime{num_to_ymd((int32_t)n - jan1900), time_t(ticks)};
             }
 
             // MSSQL doesn't allow conversion to DATETIME2 for integers, floats, or BIT
@@ -7664,29 +7676,29 @@ namespace tds {
                     }
 
                     uint32_t n = ymd_to_num(dt.d) + jan1900;
-                    uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
+                    auto ticks = dt.t.to_duration().count();
 
-                    for (unsigned int j = 0; j < col.scale; j++) {
-                        secs *= 10;
+                    for (int j = 0; j < 7 - col.scale; j++) {
+                        ticks /= 10;
                     }
 
                     if (col.scale <= 2) {
                         *(uint8_t*)ptr = 6;
                         ptr++;
 
-                        memcpy(ptr, &secs, 3);
+                        memcpy(ptr, &ticks, 3);
                         ptr += 3;
                     } else if (col.scale <= 4) {
                         *(uint8_t*)ptr = 7;
                         ptr++;
 
-                        memcpy(ptr, &secs, 4);
+                        memcpy(ptr, &ticks, 4);
                         ptr += 4;
                     } else {
                         *(uint8_t*)ptr = 8;
                         ptr++;
 
-                        memcpy(ptr, &secs, 5);
+                        memcpy(ptr, &ticks, 5);
                         ptr += 5;
                     }
 
@@ -7709,29 +7721,29 @@ namespace tds {
                     }
 
                     uint32_t n = ymd_to_num(dto.d) + jan1900;
-                    uint64_t secs = (dto.t.hour * 3600) + (dto.t.minute * 60) + dto.t.second;
+                    auto ticks = dto.t.to_duration().count();
 
-                    for (unsigned int j = 0; j < col.scale; j++) {
-                        secs *= 10;
+                    for (int j = 0; j < 7 - col.scale; j++) {
+                        ticks /= 10;
                     }
 
                     if (col.scale <= 2) {
                         *(uint8_t*)ptr = 8;
                         ptr++;
 
-                        memcpy(ptr, &secs, 3);
+                        memcpy(ptr, &ticks, 3);
                         ptr += 3;
                     } else if (col.scale <= 4) {
                         *(uint8_t*)ptr = 9;
                         ptr++;
 
-                        memcpy(ptr, &secs, 4);
+                        memcpy(ptr, &ticks, 4);
                         ptr += 4;
                     } else {
                         *(uint8_t*)ptr = 10;
                         ptr++;
 
-                        memcpy(ptr, &secs, 5);
+                        memcpy(ptr, &ticks, 5);
                         ptr += 5;
                     }
 
@@ -7754,12 +7766,12 @@ namespace tds {
                     throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
                 }
 
-                uint32_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
+                auto ticks = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t.to_duration());
 
                 *(int32_t*)ptr = ymd_to_num(dt.d);
                 ptr += sizeof(int32_t);
 
-                *(uint32_t*)ptr = (uint32_t)(secs * 300);
+                *(uint32_t*)ptr = (uint32_t)ticks.count();
                 ptr += sizeof(uint32_t);
 
                 break;
@@ -7791,14 +7803,14 @@ namespace tds {
                             *(uint16_t*)ptr = (uint16_t)ymd_to_num(dt.d);
                             ptr += sizeof(uint16_t);
 
-                            *(uint16_t*)ptr = (uint16_t)((dt.t.hour * 60) + dt.t.minute);
+                            *(uint16_t*)ptr = (uint16_t)chrono::duration_cast<chrono::minutes>(dt.t.to_duration()).count();
                             ptr += sizeof(uint16_t);
 
                             break;
                         }
 
                         case 8: {
-                            uint64_t secs = (dt.t.hour * 3600) + (dt.t.minute * 60) + dt.t.second;
+                            auto dur = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t.to_duration());
 
                             *(uint8_t*)ptr = (uint8_t)col.max_length;
                             ptr++;
@@ -7806,7 +7818,7 @@ namespace tds {
                             *(int32_t*)ptr = ymd_to_num(dt.d);
                             ptr += sizeof(int32_t);
 
-                            *(uint32_t*)ptr = (uint32_t)(secs * 300);
+                            *(uint32_t*)ptr = (uint32_t)dur.count();
                             ptr += sizeof(uint32_t);
 
                             break;
