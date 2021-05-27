@@ -3154,6 +3154,32 @@ namespace tds {
         }
     }
 
+    value::value(time_t t) {
+        auto secs = (uint32_t)chrono::duration_cast<chrono::seconds>(t).count();
+
+        type = sql_type::TIME;
+        max_length = 0; // TIME(0)
+        scale = 0;
+
+        val.resize(3);
+        memcpy(val.data(), &secs, val.length());
+    }
+
+    value::value(const std::optional<time_t>& t) {
+        type = sql_type::TIME;
+        max_length = 0; // TIME(0)
+        scale = 0;
+
+        if (!t.has_value())
+            is_null = true;
+        else {
+            auto secs = (uint32_t)chrono::duration_cast<chrono::seconds>(t.value()).count();
+
+            val.resize(3);
+            memcpy(val.data(), &secs, val.length());
+        }
+    }
+
     value::value(const time& t) {
         uint32_t secs;
 

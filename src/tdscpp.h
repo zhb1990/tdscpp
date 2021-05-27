@@ -340,9 +340,11 @@ namespace tds {
         value(double d);
         value(const std::optional<double>& d);
         value(const time& t);
+        value(const std::optional<time>& t);
         value(const std::chrono::year_month_day& d) noexcept;
         value(const std::optional<std::chrono::year_month_day>& d) noexcept;
-        value(const std::optional<time>& t);
+        value(time_t t);
+        value(const std::optional<time_t>& t);
         value(const datetime& dt);
         value(const std::optional<datetime>& t);
         value(const datetimeoffset& dt);
@@ -370,6 +372,9 @@ namespace tds {
         value(bool b);
         value(const std::optional<bool>& b);
         value(const std::chrono::time_point<std::chrono::system_clock>& chr) : value((datetime)chr) { }
+
+        template<typename T, typename U>
+        value(std::chrono::duration<T, U> t) : value(std::chrono::duration_cast<time_t>(t)) { }
 
         operator const std::string() const;
         operator const std::u16string() const;
