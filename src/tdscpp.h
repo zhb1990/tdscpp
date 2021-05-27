@@ -365,12 +365,12 @@ namespace tds {
         template<typename T, typename U>
         value(std::chrono::duration<T, U> t) : value(std::chrono::duration_cast<time_t>(t)) { }
 
-        operator const std::string() const;
-        operator const std::u16string() const;
+        operator std::string() const;
+        operator std::u16string() const;
         operator int64_t() const;
         operator double() const;
         operator std::chrono::year_month_day() const;
-        operator const datetime() const;
+        operator datetime() const;
 
         operator time_t() const;
 

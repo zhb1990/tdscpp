@@ -3308,7 +3308,7 @@ namespace tds {
         }
     }
 
-    value::operator const string() const {
+    value::operator string() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
         uint8_t scale2 = scale;
@@ -3669,11 +3669,11 @@ namespace tds {
         }
     }
 
-    value::operator const u16string() const {
+    value::operator u16string() const {
         if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT || type == sql_type::XML)
             return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
         else
-            return utf8_to_utf16(operator const string()); // FIXME - VARCHARs might not be valid UTF-8
+            return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
     }
 
     value::operator int64_t() const {
@@ -4515,7 +4515,7 @@ namespace tds {
         }
     }
 
-    value::operator const datetime() const {
+    value::operator datetime() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
         string_view d = val;
