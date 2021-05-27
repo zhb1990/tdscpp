@@ -379,24 +379,10 @@ namespace tds {
             return std::chrono::duration_cast<std::chrono::duration<T, U>>((time_t)*this);
         }
 
-        explicit operator uint32_t() const {
-            return static_cast<uint32_t>(static_cast<int64_t>(*this));
-        }
-
-        explicit operator int32_t() const {
-            return static_cast<int32_t>(static_cast<int64_t>(*this));
-        }
-
-        explicit operator uint64_t() const {
-            return static_cast<uint64_t>(static_cast<int64_t>(*this));
-        }
-
-        explicit operator int16_t() const {
-            return static_cast<int16_t>(static_cast<int64_t>(*this));
-        }
-
-        explicit operator uint8_t() const {
-            return static_cast<uint8_t>(static_cast<int64_t>(*this));
+        template<typename T>
+        requires std::is_integral_v<T>
+        explicit operator T() const {
+            return static_cast<T>(static_cast<int64_t>(*this));
         }
 
         explicit operator float() const {
