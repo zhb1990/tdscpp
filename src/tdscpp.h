@@ -438,24 +438,12 @@ namespace tds {
         std::u16string name;
         bool nullable;
         collation coll;
-
-        template<typename T>
-        requires std::is_convertible_v<T, value>
-        operator T() const {
-            return (T)static_cast<value>(*this);
-        }
     };
 
     template<typename T>
     class output_param : public value {
     public:
         output_param() : value(std::optional<T>(std::nullopt)) {
-        }
-
-        template<typename U>
-        requires std::is_convertible_v<U, value>
-        operator U() const {
-            return (U)static_cast<value>(*this);
         }
     };
 
