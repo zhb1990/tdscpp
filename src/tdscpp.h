@@ -385,8 +385,10 @@ namespace tds {
             return static_cast<T>(static_cast<int64_t>(*this));
         }
 
-        explicit operator float() const {
-            return static_cast<float>(static_cast<double>(*this));
+        template<typename T>
+        requires std::is_floating_point_v<T>
+        explicit operator T() const {
+            return static_cast<T>(static_cast<double>(*this));
         }
 
         enum sql_type type;
