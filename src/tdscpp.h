@@ -384,14 +384,11 @@ namespace tds {
         operator const time() const;
         operator const datetime() const;
 
-        operator std::chrono::hh_mm_ss<time_t>() const;
+        operator time_t() const;
 
         template<typename T, typename U>
-        operator std::chrono::hh_mm_ss<std::chrono::duration<T, U>>() const {
-            auto dur = static_cast<std::chrono::hh_mm_ss<time_t>>(*this);
-            auto dur2 = std::chrono::duration_cast<std::chrono::duration<T, U>>(dur.to_duration());
-
-            return std::chrono::hh_mm_ss{dur2};
+        operator std::chrono::duration<T, U>() const {
+            return std::chrono::duration_cast<std::chrono::duration<T, U>>((time_t)*this);
         }
 
         operator uint32_t() const {

@@ -4528,13 +4528,13 @@ namespace tds {
         }
     }
 
-    value::operator chrono::hh_mm_ss<time_t>() const {
+    value::operator time_t() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
         string_view d = val;
 
         if (is_null)
-            return chrono::hh_mm_ss{time_t::zero()};
+            return time_t::zero();
 
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)d[0];
@@ -4582,14 +4582,14 @@ namespace tds {
                 }
 
                 if (t.empty())
-                    return chrono::hh_mm_ss{time_t::zero()};
+                    return time_t::zero();
 
                 if (!parse_datetime(t, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
                     throw formatted_error("Cannot convert string \"{}\" to time", d);
 
                 auto dur = chrono::seconds((h * 3600) + (min * 60) + s);
 
-                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                return chrono::duration_cast<time_t>(dur);
             }
 
             case sql_type::NVARCHAR:
@@ -4614,7 +4614,7 @@ namespace tds {
                 }
 
                 if (t.empty())
-                    return chrono::hh_mm_ss{time_t::zero()};
+                    return time_t::zero();
 
                 string t2;
 
@@ -4629,7 +4629,7 @@ namespace tds {
 
                 auto dur = chrono::seconds((h * 3600) + (min * 60) + s);
 
-                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                return chrono::duration_cast<time_t>(dur);
             }
 
             case sql_type::TIME: {
@@ -4641,14 +4641,14 @@ namespace tds {
                     ticks *= 10;
                 }
 
-                return chrono::hh_mm_ss{time_t(ticks)};
+                return time_t(ticks);
             }
 
             case sql_type::DATETIME: {
                 auto v = *(uint32_t*)(d.data() + sizeof(int32_t));
                 auto dur = chrono::duration<int64_t, ratio<1, 300>>(v);
 
-                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                return chrono::duration_cast<time_t>(dur);
             }
 
             case sql_type::DATETIMN:
@@ -4657,14 +4657,14 @@ namespace tds {
                         auto v = *(uint16_t*)(d.data() + sizeof(uint16_t));
                         auto dur = chrono::minutes(v);
 
-                        return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                        return chrono::duration_cast<time_t>(dur);
                     }
 
                     case 8: {
                         auto v = *(uint32_t*)(d.data() + sizeof(int32_t));
                         auto dur = chrono::duration<int64_t, ratio<1, 300>>(v);
 
-                        return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                        return chrono::duration_cast<time_t>(dur);
                     }
 
                     default:
@@ -4675,7 +4675,7 @@ namespace tds {
                 auto v = *(uint16_t*)(d.data() + sizeof(uint16_t));
                 auto dur = chrono::minutes(v);
 
-                return chrono::hh_mm_ss(chrono::duration_cast<time_t>(dur));
+                return chrono::duration_cast<time_t>(dur);
             }
 
             case sql_type::DATETIME2: {
@@ -4687,7 +4687,7 @@ namespace tds {
                     ticks *= 10;
                 }
 
-                return chrono::hh_mm_ss{time_t(ticks)};
+                return time_t(ticks);
             }
 
             case sql_type::DATETIMEOFFSET: {
@@ -4699,13 +4699,13 @@ namespace tds {
                     ticks *= 10;
                 }
 
-                return chrono::hh_mm_ss{time_t(ticks)};
+                return time_t(ticks);
             }
 
             // MSSQL doesn't allow conversion to TIME for integers, floats, BITs, or DATE
 
             default:
-                throw formatted_error("Cannot convert {} to std::chrono::hh_mm_ss", type2);
+                throw formatted_error("Cannot convert {} to std::chrono::duration", type2);
         }
     }
 
