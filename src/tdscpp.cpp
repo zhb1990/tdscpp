@@ -3180,40 +3180,6 @@ namespace tds {
         }
     }
 
-    value::value(const time& t) {
-        uint32_t secs;
-
-        secs = (unsigned int)t.hour * 3600;
-        secs += (unsigned int)t.minute * 60;
-        secs += t.second;
-
-        type = sql_type::TIME;
-        max_length = 0; // TIME(0)
-        scale = 0;
-
-        val.resize(3);
-        memcpy(val.data(), &secs, val.length());
-    }
-
-    value::value(const optional<time>& t) {
-        type = sql_type::TIME;
-        max_length = 0; // TIME(0)
-        scale = 0;
-
-        if (!t.has_value())
-            is_null = true;
-        else {
-            uint32_t secs;
-
-            secs = (unsigned int)t.value().hour * 3600;
-            secs += (unsigned int)t.value().minute * 60;
-            secs += t.value().second;
-
-            val.resize(3);
-            memcpy(val.data(), &secs, val.length());
-        }
-    }
-
     value::value(const datetime& dt) {
         int32_t n;
 
@@ -3466,17 +3432,18 @@ namespace tds {
             }
 
             case sql_type::TIME: {
-                uint64_t secs = 0;
+                uint64_t ticks = 0;
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length()));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length()));
 
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
                 }
 
-                time t((uint32_t)secs);
+                time_t t(ticks);
+                chrono::hh_mm_ss hms(t);
 
-                return fmt::format(FMT_STRING("{}"), t);
+                return fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), hms.hours().count(), hms.minutes().count(), hms.seconds().count());
             }
 
             case sql_type::DATETIME2: {
@@ -4364,167 +4331,6 @@ namespace tds {
 
             default:
                 throw formatted_error("Cannot convert {} to std::chrono::year_month_day", type2);
-        }
-    }
-
-    value::operator const time() const {
-        auto type2 = type;
-        unsigned int max_length2 = max_length;
-        string_view d = val;
-
-        if (is_null)
-            return time{0, 0, 0};
-
-        if (type2 == sql_type::SQL_VARIANT) {
-            type2 = (sql_type)d[0];
-
-            d = d.substr(1);
-
-            auto propbytes = (uint8_t)d[0];
-
-            d = d.substr(1);
-
-            switch (type2) {
-                case sql_type::TIME:
-                case sql_type::DATETIME2:
-                case sql_type::DATETIMEOFFSET:
-                    max_length2 = d[0];
-                    break;
-
-                default:
-                    break;
-            }
-
-            d = d.substr(propbytes);
-        }
-
-        switch (type2) {
-            case sql_type::VARCHAR:
-            case sql_type::CHAR:
-            case sql_type::TEXT:
-            {
-                uint16_t y;
-                uint8_t mon, day, h, min, s;
-
-                auto t = d;
-
-                // remove leading whitespace
-
-                while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
-                    t = t.substr(1, t.length() - 1);
-                }
-
-                // remove trailing whitespace
-
-                while (!t.empty() && (t.back() == ' ' || t.back() == '\t')) {
-                    t = t.substr(0, t.length() - 1);
-                }
-
-                if (t.empty())
-                    return time{0, 0, 0};
-
-                if (!parse_datetime(t, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-                    throw formatted_error("Cannot convert string \"{}\" to time", d);
-
-                return time{h, min, s};
-            }
-
-            case sql_type::NVARCHAR:
-            case sql_type::NCHAR:
-            case sql_type::NTEXT:
-            {
-                uint16_t y;
-                uint8_t mon, day, h, min, s;
-
-                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
-
-                // remove leading whitespace
-
-                while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
-                    t = t.substr(1, t.length() - 1);
-                }
-
-                // remove trailing whitespace
-
-                while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
-                    t = t.substr(0, t.length() - 1);
-                }
-
-                if (t.empty())
-                    return time{0, 0, 0};
-
-                string t2;
-
-                t2.reserve(t.length());
-
-                for (auto c : t) {
-                    t2 += (char)c;
-                }
-
-                if (!parse_datetime(t2, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
-                    throw formatted_error("Cannot convert string \"{}\" to time", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
-
-                return time{h, min, s};
-            }
-
-            case sql_type::TIME: {
-                uint64_t secs = 0;
-
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length()));
-
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
-                }
-
-                return time{(uint32_t)secs};
-            }
-
-            case sql_type::DATETIME:
-                return time{*(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
-
-            case sql_type::DATETIMN:
-                switch (d.length()) {
-                    case 4:
-                        return time{(uint32_t)(*(uint16_t*)(d.data() + sizeof(uint16_t)) * 60)};
-
-                    case 8:
-                        return time{*(uint32_t*)(d.data() + sizeof(int32_t)) / 300};
-
-                    default:
-                        throw formatted_error("DATETIMN has invalid length {}", d.length());
-                }
-
-            case sql_type::DATETIM4:
-                return time{(uint32_t)(*(uint16_t*)(d.data() + sizeof(uint16_t)) * 60)};
-
-            case sql_type::DATETIME2: {
-                uint64_t secs = 0;
-
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 3));
-
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
-                }
-
-                return time{(uint32_t)secs};
-            }
-
-            case sql_type::DATETIMEOFFSET: {
-                uint64_t secs = 0;
-
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 5));
-
-                for (auto n = max_length2; n > 0; n--) {
-                    secs /= 10;
-                }
-
-                return time{(uint32_t)secs};
-            }
-
-            // MSSQL doesn't allow conversion to TIME for integers, floats, BITs, or DATE
-
-            default:
-                throw formatted_error("Cannot convert {} to time", type2);
         }
     }
 
@@ -7652,37 +7458,35 @@ namespace tds {
                     *(uint8_t*)ptr = 0;
                     ptr++;
                 } else {
-                    time t;
+                    uint64_t ticks;
 
                     try {
-                        t = (time)vv;
+                        ticks = time_t(vv).count();
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
                     }
 
-                    uint64_t secs = (t.hour * 3600) + (t.minute * 60) + t.second;
-
-                    for (unsigned int j = 0; j < col.scale; j++) {
-                        secs *= 10;
+                    for (int j = 0; j < 7 - col.scale; j++) {
+                        ticks /= 10;
                     }
 
                     if (col.scale <= 2) {
                         *(uint8_t*)ptr = 3;
                         ptr++;
 
-                        memcpy(ptr, &secs, 3);
+                        memcpy(ptr, &ticks, 3);
                         ptr += 3;
                     } else if (col.scale <= 4) {
                         *(uint8_t*)ptr = 4;
                         ptr++;
 
-                        memcpy(ptr, &secs, 4);
+                        memcpy(ptr, &ticks, 4);
                         ptr += 4;
                     } else {
                         *(uint8_t*)ptr = 5;
                         ptr++;
 
-                        memcpy(ptr, &secs, 5);
+                        memcpy(ptr, &ticks, 5);
                         ptr += 5;
                     }
                 }

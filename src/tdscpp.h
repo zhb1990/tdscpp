@@ -250,15 +250,6 @@ namespace tds {
 
     using time_t = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
 
-    class TDSCPP time {
-    public:
-        time() = default;
-        time(uint8_t hour, uint8_t minute, uint8_t second) : hour(hour), minute(minute), second(second) { }
-        time(uint32_t secs) : hour((uint8_t)(secs / 3600)), minute((uint8_t)((secs / 60) % 60)), second((uint8_t)(secs % 60)) { }
-
-        uint8_t hour, minute, second;
-    };
-
     class TDSCPP datetime {
     public:
         datetime() = default;
@@ -339,8 +330,6 @@ namespace tds {
         value(const std::optional<float>& f);
         value(double d);
         value(const std::optional<double>& d);
-        value(const time& t);
-        value(const std::optional<time>& t);
         value(const std::chrono::year_month_day& d) noexcept;
         value(const std::optional<std::chrono::year_month_day>& d) noexcept;
         value(time_t t);
@@ -381,7 +370,6 @@ namespace tds {
         operator int64_t() const;
         operator double() const;
         operator std::chrono::year_month_day() const;
-        operator const time() const;
         operator const datetime() const;
 
         operator time_t() const;
@@ -1011,23 +999,6 @@ struct fmt::formatter<enum tds::sql_type> {
             default:
                 return format_to(ctx.out(), "{:x}", (uint8_t)t);
         }
-    }
-};
-
-template<>
-struct fmt::formatter<tds::time> {
-    constexpr auto parse(format_parse_context& ctx) {
-        auto it = ctx.begin();
-
-        if (it != ctx.end() && *it != '}')
-            throw format_error("invalid format");
-
-        return it;
-    }
-
-    template<typename format_context>
-    auto format(const tds::time& t, format_context& ctx) {
-        return format_to(ctx.out(), "{:02}:{:02}:{:02}", t.hour, t.minute, t.second);
     }
 };
 
