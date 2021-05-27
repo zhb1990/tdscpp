@@ -365,41 +365,41 @@ namespace tds {
         template<typename T, typename U>
         value(std::chrono::duration<T, U> t) : value(std::chrono::duration_cast<time_t>(t)) { }
 
-        operator std::string() const;
-        operator std::u16string() const;
-        operator int64_t() const;
-        operator double() const;
-        operator std::chrono::year_month_day() const;
-        operator datetime() const;
+        explicit operator std::string() const;
+        explicit operator std::u16string() const;
+        explicit operator int64_t() const;
+        explicit operator double() const;
+        explicit operator std::chrono::year_month_day() const;
+        explicit operator datetime() const;
 
-        operator time_t() const;
+        explicit operator time_t() const;
 
         template<typename T, typename U>
-        operator std::chrono::duration<T, U>() const {
+        explicit operator std::chrono::duration<T, U>() const {
             return std::chrono::duration_cast<std::chrono::duration<T, U>>((time_t)*this);
         }
 
-        operator uint32_t() const {
+        explicit operator uint32_t() const {
             return static_cast<uint32_t>(static_cast<int64_t>(*this));
         }
 
-        operator int32_t() const {
+        explicit operator int32_t() const {
             return static_cast<int32_t>(static_cast<int64_t>(*this));
         }
 
-        operator uint64_t() const {
+        explicit operator uint64_t() const {
             return static_cast<uint64_t>(static_cast<int64_t>(*this));
         }
 
-        operator int16_t() const {
+        explicit operator int16_t() const {
             return static_cast<int16_t>(static_cast<int64_t>(*this));
         }
 
-        operator uint8_t() const {
+        explicit operator uint8_t() const {
             return static_cast<uint8_t>(static_cast<int64_t>(*this));
         }
 
-        operator float() const {
+        explicit operator float() const {
             return static_cast<float>(static_cast<double>(*this));
         }
 
