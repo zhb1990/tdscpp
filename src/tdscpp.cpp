@@ -3490,7 +3490,7 @@ namespace tds {
 
                         datetime dt(num_to_ymd(v), dur);
 
-                        return fmt::format(FMT_STRING("{}"), dt);
+                        return fmt::format(FMT_STRING("{:0}"), dt);
                     }
 
                     case 8: {
@@ -3514,7 +3514,7 @@ namespace tds {
 
                 datetime dt(num_to_ymd(v), dur);
 
-                return fmt::format(FMT_STRING("{}"), dt);
+                return fmt::format(FMT_STRING("{:0}"), dt);
             }
 
             case sql_type::DATETIMEOFFSET: {
