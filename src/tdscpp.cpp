@@ -3133,7 +3133,7 @@ namespace tds {
 
     static const auto jan1900 = -ymd_to_num({1y, chrono::January, 1d});
 
-    value::value(const chrono::year_month_day& d) noexcept {
+    value::value(const chrono::year_month_day& d) {
         int32_t n = ymd_to_num(d) + jan1900;
 
         type = sql_type::DATE;
@@ -3142,7 +3142,7 @@ namespace tds {
         memcpy(val.data(), &n, 3);
     }
 
-    value::value(const optional<chrono::year_month_day>& d) noexcept {
+    value::value(const optional<chrono::year_month_day>& d) {
         type = sql_type::DATE;
 
         if (!d.has_value())

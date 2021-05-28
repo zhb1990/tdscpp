@@ -330,8 +330,8 @@ namespace tds {
         value(const std::optional<float>& f);
         value(double d);
         value(const std::optional<double>& d);
-        value(const std::chrono::year_month_day& d) noexcept;
-        value(const std::optional<std::chrono::year_month_day>& d) noexcept;
+        value(const std::chrono::year_month_day& d);
+        value(const std::optional<std::chrono::year_month_day>& d);
         value(time_t t);
         value(const std::optional<time_t>& t);
         value(const datetime& dt);
