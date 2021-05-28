@@ -3467,7 +3467,7 @@ namespace tds {
 
                 datetime dt(num_to_ymd(v - jan1900), time_t(ticks));
 
-                return fmt::format(FMT_STRING("{}"), dt);
+                return fmt::format(FMT_STRING("{:{}}"), dt, max_length2);
             }
 
             case sql_type::DATETIME: {
