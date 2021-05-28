@@ -3443,7 +3443,13 @@ namespace tds {
                 time_t t(ticks);
                 chrono::hh_mm_ss hms(t);
 
-                return fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), hms.hours().count(), hms.minutes().count(), hms.seconds().count());
+                if (max_length2 == 0)
+                    return fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), hms.hours().count(), hms.minutes().count(), hms.seconds().count());
+                else {
+                    double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
+
+                    return fmt::format(FMT_STRING("{:02}:{:02}:{:02.{}f}"), hms.hours().count(), hms.minutes().count(), s, max_length2);
+                }
             }
 
             case sql_type::DATETIME2: {
