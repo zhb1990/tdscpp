@@ -3185,36 +3185,34 @@ namespace tds {
 
         type = sql_type::DATETIME2;
         scale = 0;
-        val.resize(6);
-        max_length = 0; // DATETIME2(0)
+        val.resize(8);
+        max_length = 7; // DATETIME2(7)
 
-        auto dur = chrono::duration_cast<chrono::seconds>(dt.t);
-        auto secs = static_cast<uint32_t>(dur.count());
+        auto secs = (uint64_t)dt.t.count();
 
-        memcpy(val.data(), &secs, 3);
+        memcpy(val.data(), &secs, 5);
 
         n = ymd_to_num(dt.d) + jan1900;
-        memcpy(val.data() + 3, &n, 3);
+        memcpy(val.data() + 5, &n, 3);
     }
 
     value::value(const optional<datetime>& dt) {
         type = sql_type::DATETIME2;
         scale = 0;
-        val.resize(6);
-        max_length = 0; // DATETIME2(0)
+        val.resize(8);
+        max_length = 7; // DATETIME2(7)
 
         if (!dt.has_value())
             is_null = true;
         else {
             int32_t n;
 
-            auto dur = chrono::duration_cast<chrono::seconds>(dt.value().t);
-            auto secs = static_cast<uint32_t>(dur.count());
+            auto secs = (uint64_t)dt.value().t.count();
 
-            memcpy(val.data(), &secs, 3);
+            memcpy(val.data(), &secs, 5);
 
             n = ymd_to_num(dt.value().d) + jan1900;
-            memcpy(val.data() + 3, &n, 3);
+            memcpy(val.data() + 5, &n, 3);
         }
     }
 
