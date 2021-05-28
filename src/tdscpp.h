@@ -278,6 +278,10 @@ namespace tds {
             t = std::chrono::floor<time_t>(chr - std::chrono::floor<std::chrono::days>(chr));
         }
 
+        constexpr operator std::chrono::time_point<std::chrono::system_clock>() const {
+            return std::chrono::sys_days{d} + t;
+        }
+
         std::chrono::year_month_day d;
         time_t t;
     };
@@ -395,6 +399,10 @@ namespace tds {
         requires std::is_floating_point_v<T>
         explicit operator T() const {
             return static_cast<T>(static_cast<double>(*this));
+        }
+
+        explicit operator std::chrono::time_point<std::chrono::system_clock>() const {
+            return static_cast<std::chrono::time_point<std::chrono::system_clock>>(static_cast<datetime>(*this));
         }
 
         enum sql_type type;
