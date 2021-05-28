@@ -1042,8 +1042,27 @@ struct fmt::formatter<tds::datetime> {
 
 template<>
 struct fmt::formatter<tds::datetimeoffset> {
+    unsigned int len = 7;
+    int len_arg = -1;
+
     constexpr auto parse(format_parse_context& ctx) {
         auto it = ctx.begin();
+
+        if (it != ctx.end()) {
+            if (*it >= '0' && *it <= '7') {
+                len = *it - '0';
+                it++;
+            } else if (*it == '{') {
+                it++;
+
+                if (it == ctx.end() || *it != '}')
+                    throw format_error("invalid format");
+
+                len_arg = ctx.next_arg_id();
+
+                it++;
+            }
+        }
 
         if (it != ctx.end() && *it != '}')
             throw format_error("invalid format");
@@ -1054,13 +1073,35 @@ struct fmt::formatter<tds::datetimeoffset> {
     template<typename format_context>
     auto format(const tds::datetimeoffset& dto, format_context& ctx) {
         auto hms = std::chrono::hh_mm_ss{dto.t};
-        auto absoff = abs(dto.offset);
 
-        return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {}{:02}:{:02}",
-                        (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
-                        hms.hours().count(), hms.minutes().count(), hms.seconds().count(),
-                        dto.offset < 0 ? '-' : '+',
-                        absoff / 60, absoff % 60);
+        if (len_arg != -1) {
+            auto arg = ctx.arg(len_arg);
+
+            fmt::visit_format_arg([&](auto&& v) {
+                if constexpr (std::is_integral_v<std::remove_reference_t<decltype(v)>>) {
+                    len = (unsigned int)v;
+
+                    if (len > 7)
+                        throw format_error("size out of range");
+                } else
+                    throw format_error("invalid size argument");
+            }, arg);
+        }
+
+        if (len == 0) {
+            return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {:+03}:{:02}",
+                             (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
+                             hms.hours().count(), hms.minutes().count(), hms.seconds().count(),
+                             dto.offset / 60, abs(dto.offset) % 60);
+        }
+
+        double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
+
+        return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f} {:+03}:{:02}",
+                         (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
+                         hms.hours().count(), hms.minutes().count(),
+                         s, len + 3, len,
+                         dto.offset / 60, abs(dto.offset) % 60);
     }
 };
 

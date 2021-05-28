@@ -3532,7 +3532,7 @@ namespace tds {
 
                 datetimeoffset dto(num_to_ymd(v - jan1900), (time_t)ticks, *(int16_t*)(d.data() + d.length() - sizeof(int16_t)));
 
-                return fmt::format(FMT_STRING("{}"), dto);
+                return fmt::format(FMT_STRING("{:{}}"), dto, max_length2);
             }
 
             case sql_type::BITN:
