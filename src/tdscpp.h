@@ -252,22 +252,22 @@ namespace tds {
 
     class TDSCPP datetime {
     public:
-        datetime() = default;
+        constexpr datetime() = default;
 
-        datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second) :
+        constexpr datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second) :
             d(year, month, day) {
             auto secs = std::chrono::seconds((hour * 3600) + (minute * 60) + second);
 
             t = std::chrono::duration_cast<time_t>(secs);
         }
 
-        datetime(const std::chrono::year_month_day& d, time_t t) : d(d), t(t) { }
+        constexpr datetime(const std::chrono::year_month_day& d, time_t t) : d(d), t(t) { }
 
         template<typename T, typename U>
         datetime(const std::chrono::year_month_day& d, std::chrono::duration<T, U> t) : d(d), t{std::chrono::duration_cast<time_t>(t)} { }
 
         template<typename T>
-        datetime(const std::chrono::time_point<T>& chr) {
+        constexpr datetime(const std::chrono::time_point<T>& chr) {
             d = std::chrono::floor<std::chrono::days>(chr);
             t = std::chrono::floor<time_t>(chr - std::chrono::floor<std::chrono::days>(chr));
         }
@@ -278,13 +278,13 @@ namespace tds {
 
     class TDSCPP datetimeoffset : public datetime {
     public:
-        datetimeoffset() = default;
-        datetimeoffset(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
+        constexpr datetimeoffset() = default;
+        constexpr datetimeoffset(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
             datetime(year, month, day, hour, minute, second), offset(offset) { }
-        datetimeoffset(const std::chrono::year_month_day& d, time_t t, int16_t offset) : datetime(d, t), offset(offset) { }
+        constexpr datetimeoffset(const std::chrono::year_month_day& d, time_t t, int16_t offset) : datetime(d, t), offset(offset) { }
 
         template<typename T, typename U>
-        datetimeoffset(const std::chrono::year_month_day& d2, std::chrono::duration<T, U> t2, int16_t offset) : offset(offset) {
+        constexpr datetimeoffset(const std::chrono::year_month_day& d2, std::chrono::duration<T, U> t2, int16_t offset) : offset(offset) {
             d = d2;
             t = std::chrono::duration_cast<time_t>(t2);
         }
