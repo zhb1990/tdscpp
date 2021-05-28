@@ -40,6 +40,12 @@
 
 #endif
 
+#ifdef __GNUC__
+#define WARN_UNUSED __attribute__ ((warn_unused))
+#else
+#define WARN_UNUSED
+#endif
+
 namespace tds {
     enum class sql_type : uint8_t {
         SQL_NULL = 0x1F,
@@ -297,7 +303,7 @@ namespace tds {
         { std::span<std::byte>{t} };
     };
 
-    class TDSCPP value {
+    class TDSCPP WARN_UNUSED value {
     public:
         // make sure pointers don't get interpreted as bools
         template<typename T>
