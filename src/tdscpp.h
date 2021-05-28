@@ -1034,9 +1034,9 @@ struct fmt::formatter<tds::datetime> {
 
         double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
 
-        return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02.{}f}",
+        return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f}",
                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
-                         hms.hours().count(), hms.minutes().count(), s, len);
+                         hms.hours().count(), hms.minutes().count(), s, len + 3, len);
     }
 };
 

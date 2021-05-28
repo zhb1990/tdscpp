@@ -3448,7 +3448,8 @@ namespace tds {
                 else {
                     double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
 
-                    return fmt::format(FMT_STRING("{:02}:{:02}:{:02.{}f}"), hms.hours().count(), hms.minutes().count(), s, max_length2);
+                    return fmt::format(FMT_STRING("{:02}:{:02}:{:0{}.{}f}"), hms.hours().count(), hms.minutes().count(), s,
+                                       max_length2 + 3, max_length2);
                 }
             }
 
