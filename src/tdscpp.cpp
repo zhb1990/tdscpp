@@ -3221,40 +3221,38 @@ namespace tds {
 
         type = sql_type::DATETIMEOFFSET;
         scale = 0;
-        val.resize(8);
-        max_length = 0; // DATETIMEOFFSET(0)
+        val.resize(10);
+        max_length = 7; // DATETIMEOFFSET(7)
 
-        auto dur = chrono::duration_cast<chrono::seconds>(dto.t);
-        auto secs = static_cast<uint32_t>(dur.count());
+        auto ticks = (uint64_t)dto.t.count();
 
-        memcpy(val.data(), &secs, 3);
+        memcpy(val.data(), &ticks, 5);
 
         n = ymd_to_num(dto.d) + jan1900;
-        memcpy(val.data() + 3, &n, 3);
+        memcpy(val.data() + 5, &n, 3);
 
-        *(int16_t*)(val.data() + 6) = dto.offset;
+        *(int16_t*)(val.data() + 8) = dto.offset;
     }
 
     value::value(const optional<datetimeoffset>& dto) {
         type = sql_type::DATETIMEOFFSET;
-        val.resize(8);
         scale = 0;
-        max_length = 0; // DATETIMEOFFSET(0)
+        val.resize(10);
+        max_length = 7; // DATETIMEOFFSET(7)
 
         if (!dto.has_value())
             is_null = true;
         else {
             int32_t n;
 
-            auto dur = chrono::duration_cast<chrono::seconds>(dto.value().t);
-            auto secs = static_cast<uint32_t>(dur.count());
+            auto ticks = (uint64_t)dto.value().t.count();
 
-            memcpy(val.data(), &secs, 3);
+            memcpy(val.data(), &ticks, 5);
 
             n = ymd_to_num(dto.value().d) + jan1900;
-            memcpy(val.data() + 3, &n, 3);
+            memcpy(val.data() + 5, &n, 3);
 
-            *(int16_t*)(val.data() + 6) = dto.value().offset;
+            *(int16_t*)(val.data() + 8) = dto.value().offset;
         }
     }
 
