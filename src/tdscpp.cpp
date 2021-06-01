@@ -4091,9 +4091,10 @@ namespace tds {
 
     static bool parse_time(string_view t, time_t& dur, int16_t& offset) {
         uint8_t h, m, s;
+        string_view frac;
         cmatch rm;
-        static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]");
-        static const regex r2("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?");
+        static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]{1,7}))?( *)([AaPp])[Mm]");
+        static const regex r2("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]{1,7}))?");
         static const regex r3("^([0-9]{1,2})( *)([AaPp])[Mm]");
         static const regex r4("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]");
         static const regex r5("^([0-9]{1,2}):([0-9]{1,2})");
@@ -4107,10 +4108,14 @@ namespace tds {
 
             if (ap == 'P' || ap == 'p')
                 h += 12;
+
+            frac = rm[5].str();
         } else if (regex_search(&t[0], t.data() + t.length(), rm, r2)) { // hh:mm:ss.s
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
+
+            frac = rm[5].str();
         } else if (regex_search(&t[0], t.data() + t.length(), rm, r3)) { // hh am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             m = 0;
@@ -4140,6 +4145,18 @@ namespace tds {
             return false;
 
         dur = chrono::hours{h} + chrono::minutes{m} + chrono::seconds{s};
+
+        if (!frac.empty()) {
+            uint32_t v;
+
+            from_chars(frac.data(), frac.data() + frac.length(), v);
+
+            for (auto i = frac.length(); i < 7; i++) {
+                v *= 10;
+            }
+
+            dur += time_t{v};
+        }
 
         t = t.substr((size_t)rm[0].length());
 
