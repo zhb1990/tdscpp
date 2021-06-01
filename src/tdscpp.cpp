@@ -4238,7 +4238,7 @@ namespace tds {
 
         {
             cmatch rm;
-            static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
+            static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]{1,7}))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
 
             if (regex_match(&t[0], t.data() + t.length(), rm, iso_date)) {
                 from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
@@ -4252,6 +4252,18 @@ namespace tds {
                     return false;
 
                 dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
+
+                if (rm[8].length() != 0) {
+                    uint32_t v;
+
+                    from_chars(rm[8].str().data(), rm[8].str().data() + rm[8].length(), v);
+
+                    for (auto i = rm[8].length(); i < 7; i++) {
+                        v *= 10;
+                    }
+
+                    dur += time_t{v};
+                }
 
                 return true;
             }
