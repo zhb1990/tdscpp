@@ -4089,7 +4089,8 @@ namespace tds {
         return true;
     }
 
-    static bool parse_time(string_view t, uint8_t& h, uint8_t& m, uint8_t& s, int16_t& offset) {
+    static bool parse_time(string_view t, time_t& dur, int16_t& offset) {
+        uint8_t h, m, s;
         cmatch rm;
         static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]");
         static const regex r2("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?");
@@ -4134,6 +4135,11 @@ namespace tds {
             s = 0;
         } else
             return false;
+
+        if (h > 24 || m > 60 || s > 60)
+            return false;
+
+        dur = chrono::hours{h} + chrono::minutes{m} + chrono::seconds{s};
 
         t = t.substr((size_t)rm[0].length());
 
@@ -4252,10 +4258,8 @@ namespace tds {
 
             int16_t offset;
 
-            if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60)
+            if (!parse_time(t, dur, offset))
                 return false;
-
-            dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
             return true;
         }
@@ -4264,14 +4268,12 @@ namespace tds {
 
         int16_t offset;
 
-        if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60)
+        if (!parse_time(t, dur, offset))
             return false;
 
         y = 1900;
         mon = 1;
         d = 1;
-
-        dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
         return true;
     }
@@ -4343,24 +4345,20 @@ namespace tds {
                 t = t.substr(1);
             }
 
-            if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60 || offset <= -1440 || offset >= 1440)
+            if (!parse_time(t, dur, offset) || offset <= -1440 || offset >= 1440)
                 return false;
-
-            dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
             return true;
         }
 
         // try to parse solo time
 
-        if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60 || offset <= -1440 || offset >= 1440)
+        if (!parse_time(t, dur, offset) || offset <= -1440 || offset >= 1440)
             return false;
 
         y = 1900;
         mon = 1;
         d = 1;
-
-        dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
         return true;
     }
