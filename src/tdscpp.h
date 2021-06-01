@@ -381,6 +381,7 @@ namespace tds {
         explicit operator double() const;
         explicit operator std::chrono::year_month_day() const;
         explicit operator datetime() const;
+        explicit operator datetimeoffset() const;
 
         explicit operator time_t() const;
 

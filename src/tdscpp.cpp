@@ -4089,23 +4089,23 @@ namespace tds {
         return true;
     }
 
-    static bool parse_time(const string_view& t, uint8_t& h, uint8_t& m, uint8_t& s) {
+    static bool parse_time(string_view t, uint8_t& h, uint8_t& m, uint8_t& s, int16_t& offset) {
         cmatch rm;
-        static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?$");
-        static const regex r2("^([0-9]{1,2}):([0-9]{1,2})$");
-        static const regex r3("^([0-9]{1,2})( *)([AaPp])[Mm]$");
-        static const regex r4("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]$");
-        static const regex r5("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]$");
+        static const regex r1("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?");
+        static const regex r2("^([0-9]{1,2}):([0-9]{1,2})");
+        static const regex r3("^([0-9]{1,2})( *)([AaPp])[Mm]");
+        static const regex r4("^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]+))?( *)([AaPp])[Mm]");
+        static const regex r5("^([0-9]{1,2}):([0-9]{1,2})( *)([AaPp])[Mm]");
 
-        if (regex_match(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s
+        if (regex_search(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
-        } else if (regex_match(&t[0], t.data() + t.length(), rm, r2)) { // hh:mm
+        } else if (regex_search(&t[0], t.data() + t.length(), rm, r2)) { // hh:mm
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             s = 0;
-        } else if (regex_match(&t[0], t.data() + t.length(), rm, r3)) { // hh am
+        } else if (regex_search(&t[0], t.data() + t.length(), rm, r3)) { // hh am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             m = 0;
             s = 0;
@@ -4114,7 +4114,7 @@ namespace tds {
 
             if (ap == 'P' || ap == 'p')
                 h += 12;
-        } else if (regex_match(&t[0], t.data() + t.length(), rm, r4)) { // hh:mm:ss.s am
+        } else if (regex_search(&t[0], t.data() + t.length(), rm, r4)) { // hh:mm:ss.s am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), s);
@@ -4123,7 +4123,7 @@ namespace tds {
 
             if (ap == 'P' || ap == 'p')
                 h += 12;
-        } else if (regex_match(&t[0], t.data() + t.length(), rm, r5)) { // hh:mm am
+        } else if (regex_search(&t[0], t.data() + t.length(), rm, r5)) { // hh:mm am
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), h);
             from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), m);
             s = 0;
@@ -4134,6 +4134,78 @@ namespace tds {
                 h += 12;
         } else
             return false;
+
+        t = t.substr((size_t)rm[0].length());
+
+        while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
+            t = t.substr(1);
+        }
+
+        if (t.empty()) {
+            offset = 0;
+            return true;
+        }
+
+        bool neg = false;
+
+        if (t[0] == '-') {
+            neg = true;
+            t = t.substr(1);
+        } else if (t[0] == '+')
+            t = t.substr(1);
+
+        if (t.empty())
+            return false;
+
+        uint16_t offset_hours, offset_mins;
+
+        auto fcr = from_chars(t.data(), t.data() + t.length(), offset_hours);
+
+        if (fcr.ec != errc())
+            return false;
+
+        t = t.substr(fcr.ptr - t.data());
+
+        if (t.empty() || t[0] != ':') {
+            for (auto c : t) {
+                if (c != ' ' && c != '\t')
+                    return false;
+            }
+
+            if (offset_hours >= 100) {
+                offset_mins = offset_hours % 100;
+                offset_hours /= 100;
+            } else
+                offset_mins = 0;
+
+            if (offset_hours >= 24 || offset_mins >= 60)
+                return false;
+
+            offset = (int16_t)(((unsigned int)offset_hours * 60) + (unsigned int)offset_mins);
+
+            if (neg)
+                offset = -offset;
+
+            return true;
+        }
+
+        if (offset_hours >= 24)
+            return false;
+
+        t = t.substr(1);
+
+        fcr = from_chars(t.data(), t.data() + t.length(), offset_mins);
+
+        if (fcr.ec != errc())
+            return false;
+
+        if (offset_mins >= 60)
+            return false;
+
+        offset = (int16_t)(((unsigned int)offset_hours * 60) + (unsigned int)offset_mins);
+
+        if (neg)
+            offset = -offset;
 
         return true;
     }
@@ -4174,7 +4246,9 @@ namespace tds {
                 t = t.substr(1);
             }
 
-            if (!parse_time(t, h, min, s) || h >= 24 || min >= 60 || s >= 60)
+            int16_t offset;
+
+            if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60)
                 return false;
 
             return true;
@@ -4182,7 +4256,90 @@ namespace tds {
 
         // try to parse solo time
 
-        if (!parse_time(t, h, min, s) || h >= 24 || min >= 60 || s >= 60)
+        int16_t offset;
+
+        if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60)
+            return false;
+
+        y = 1900;
+        mon = 1;
+        d = 1;
+
+        return true;
+    }
+
+    static bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, uint8_t& h, uint8_t& min, uint8_t& s, int16_t& offset) {
+        {
+            cmatch rm;
+            static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}):([0-9]{2}))?$");
+
+            if (regex_match(&t[0], t.data() + t.length(), rm, iso_date)) {
+                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
+                from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
+                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+                from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
+                from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
+                from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
+                // FIXME - rm[8] fractional seconds
+
+                if (!is_valid_date(y, mon, d) || h >= 24 || min >= 60 || s >= 60)
+                    return false;
+
+                if (rm[9].str().empty() || rm[9].str() == "Z") {
+                    offset = 0;
+                    return true;
+                }
+
+                int offset_hours;
+                unsigned int offset_mins;
+
+                if (rm[10].str().front() == '+')
+                    from_chars(rm[10].str().data() + 1, rm[10].str().data() + rm[10].length() - 1, offset_hours);
+                else
+                    from_chars(rm[10].str().data(), rm[10].str().data() + rm[10].length(), offset_hours);
+
+                from_chars(rm[11].str().data(), rm[11].str().data() + rm[11].length(), offset_mins);
+
+                if (offset_hours < -24 || offset_hours > 24 || offset_mins >= 60)
+                    return false;
+
+                offset = (int16_t)(offset_hours * 60);
+
+                if (offset_hours < 0)
+                    offset -= (int16_t)offset_mins;
+                else
+                    offset += (int16_t)offset_mins;
+
+                return true;
+            }
+        }
+
+        if (parse_date(t, y, mon, d)) {
+            if (!is_valid_date(y, mon, d))
+                return false;
+
+            if (t.empty()) {
+                h = min = s = 0;
+                offset = 0;
+                return true;
+            }
+
+            if (t.front() != ' ' && t.front() != '\t')
+                return false;
+
+            while (t.front() == ' ' || t.front() == '\t') {
+                t = t.substr(1);
+            }
+
+            if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60 || offset <= -1440 || offset >= 1440)
+                return false;
+
+            return true;
+        }
+
+        // try to parse solo time
+
+        if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60 || offset <= -1440 || offset >= 1440)
             return false;
 
         y = 1900;
@@ -4712,6 +4869,205 @@ namespace tds {
 
             default:
                 throw formatted_error("Cannot convert {} to datetime", type2);
+        }
+    }
+
+    value::operator datetimeoffset() const {
+        auto type2 = type;
+        unsigned int max_length2 = max_length;
+        string_view d = val;
+
+        if (is_null)
+            return datetimeoffset{1900y, chrono::January, 1d, 0, 0, 0, 0};
+
+        if (type2 == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)d[0];
+
+            d = d.substr(1);
+
+            auto propbytes = (uint8_t)d[0];
+
+            d = d.substr(1);
+
+            switch (type2) {
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMEOFFSET:
+                    max_length2 = d[0];
+                    break;
+
+                default:
+                    break;
+            }
+
+            d = d.substr(propbytes);
+        }
+
+        switch (type2) {
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+            case sql_type::TEXT:
+            {
+                uint16_t y;
+                uint8_t mon, day, h, min, s;
+                int16_t offset;
+
+                auto t = d;
+
+                // remove leading whitespace
+
+                while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
+                    t = t.substr(1);
+                }
+
+                // remove trailing whitespace
+
+                while (!t.empty() && (t.back() == ' ' || t.back() == '\t')) {
+                    t = t.substr(0, t.length() - 1);
+                }
+
+                if (t.empty())
+                    return datetimeoffset{1900y, chrono::January, 1d, 0, 0, 0, 0};
+
+                if (!parse_datetimeoffset(t, y, mon, day, h, min, s, offset))
+                    throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", d);
+
+                return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, h, min, s, offset};
+            }
+
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
+            case sql_type::NTEXT:
+            {
+                uint16_t y;
+                uint8_t mon, day, h, min, s;
+                int16_t offset;
+
+                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
+
+                // remove leading whitespace
+
+                while (!t.empty() && (t.front() == u' ' || t.front() == u'\t')) {
+                    t = t.substr(1);
+                }
+
+                // remove trailing whitespace
+
+                while (!t.empty() && (t.back() == u' ' || t.back() == u'\t')) {
+                    t = t.substr(0, t.length() - 1);
+                }
+
+                if (t.empty())
+                    return datetimeoffset{1900y, chrono::January, 1d, 0, 0, 0, 0};
+
+                string t2;
+
+                t2.reserve(t.length());
+
+                for (auto c : t) {
+                    t2 += (char)c;
+                }
+
+                if (!parse_datetimeoffset(t2, y, mon, day, h, min, s, offset))
+                    throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+
+                return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, h, min, s, offset};
+            }
+
+            case sql_type::DATE: {
+                uint32_t n = 0;
+
+                memcpy(&n, d.data(), 3);
+
+                return datetimeoffset{num_to_ymd(n - jan1900), time_t(0), 0};
+            }
+
+            case sql_type::TIME: {
+                uint64_t ticks = 0;
+
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length()));
+
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
+                }
+
+                return datetimeoffset{chrono::year_month_day{1900y, chrono::January, 1d}, time_t(ticks), 0};
+            }
+
+            case sql_type::DATETIME: {
+                auto v = *(int32_t*)d.data();
+                auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
+                auto dur = chrono::duration<int64_t, ratio<1, 300>>(t);
+
+                return datetimeoffset{num_to_ymd(v), dur, 0};
+            }
+
+            case sql_type::DATETIMN:
+                switch (d.length()) {
+                    case 4: {
+                        auto v = *(uint16_t*)d.data();
+                        auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                        auto dur = chrono::minutes(t);
+
+                        return datetimeoffset{num_to_ymd(v), dur, 0};
+                    }
+
+                    case 8: {
+                        auto v = *(int32_t*)d.data();
+                        auto t = *(uint32_t*)(d.data() + sizeof(int32_t));
+                        auto dur = chrono::duration<int64_t, ratio<1, 300>>(t);
+
+                        return datetimeoffset{num_to_ymd(v), dur, 0};
+                    }
+
+                    default:
+                        throw formatted_error("DATETIMN has invalid length {}", d.length());
+                }
+
+            case sql_type::DATETIM4: {
+                auto v = *(uint16_t*)d.data();
+                auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
+                auto dur = chrono::minutes(t);
+
+                return datetimeoffset{num_to_ymd(v), dur, 0};
+            }
+
+            case sql_type::DATETIME2: {
+                uint32_t n = 0;
+                uint64_t ticks = 0;
+
+                memcpy(&n, d.data() + d.length() - 3, 3);
+
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 3));
+
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
+                }
+
+                return datetimeoffset{num_to_ymd((int32_t)n - jan1900), time_t(ticks), 0};
+            }
+
+            case sql_type::DATETIMEOFFSET: {
+                uint32_t n = 0;
+                uint64_t ticks = 0;
+
+                memcpy(&n, d.data() + d.length() - 5, 3);
+
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 5));
+
+                for (unsigned int n = 0; n < 7 - max_length2; n++) {
+                    ticks *= 10;
+                }
+
+                auto offset = *(int16_t*)&d[d.length() - sizeof(int16_t)];
+
+                return datetimeoffset{num_to_ymd((int32_t)n - jan1900), time_t(ticks), offset};
+            }
+
+            // MSSQL doesn't allow conversion to DATETIME2 for integers, floats, or BIT
+
+            default:
+                throw formatted_error("Cannot convert {} to datetimeoffset", type2);
         }
     }
 
