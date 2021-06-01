@@ -4321,12 +4321,23 @@ namespace tds {
                 from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
                 from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
                 from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
-                // FIXME - rm[8] fractional seconds
 
                 if (!is_valid_date(y, mon, d) || h >= 24 || min >= 60 || s >= 60)
                     return false;
 
                 dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
+
+                if (rm[8].length() != 0) {
+                    uint32_t v;
+
+                    from_chars(rm[8].str().data(), rm[8].str().data() + rm[8].length(), v);
+
+                    for (auto i = rm[8].length(); i < 7; i++) {
+                        v *= 10;
+                    }
+
+                    dur += time_t{v};
+                }
 
                 if (rm[9].str().empty() || rm[9].str() == "Z") {
                     offset = 0;
