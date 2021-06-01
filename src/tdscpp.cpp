@@ -4276,7 +4276,9 @@ namespace tds {
         return true;
     }
 
-    static bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, uint8_t& h, uint8_t& min, uint8_t& s, int16_t& offset) {
+    static bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, time_t& dur, int16_t& offset) {
+        uint8_t h, min, s;
+
         {
             cmatch rm;
             static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}):([0-9]{2}))?$");
@@ -4292,6 +4294,8 @@ namespace tds {
 
                 if (!is_valid_date(y, mon, d) || h >= 24 || min >= 60 || s >= 60)
                     return false;
+
+                dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
                 if (rm[9].str().empty() || rm[9].str() == "Z") {
                     offset = 0;
@@ -4327,7 +4331,7 @@ namespace tds {
                 return false;
 
             if (t.empty()) {
-                h = min = s = 0;
+                dur = time_t::zero();
                 offset = 0;
                 return true;
             }
@@ -4342,6 +4346,8 @@ namespace tds {
             if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60 || offset <= -1440 || offset >= 1440)
                 return false;
 
+            dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
+
             return true;
         }
 
@@ -4353,6 +4359,8 @@ namespace tds {
         y = 1900;
         mon = 1;
         d = 1;
+
+        dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
         return true;
     }
@@ -4924,7 +4932,7 @@ namespace tds {
             case sql_type::TEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
                 int16_t offset;
 
                 auto t = d;
@@ -4944,10 +4952,12 @@ namespace tds {
                 if (t.empty())
                     return datetimeoffset{1900y, chrono::January, 1d, 0, 0, 0, 0};
 
-                if (!parse_datetimeoffset(t, y, mon, day, h, min, s, offset))
+                time_t dur;
+
+                if (!parse_datetimeoffset(t, y, mon, day, dur, offset))
                     throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", d);
 
-                return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, h, min, s, offset};
+                return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, dur, offset};
             }
 
             case sql_type::NVARCHAR:
@@ -4955,7 +4965,7 @@ namespace tds {
             case sql_type::NTEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
                 int16_t offset;
 
                 auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
@@ -4983,10 +4993,12 @@ namespace tds {
                     t2 += (char)c;
                 }
 
-                if (!parse_datetimeoffset(t2, y, mon, day, h, min, s, offset))
+                time_t dur;
+
+                if (!parse_datetimeoffset(t2, y, mon, day, dur, offset))
                     throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
-                return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, h, min, s, offset};
+                return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, dur, offset};
             }
 
             case sql_type::DATE: {

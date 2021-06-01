@@ -296,6 +296,9 @@ namespace tds {
             datetime(year, month, day, hour, minute, second), offset(offset) { }
         constexpr datetimeoffset(const std::chrono::year_month_day& d, time_t t, int16_t offset) : datetime(d, t), offset(offset) { }
 
+        constexpr datetimeoffset(std::chrono::year year, std::chrono::month month, std::chrono::day day, time_t t, int16_t offset) :
+            datetime(year, month, day, t), offset(offset) { }
+
         template<typename T, typename U>
         constexpr datetimeoffset(const std::chrono::year_month_day& d2, std::chrono::duration<T, U> t2, int16_t offset) : offset(offset) {
             d = d2;
