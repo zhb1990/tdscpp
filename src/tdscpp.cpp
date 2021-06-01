@@ -7903,10 +7903,10 @@ namespace tds {
                     *(uint8_t*)ptr = 0;
                     ptr++;
                 } else {
-                    datetime dto;
+                    datetimeoffset dto;
 
                     try {
-                        dto = (datetime)vv;
+                        dto = (datetimeoffset)vv;
                     } catch (const exception& e) {
                         throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
                     }
@@ -7941,9 +7941,7 @@ namespace tds {
                     memcpy(ptr, &n, 3);
                     ptr += 3;
 
-                    // FIXME - get offset
-
-                    *(int16_t*)ptr = 0;
+                    *(int16_t*)ptr = dto.offset;
                     ptr += sizeof(int16_t);
                 }
             break;
