@@ -4210,7 +4210,9 @@ namespace tds {
         return true;
     }
 
-    static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, uint8_t& h, uint8_t& min, uint8_t& s) {
+    static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, time_t& dur) {
+        uint8_t h, min, s;
+
         {
             cmatch rm;
             static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
@@ -4225,6 +4227,8 @@ namespace tds {
 
                 if (!is_valid_date(y, mon, d) || h >= 24 || min >= 60 || s >= 60)
                     return false;
+
+                dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
                 return true;
             }
@@ -4251,6 +4255,8 @@ namespace tds {
             if (!parse_time(t, h, min, s, offset) || h >= 24 || min >= 60 || s >= 60)
                 return false;
 
+            dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
+
             return true;
         }
 
@@ -4264,6 +4270,8 @@ namespace tds {
         y = 1900;
         mon = 1;
         d = 1;
+
+        dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
 
         return true;
     }
@@ -4372,7 +4380,7 @@ namespace tds {
             case sql_type::TEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
 
                 auto t = d;
 
@@ -4391,7 +4399,9 @@ namespace tds {
                 if (t.empty())
                     return chrono::year_month_day{1900y, chrono::January, 1d};
 
-                if (!parse_datetime(t, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
+                time_t dur;
+
+                if (!parse_datetime(t, y, mon, day, dur) || !is_valid_date(y, mon, day))
                     throw formatted_error("Cannot convert string \"{}\" to date", d);
 
                 return chrono::year_month_day{chrono::year{y}, chrono::month{mon}, chrono::day{day}};
@@ -4402,7 +4412,7 @@ namespace tds {
             case sql_type::NTEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
 
                 auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
 
@@ -4430,8 +4440,9 @@ namespace tds {
                 }
 
                 auto sv = string_view(t2);
+                time_t dur;
 
-                if (!parse_datetime(sv, y, mon, day, h, min, s) || !is_valid_date(y, mon, day))
+                if (!parse_datetime(sv, y, mon, day, dur) || !is_valid_date(y, mon, day))
                     throw formatted_error("Cannot convert string \"{}\" to date", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
                 return chrono::year_month_day{chrono::year{y}, chrono::month{mon}, chrono::day{day}};
@@ -4533,7 +4544,7 @@ namespace tds {
             case sql_type::TEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
 
                 auto t = d;
 
@@ -4552,12 +4563,12 @@ namespace tds {
                 if (t.empty())
                     return time_t::zero();
 
-                if (!parse_datetime(t, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+                time_t dur;
+
+                if (!parse_datetime(t, y, mon, day, dur))
                     throw formatted_error("Cannot convert string \"{}\" to time", d);
 
-                auto dur = chrono::seconds((h * 3600) + (min * 60) + s);
-
-                return chrono::duration_cast<time_t>(dur);
+                return dur;
             }
 
             case sql_type::NVARCHAR:
@@ -4565,7 +4576,7 @@ namespace tds {
             case sql_type::NTEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
 
                 auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
 
@@ -4592,12 +4603,12 @@ namespace tds {
                     t2 += (char)c;
                 }
 
-                if (!parse_datetime(t2, y, mon, day, h, min, s) || h >= 60 || min >= 60 || s >= 60)
+                time_t dur;
+
+                if (!parse_datetime(t2, y, mon, day, dur))
                     throw formatted_error("Cannot convert string \"{}\" to time", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
-                auto dur = chrono::seconds((h * 3600) + (min * 60) + s);
-
-                return chrono::duration_cast<time_t>(dur);
+                return dur;
             }
 
             case sql_type::TIME: {
@@ -4714,7 +4725,7 @@ namespace tds {
             case sql_type::TEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
 
                 auto t = d;
 
@@ -4733,10 +4744,12 @@ namespace tds {
                 if (t.empty())
                     return datetime{1900y, chrono::January, 1d, 0, 0, 0};
 
-                if (!parse_datetime(t, y, mon, day, h, min, s))
+                time_t dur;
+
+                if (!parse_datetime(t, y, mon, day, dur))
                     throw formatted_error("Cannot convert string \"{}\" to datetime", d);
 
-                return datetime{chrono::year{y}, chrono::month{mon}, chrono::day{day}, h, min, s};
+                return datetime{chrono::year{y}, chrono::month{mon}, chrono::day{day}, dur};
             }
 
             case sql_type::NVARCHAR:
@@ -4744,7 +4757,7 @@ namespace tds {
             case sql_type::NTEXT:
             {
                 uint16_t y;
-                uint8_t mon, day, h, min, s;
+                uint8_t mon, day;
 
                 auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
 
@@ -4771,10 +4784,12 @@ namespace tds {
                     t2 += (char)c;
                 }
 
-                if (!parse_datetime(t2, y, mon, day, h, min, s))
+                time_t dur;
+
+                if (!parse_datetime(t2, y, mon, day, dur))
                     throw formatted_error("Cannot convert string \"{}\" to datetime", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
 
-                return datetime{chrono::year{y}, chrono::month{mon}, chrono::day{day}, h, min, s};
+                return datetime{chrono::year{y}, chrono::month{mon}, chrono::day{day}, dur};
             }
 
             case sql_type::DATE: {

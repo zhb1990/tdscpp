@@ -267,6 +267,9 @@ namespace tds {
             t = std::chrono::duration_cast<time_t>(secs);
         }
 
+        constexpr datetime(std::chrono::year year, std::chrono::month month, std::chrono::day day, time_t t) :
+            d(year, month, day), t(t) { }
+
         constexpr datetime(const std::chrono::year_month_day& d, time_t t) : d(d), t(t) { }
 
         template<typename T, typename U>
