@@ -305,6 +305,10 @@ namespace tds {
             t = std::chrono::duration_cast<time_t>(t2);
         }
 
+        constexpr operator std::chrono::time_point<std::chrono::system_clock>() const {
+            return std::chrono::sys_days{d} + t - std::chrono::minutes{offset};
+        }
+
         int16_t offset;
     };
 
