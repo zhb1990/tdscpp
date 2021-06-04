@@ -4232,10 +4232,9 @@ namespace tds {
     }
 
     static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, time_t& dur) {
-        uint8_t h, min, s;
-
         {
             cmatch rm;
+            uint8_t h, min, s;
             static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]{1,7}))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
 
             if (regex_match(&t[0], t.data() + t.length(), rm, iso_date)) {
@@ -4272,7 +4271,7 @@ namespace tds {
                 return false;
 
             if (t.empty()) {
-                h = min = s = 0;
+                dur = time_t::zero();
                 return true;
             }
 
