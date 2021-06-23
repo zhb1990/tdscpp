@@ -895,115 +895,115 @@ struct fmt::formatter<enum tds::sql_type> {
     auto format(enum tds::sql_type t, format_context& ctx) const {
         switch (t) {
             case tds::sql_type::IMAGE:
-                return format_to(ctx.out(), "IMAGE");
+                return fmt::format_to(ctx.out(), "IMAGE");
 
             case tds::sql_type::TEXT:
-                return format_to(ctx.out(), "TEXT");
+                return fmt::format_to(ctx.out(), "TEXT");
 
             case tds::sql_type::UNIQUEIDENTIFIER:
-                return format_to(ctx.out(), "UNIQUEIDENTIFIER");
+                return fmt::format_to(ctx.out(), "UNIQUEIDENTIFIER");
 
             case tds::sql_type::INTN:
-                return format_to(ctx.out(), "INTN");
+                return fmt::format_to(ctx.out(), "INTN");
 
             case tds::sql_type::DATE:
-                return format_to(ctx.out(), "DATE");
+                return fmt::format_to(ctx.out(), "DATE");
 
             case tds::sql_type::TIME:
-                return format_to(ctx.out(), "TIME");
+                return fmt::format_to(ctx.out(), "TIME");
 
             case tds::sql_type::DATETIME2:
-                return format_to(ctx.out(), "DATETIME2");
+                return fmt::format_to(ctx.out(), "DATETIME2");
 
             case tds::sql_type::DATETIMEOFFSET:
-                return format_to(ctx.out(), "DATETIMEOFFSET");
+                return fmt::format_to(ctx.out(), "DATETIMEOFFSET");
 
             case tds::sql_type::SQL_VARIANT:
-                return format_to(ctx.out(), "SQL_VARIANT");
+                return fmt::format_to(ctx.out(), "SQL_VARIANT");
 
             case tds::sql_type::NTEXT:
-                return format_to(ctx.out(), "NTEXT");
+                return fmt::format_to(ctx.out(), "NTEXT");
 
             case tds::sql_type::BITN:
-                return format_to(ctx.out(), "BITN");
+                return fmt::format_to(ctx.out(), "BITN");
 
             case tds::sql_type::DECIMAL:
-                return format_to(ctx.out(), "DECIMAL");
+                return fmt::format_to(ctx.out(), "DECIMAL");
 
             case tds::sql_type::NUMERIC:
-                return format_to(ctx.out(), "NUMERIC");
+                return fmt::format_to(ctx.out(), "NUMERIC");
 
             case tds::sql_type::FLTN:
-                return format_to(ctx.out(), "FLTN");
+                return fmt::format_to(ctx.out(), "FLTN");
 
             case tds::sql_type::MONEYN:
-                return format_to(ctx.out(), "MONEYN");
+                return fmt::format_to(ctx.out(), "MONEYN");
 
             case tds::sql_type::DATETIMN:
-                return format_to(ctx.out(), "DATETIMN");
+                return fmt::format_to(ctx.out(), "DATETIMN");
 
             case tds::sql_type::VARBINARY:
-                return format_to(ctx.out(), "VARBINARY");
+                return fmt::format_to(ctx.out(), "VARBINARY");
 
             case tds::sql_type::VARCHAR:
-                return format_to(ctx.out(), "VARCHAR");
+                return fmt::format_to(ctx.out(), "VARCHAR");
 
             case tds::sql_type::BINARY:
-                return format_to(ctx.out(), "BINARY");
+                return fmt::format_to(ctx.out(), "BINARY");
 
             case tds::sql_type::CHAR:
-                return format_to(ctx.out(), "CHAR");
+                return fmt::format_to(ctx.out(), "CHAR");
 
             case tds::sql_type::NVARCHAR:
-                return format_to(ctx.out(), "NVARCHAR");
+                return fmt::format_to(ctx.out(), "NVARCHAR");
 
             case tds::sql_type::NCHAR:
-                return format_to(ctx.out(), "NCHAR");
+                return fmt::format_to(ctx.out(), "NCHAR");
 
             case tds::sql_type::UDT:
-                return format_to(ctx.out(), "UDT");
+                return fmt::format_to(ctx.out(), "UDT");
 
             case tds::sql_type::XML:
-                return format_to(ctx.out(), "XML");
+                return fmt::format_to(ctx.out(), "XML");
 
             case tds::sql_type::SQL_NULL:
-                return format_to(ctx.out(), "NULL");
+                return fmt::format_to(ctx.out(), "NULL");
 
             case tds::sql_type::TINYINT:
-                return format_to(ctx.out(), "TINYINT");
+                return fmt::format_to(ctx.out(), "TINYINT");
 
             case tds::sql_type::BIT:
-                return format_to(ctx.out(), "BIT");
+                return fmt::format_to(ctx.out(), "BIT");
 
             case tds::sql_type::SMALLINT:
-                return format_to(ctx.out(), "SMALLINT");
+                return fmt::format_to(ctx.out(), "SMALLINT");
 
             case tds::sql_type::INT:
-                return format_to(ctx.out(), "INT");
+                return fmt::format_to(ctx.out(), "INT");
 
             case tds::sql_type::DATETIM4:
-                return format_to(ctx.out(), "DATETIM4");
+                return fmt::format_to(ctx.out(), "DATETIM4");
 
             case tds::sql_type::REAL:
-                return format_to(ctx.out(), "REAL");
+                return fmt::format_to(ctx.out(), "REAL");
 
             case tds::sql_type::MONEY:
-                return format_to(ctx.out(), "MONEY");
+                return fmt::format_to(ctx.out(), "MONEY");
 
             case tds::sql_type::DATETIME:
-                return format_to(ctx.out(), "DATETIME");
+                return fmt::format_to(ctx.out(), "DATETIME");
 
             case tds::sql_type::FLOAT:
-                return format_to(ctx.out(), "FLOAT");
+                return fmt::format_to(ctx.out(), "FLOAT");
 
             case tds::sql_type::SMALLMONEY:
-                return format_to(ctx.out(), "SMALLMONEY");
+                return fmt::format_to(ctx.out(), "SMALLMONEY");
 
             case tds::sql_type::BIGINT:
-                return format_to(ctx.out(), "BIGINT");
+                return fmt::format_to(ctx.out(), "BIGINT");
 
             default:
-                return format_to(ctx.out(), "{:x}", (uint8_t)t);
+                return fmt::format_to(ctx.out(), "{:x}", (uint8_t)t);
         }
     }
 };
@@ -1058,14 +1058,14 @@ struct fmt::formatter<tds::datetime> {
         }
 
         if (len2 == 0) {
-            return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+            return fmt::format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
                             (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
                             hms.hours().count(), hms.minutes().count(), hms.seconds().count());
         }
 
         double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
 
-        return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f}",
+        return fmt::format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f}",
                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
                          hms.hours().count(), hms.minutes().count(), s, len2 + 3, len2);
     }
@@ -1121,7 +1121,7 @@ struct fmt::formatter<tds::datetimeoffset> {
         }
 
         if (len2 == 0) {
-            return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {:+03}:{:02}",
+            return fmt::format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {:+03}:{:02}",
                              (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
                              hms.hours().count(), hms.minutes().count(), hms.seconds().count(),
                              dto.offset / 60, abs(dto.offset) % 60);
@@ -1129,7 +1129,7 @@ struct fmt::formatter<tds::datetimeoffset> {
 
         double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
 
-        return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f} {:+03}:{:02}",
+        return fmt::format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f} {:+03}:{:02}",
                          (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
                          hms.hours().count(), hms.minutes().count(),
                          s, len2 + 3, len2,
@@ -1151,7 +1151,7 @@ struct fmt::formatter<tds::value> {
     template<typename format_context>
     auto format(const tds::value& p, format_context& ctx) const {
         if (p.is_null)
-            return format_to(ctx.out(), "NULL");
+            return fmt::format_to(ctx.out(), "NULL");
         else if (p.type == tds::sql_type::VARBINARY || p.type == tds::sql_type::BINARY || p.type == tds::sql_type::IMAGE) {
             std::string s = "0x";
 
@@ -1159,9 +1159,9 @@ struct fmt::formatter<tds::value> {
                 s += fmt::format("{:02x}", (uint8_t)c);
             }
 
-            return format_to(ctx.out(), "{}", s);
+            return fmt::format_to(ctx.out(), "{}", s);
         } else
-            return format_to(ctx.out(), "{}", (std::string)p);
+            return fmt::format_to(ctx.out(), "{}", (std::string)p);
     }
 };
 
@@ -1178,7 +1178,7 @@ struct fmt::formatter<tds::output_param<T>> {
 
     template<typename format_context>
     auto format(const tds::output_param<T>& p, format_context& ctx) const {
-        return format_to(ctx.out(), "{}", static_cast<tds::value>(p));
+        return fmt::format_to(ctx.out(), "{}", static_cast<tds::value>(p));
     }
 };
 
@@ -1195,7 +1195,7 @@ struct fmt::formatter<tds::column> {
 
     template<typename format_context>
     auto format(const tds::column& c, format_context& ctx) const {
-        return format_to(ctx.out(), "{}", static_cast<tds::value>(c));
+        return fmt::format_to(ctx.out(), "{}", static_cast<tds::value>(c));
     }
 };
 
