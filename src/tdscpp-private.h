@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fmt/format.h>
+#include <fmt/compile.h>
 #include <string>
 #include <stdint.h>
 #include "config.h"
@@ -25,7 +26,7 @@ private:
     std::string msg;
 };
 
-#define formatted_error(s, ...) _formatted_error(FMT_STRING(s), ##__VA_ARGS__)
+#define formatted_error(s, ...) _formatted_error(FMT_COMPILE(s), ##__VA_ARGS__)
 
 enum class tds_msg : uint8_t {
     sql_batch = 1,

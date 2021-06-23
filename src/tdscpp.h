@@ -892,7 +892,7 @@ struct fmt::formatter<enum tds::sql_type> {
     }
 
     template<typename format_context>
-    auto format(enum tds::sql_type t, format_context& ctx) {
+    auto format(enum tds::sql_type t, format_context& ctx) const {
         switch (t) {
             case tds::sql_type::IMAGE:
                 return format_to(ctx.out(), "IMAGE");
@@ -1039,7 +1039,8 @@ struct fmt::formatter<tds::datetime> {
     }
 
     template<typename format_context>
-    auto format(const tds::datetime& dt, format_context& ctx) {
+    auto format(const tds::datetime& dt, format_context& ctx) const {
+        auto len2 = len;
         auto hms = std::chrono::hh_mm_ss{dt.t};
 
         if (len_arg != -1) {
@@ -1047,16 +1048,16 @@ struct fmt::formatter<tds::datetime> {
 
             fmt::visit_format_arg([&](auto&& v) {
                 if constexpr (std::is_integral_v<std::remove_reference_t<decltype(v)>>) {
-                    len = (unsigned int)v;
+                    len2 = (unsigned int)v;
 
-                    if (len > 7)
+                    if (len2 > 7)
                         throw format_error("size out of range");
                 } else
                     throw format_error("invalid size argument");
             }, arg);
         }
 
-        if (len == 0) {
+        if (len2 == 0) {
             return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
                             (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
                             hms.hours().count(), hms.minutes().count(), hms.seconds().count());
@@ -1066,7 +1067,7 @@ struct fmt::formatter<tds::datetime> {
 
         return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f}",
                          (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
-                         hms.hours().count(), hms.minutes().count(), s, len + 3, len);
+                         hms.hours().count(), hms.minutes().count(), s, len2 + 3, len2);
     }
 };
 
@@ -1101,7 +1102,8 @@ struct fmt::formatter<tds::datetimeoffset> {
     }
 
     template<typename format_context>
-    auto format(const tds::datetimeoffset& dto, format_context& ctx) {
+    auto format(const tds::datetimeoffset& dto, format_context& ctx) const {
+        auto len2 = len;
         auto hms = std::chrono::hh_mm_ss{dto.t};
 
         if (len_arg != -1) {
@@ -1109,16 +1111,16 @@ struct fmt::formatter<tds::datetimeoffset> {
 
             fmt::visit_format_arg([&](auto&& v) {
                 if constexpr (std::is_integral_v<std::remove_reference_t<decltype(v)>>) {
-                    len = (unsigned int)v;
+                    len2 = (unsigned int)v;
 
-                    if (len > 7)
+                    if (len2 > 7)
                         throw format_error("size out of range");
                 } else
                     throw format_error("invalid size argument");
             }, arg);
         }
 
-        if (len == 0) {
+        if (len2 == 0) {
             return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {:+03}:{:02}",
                              (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
                              hms.hours().count(), hms.minutes().count(), hms.seconds().count(),
@@ -1130,7 +1132,7 @@ struct fmt::formatter<tds::datetimeoffset> {
         return format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f} {:+03}:{:02}",
                          (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
                          hms.hours().count(), hms.minutes().count(),
-                         s, len + 3, len,
+                         s, len2 + 3, len2,
                          dto.offset / 60, abs(dto.offset) % 60);
     }
 };
@@ -1147,7 +1149,7 @@ struct fmt::formatter<tds::value> {
     }
 
     template<typename format_context>
-    auto format(const tds::value& p, format_context& ctx) {
+    auto format(const tds::value& p, format_context& ctx) const {
         if (p.is_null)
             return format_to(ctx.out(), "NULL");
         else if (p.type == tds::sql_type::VARBINARY || p.type == tds::sql_type::BINARY || p.type == tds::sql_type::IMAGE) {
@@ -1175,7 +1177,7 @@ struct fmt::formatter<tds::output_param<T>> {
     }
 
     template<typename format_context>
-    auto format(const tds::output_param<T>& p, format_context& ctx) {
+    auto format(const tds::output_param<T>& p, format_context& ctx) const {
         return format_to(ctx.out(), "{}", static_cast<tds::value>(p));
     }
 };
@@ -1192,7 +1194,7 @@ struct fmt::formatter<tds::column> {
     }
 
     template<typename format_context>
-    auto format(const tds::column& c, format_context& ctx) {
+    auto format(const tds::column& c, format_context& ctx) const {
         return format_to(ctx.out(), "{}", static_cast<tds::value>(c));
     }
 };

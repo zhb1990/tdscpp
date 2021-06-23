@@ -59,7 +59,7 @@ struct fmt::formatter<enum tds::token> {
     }
 
     template<typename format_context>
-    auto format(enum tds::token t, format_context& ctx) {
+    auto format(enum tds::token t, format_context& ctx) const {
         switch (t) {
             case tds::token::OFFSET:
                 return format_to(ctx.out(), "OFFSET");
@@ -208,7 +208,7 @@ struct fmt::formatter<enum sec_error> {
     }
 
     template<typename format_context>
-    auto format(enum sec_error t, format_context& ctx) {
+    auto format(enum sec_error t, format_context& ctx) const {
         switch (t) {
             case sec_error::_SEC_E_OK:
                 return format_to(ctx.out(), "SEC_E_OK");
@@ -507,7 +507,7 @@ struct fmt::formatter<enum krb5_minor> {
     }
 
     template<typename format_context>
-    auto format(enum krb5_minor t, format_context& ctx) {
+    auto format(enum krb5_minor t, format_context& ctx) const {
         switch (t) {
             case krb5_minor::KRB5KDC_ERR_NONE:
                 return format_to(ctx.out(), "KRB5KDC_ERR_NONE");
