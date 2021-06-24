@@ -9779,4 +9779,46 @@ namespace tds {
 
         return {n, (int16_t)(offset / 60)};
     }
+
+    template<unsigned N, typename T>
+    constexpr bool test_numeric(T&& t, uint64_t low_part, uint64_t high_part, bool neg) {
+        numeric<N> n{t};
+
+        return n.low_part == low_part && n.high_part == high_part && !n.neg == !neg;
+    }
+
+    static_assert(test_numeric<0>((int64_t)0, 0, 0, false));
+    static_assert(test_numeric<5>((int64_t)0, 0, 0, false));
+    static_assert(test_numeric<0>((int64_t)42, 42, 0, false));
+    static_assert(test_numeric<5>((int64_t)42, 4200000, 0, false));
+    static_assert(test_numeric<18>((int64_t)42, 0x46ddf97976680000, 0x2, false));
+    static_assert(test_numeric<19>((int64_t)42, 0xc4abbebea0100000, 0x16, false));
+    static_assert(test_numeric<20>((int64_t)42, 0xaeb5737240a00000, 0xe3, false));
+    static_assert(test_numeric<21>((int64_t)42, 0xd316827686400000, 0x8e4, false));
+    static_assert(test_numeric<22>((int64_t)42, 0x3ee118a13e800000, 0x58f0, false));
+    static_assert(test_numeric<23>((int64_t)42, 0x74caf64c71000000, 0x37962, false));
+    static_assert(test_numeric<24>((int64_t)42, 0x8fed9efc6a000000, 0x22bdd8, false));
+    static_assert(test_numeric<25>((int64_t)42, 0x9f4835dc24000000, 0x15b6a75, false));
+    static_assert(test_numeric<26>((int64_t)42, 0x38d21a9968000000, 0xd922898, false));
+    static_assert(test_numeric<27>((int64_t)42, 0x383509fe10000000, 0x87b595f2, false));
+    static_assert(test_numeric<28>((int64_t)42, 0x321263eca0000000, 0x54d17db76, false));
+    static_assert(test_numeric<29>((int64_t)42, 0xf4b7e73e40000000, 0x3502ee929d, false));
+    static_assert(test_numeric<0>((int64_t)-17, 17, 0, true));
+    static_assert(test_numeric<5>((int64_t)-17, 1700000, 0, true));
+    static_assert(test_numeric<0>((uint64_t)0, 0, 0, false));
+    static_assert(test_numeric<5>((uint64_t)0, 0, 0, false));
+    static_assert(test_numeric<0>((uint64_t)42, 42, 0, false));
+    static_assert(test_numeric<5>((uint64_t)42, 4200000, 0, false));
+    static_assert(test_numeric<18>((uint64_t)42, 0x46ddf97976680000, 0x2, false));
+    static_assert(test_numeric<19>((uint64_t)42, 0xc4abbebea0100000, 0x16, false));
+    static_assert(test_numeric<20>((uint64_t)42, 0xaeb5737240a00000, 0xe3, false));
+    static_assert(test_numeric<21>((uint64_t)42, 0xd316827686400000, 0x8e4, false));
+    static_assert(test_numeric<22>((uint64_t)42, 0x3ee118a13e800000, 0x58f0, false));
+    static_assert(test_numeric<23>((uint64_t)42, 0x74caf64c71000000, 0x37962, false));
+    static_assert(test_numeric<24>((uint64_t)42, 0x8fed9efc6a000000, 0x22bdd8, false));
+    static_assert(test_numeric<25>((uint64_t)42, 0x9f4835dc24000000, 0x15b6a75, false));
+    static_assert(test_numeric<26>((uint64_t)42, 0x38d21a9968000000, 0xd922898, false));
+    static_assert(test_numeric<27>((uint64_t)42, 0x383509fe10000000, 0x87b595f2, false));
+    static_assert(test_numeric<28>((uint64_t)42, 0x321263eca0000000, 0x54d17db76, false));
+    static_assert(test_numeric<29>((uint64_t)42, 0xf4b7e73e40000000, 0x3502ee929d, false));
 };

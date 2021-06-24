@@ -878,6 +878,73 @@ namespace tds {
 
         return cols;
     }
+
+    // FIXME - limit N
+    template<unsigned N>
+    class numeric {
+    public:
+        numeric() = default;
+
+        constexpr numeric(int64_t v) {
+            if (v < 0)
+                low_part = (uint64_t)-v;
+            else
+                low_part = (uint64_t)v;
+
+            high_part = 0;
+            neg = v < 0;
+
+            for (unsigned int i = 0; i < N; i++) {
+                ten_mult();
+            }
+        }
+
+        constexpr numeric(uint64_t v) {
+            low_part = v;
+            high_part = 0;
+            neg = false;
+
+            for (unsigned int i = 0; i < N; i++) {
+                ten_mult();
+            }
+        }
+
+        // FIXME - other signed ints to int64_t
+        // FIXME - other unsigned ints to uint64_t
+        // FIXME - double
+        // FIXME - float to double
+        // FIXME - other numerics
+
+        // FIXME - operators (int64_t, uint64_t, double)
+
+        // FIXME - bcp
+        // FIXME - tds::value
+        // FIXME - fmt specialization
+
+        uint64_t low_part, high_part;
+        bool neg;
+
+    private:
+        constexpr void ten_mult() {
+            if (low_part >= std::numeric_limits<uint64_t>::max() / 10) {
+                auto lp1 = low_part << 1;
+                auto lp2 = low_part << 3;
+
+                auto hp1 = low_part >> 63;
+                auto hp2 = low_part >> 61;
+
+                low_part = lp1 + lp2;
+                high_part *= 10;
+                high_part += hp1 + hp2;
+
+                if ((lp1 >> 60) + (lp2 >> 60) >= 0x10)
+                    high_part++;
+            } else {
+                low_part *= 10;
+                high_part *= 10;
+            }
+        }
+    };
 };
 
 template<>
