@@ -909,8 +909,14 @@ namespace tds {
             }
         }
 
-        // FIXME - other signed ints to int64_t
-        // FIXME - other unsigned ints to uint64_t
+        template<typename T>
+        requires std::is_integral_v<T> && std::is_signed_v<T>
+        constexpr numeric(T v) : numeric(static_cast<int64_t>(v)) { }
+
+        template<typename T>
+        requires std::is_integral_v<T> && (!std::is_signed_v<T>)
+        constexpr numeric(T v) : numeric(static_cast<uint64_t>(v)) { }
+
         // FIXME - double
         // FIXME - float to double
         // FIXME - other numerics
