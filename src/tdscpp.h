@@ -879,8 +879,8 @@ namespace tds {
         return cols;
     }
 
-    // FIXME - limit N
     template<unsigned N>
+    requires (N <= 38)
     class numeric {
     public:
         numeric() = default;
