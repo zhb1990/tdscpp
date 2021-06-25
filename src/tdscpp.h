@@ -917,8 +917,30 @@ namespace tds {
         requires std::is_integral_v<T> && (!std::is_signed_v<T>)
         constexpr numeric(T v) : numeric(static_cast<uint64_t>(v)) { }
 
-        // FIXME - double
+#if 0 // FIXME - this is non-trivial...
+        constexpr numeric(double d) {
+            neg = d < 0;
+
+            if (neg)
+                d = -d;
+
+            // FIXME? Introduces inaccuracies if N is large
+            for (unsigned int i = 0; i < N; i++) {
+                d *= 10.0;
+            }
+
+            if (d < (double)std::numeric_limits<uint64_t>::max()) {
+                low_part = (uint64_t)d;
+                high_part = 0;
+            } else {
+                // FIXME
+//                 throw std::runtime_error("!");
+            }
+        }
+
         // FIXME - float to double
+#endif
+
         // FIXME - other numerics
 
         // FIXME - operators (int64_t, uint64_t, double)

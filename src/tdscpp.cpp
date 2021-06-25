@@ -9821,6 +9821,7 @@ namespace tds {
     static_assert(test_numeric<27>((uint64_t)42, 0x383509fe10000000, 0x87b595f2, false));
     static_assert(test_numeric<28>((uint64_t)42, 0x321263eca0000000, 0x54d17db76, false));
     static_assert(test_numeric<29>((uint64_t)42, 0xf4b7e73e40000000, 0x3502ee929d, false));
+    static_assert(test_numeric<1>((uint64_t)0xffffffffffffffff, 0xfffffffffffffff6, 0x9, false));
     static_assert(test_numeric<0>((int32_t)0, 0, 0, false));
     static_assert(test_numeric<5>((int32_t)0, 0, 0, false));
     static_assert(test_numeric<0>((int32_t)42, 42, 0, false));
@@ -9831,4 +9832,16 @@ namespace tds {
     static_assert(test_numeric<5>((uint32_t)0, 0, 0, false));
     static_assert(test_numeric<0>((uint32_t)42, 42, 0, false));
     static_assert(test_numeric<5>((uint32_t)42, 4200000, 0, false));
+
+#if 0
+    static_assert(test_numeric<0>(0.0, 0, 0, false));
+    static_assert(test_numeric<5>(0.0, 0, 0, false));
+    static_assert(test_numeric<0>(0x1921fb54442d18p-51, 3, 0, false));
+    static_assert(test_numeric<5>(0x1921fb54442d18p-51, 314159, 0, false));
+    static_assert(test_numeric<9>(0x1921fb54442d18p-51, 0xbb40e64d, 0, false));
+    static_assert(test_numeric<18>(0x1921fb54442d18p-51, 0x2b992ddfa2324c00, 0, false)); // FIXME - slightly wrong
+    static_assert(test_numeric<19>(0x1921fb54442d18p-51, 0xb3fbcabc55f6e260, 0x1, false)); // FIXME - probably slightly wrong
+    // FIXME - negatives
+    // FIXME - floats
+#endif
 };
