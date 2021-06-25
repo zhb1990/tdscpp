@@ -9832,7 +9832,6 @@ namespace tds {
     static_assert(test_numeric<5>((uint32_t)0, 0, 0, false));
     static_assert(test_numeric<0>((uint32_t)42, 42, 0, false));
     static_assert(test_numeric<5>((uint32_t)42, 4200000, 0, false));
-
 #if 0
     static_assert(test_numeric<0>(0.0, 0, 0, false));
     static_assert(test_numeric<5>(0.0, 0, 0, false));
@@ -9844,4 +9843,28 @@ namespace tds {
     // FIXME - negatives
     // FIXME - floats
 #endif
+    static_assert(test_numeric<5>(numeric<5>(0), 0, 0, false));
+    static_assert(test_numeric<5>(numeric<0>(0), 0, 0, false));
+    static_assert(test_numeric<0>(numeric<5>(0), 0, 0, false));
+    static_assert(test_numeric<5>(numeric<5>(42), 4200000, 0, false));
+    static_assert(test_numeric<5>(numeric<0>(42), 4200000, 0, false));
+    static_assert(test_numeric<0>(numeric<5>(42), 42, 0, false));
+    static_assert(test_numeric<5>(numeric<5>(-17), 1700000, 0, true));
+    static_assert(test_numeric<5>(numeric<0>(-17), 1700000, 0, true));
+    static_assert(test_numeric<0>(numeric<5>(-17), 17, 0, true));
+    static_assert(test_numeric<18>(numeric<0>(42), 0x46ddf97976680000, 0x2, false));
+    static_assert(test_numeric<19>(numeric<0>(42), 0xc4abbebea0100000, 0x16, false));
+    static_assert(test_numeric<0>(numeric<18>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<19>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<20>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<21>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<22>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<23>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<24>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<25>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<26>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<27>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<28>(42), 42, 0, false));
+    static_assert(test_numeric<0>(numeric<29>(42), 42, 0, false));
+    static_assert(test_numeric<18>(numeric<19>(42), 0x46ddf97976680000, 0x2, false));
 };

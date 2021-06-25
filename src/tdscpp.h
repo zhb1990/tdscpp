@@ -941,7 +941,22 @@ namespace tds {
         // FIXME - float to double
 #endif
 
-        // FIXME - other numerics
+        template<unsigned N2>
+        constexpr numeric(const numeric<N2>& n) {
+            low_part = n.low_part;
+            high_part = n.high_part;
+            neg = n.neg;
+
+            if constexpr (N2 < N) {
+                for (unsigned int i = N2; i < N; i++) {
+                    ten_mult();
+                }
+            } else if constexpr (N2 > N) {
+                for (unsigned int i = N; i < N2; i++) {
+                    ten_div();
+                }
+            }
+        }
 
         // FIXME - operators (int64_t, uint64_t, double)
 
@@ -970,6 +985,17 @@ namespace tds {
             } else {
                 low_part *= 10;
                 high_part *= 10;
+            }
+        }
+
+        constexpr void ten_div() {
+            low_part /= 10;
+
+            if (high_part != 0) {
+                auto hp1 = high_part % 10;
+
+                high_part /= 10;
+                low_part += 0x199999999999999a * hp1;
             }
         }
     };
