@@ -400,7 +400,7 @@ namespace tds {
             precision = 38;
             scale = N;
             val.resize(17);
-            val[0] = n.neg ? 1 : 0;
+            val[0] = n.neg ? 0 : 1;
             *(uint64_t*)&val[1] = n.low_part;
             *(uint64_t*)&val[1 + sizeof(uint64_t)] = n.high_part;
         }
@@ -434,6 +434,57 @@ namespace tds {
 
         explicit operator std::chrono::time_point<std::chrono::system_clock>() const {
             return static_cast<std::chrono::time_point<std::chrono::system_clock>>(static_cast<datetime>(*this));
+        }
+
+        template<unsigned N>
+        explicit operator numeric<N>() const {
+            auto type2 = type;
+            std::string_view d = val;
+
+            if (is_null)
+                return 0;
+
+            if (type2 == sql_type::SQL_VARIANT) {
+                type2 = (sql_type)d[0];
+                d = d.substr(1);
+                auto propbytes = (uint8_t)d[0];
+                d = d.substr(1 + propbytes);
+            }
+
+            switch (type2) {
+                case sql_type::TINYINT:
+                case sql_type::SMALLINT:
+                case sql_type::INT:
+                case sql_type::BIGINT:
+                case sql_type::INTN:
+                    return (int64_t)*this;
+
+                case sql_type::NUMERIC:
+                case sql_type::DECIMAL: {
+                    numeric<N> n;
+
+                    n.neg = d[0] == 0;
+                    n.low_part = *(uint64_t*)&d[1];
+                    n.high_part = *(uint64_t*)&d[1 + sizeof(uint64_t)];
+
+                    if (N < scale) {
+                        for (unsigned int i = N; i < scale; i++) {
+                            n.ten_div();
+                        }
+                    } else if (N > scale) {
+                        for (unsigned int i = scale; i < N; i++) {
+                            n.ten_mult();
+                        }
+                    }
+
+                    return n;
+                }
+
+                // FIXME - REAL / FLOAT
+
+                default:
+                    return (int64_t)*this; // FIXME - should be double when supported
+            }
         }
 
         enum sql_type type;
@@ -988,10 +1039,11 @@ namespace tds {
         // FIXME - operator numeric<N2>?
 
         // FIXME - bcp
-        // FIXME - tds::value
 
         uint64_t low_part, high_part;
         bool neg;
+
+        friend value;
 
     private:
         constexpr void ten_mult() noexcept {
