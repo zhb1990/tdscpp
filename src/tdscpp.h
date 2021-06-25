@@ -885,7 +885,7 @@ namespace tds {
     public:
         numeric() = default;
 
-        constexpr numeric(int64_t v) {
+        constexpr numeric(int64_t v) noexcept {
             if (v < 0)
                 low_part = (uint64_t)-v;
             else
@@ -899,7 +899,7 @@ namespace tds {
             }
         }
 
-        constexpr numeric(uint64_t v) {
+        constexpr numeric(uint64_t v) noexcept {
             low_part = v;
             high_part = 0;
             neg = false;
@@ -911,11 +911,11 @@ namespace tds {
 
         template<typename T>
         requires std::is_integral_v<T> && std::is_signed_v<T>
-        constexpr numeric(T v) : numeric(static_cast<int64_t>(v)) { }
+        constexpr numeric(T v) noexcept : numeric(static_cast<int64_t>(v)) { }
 
         template<typename T>
         requires std::is_integral_v<T> && (!std::is_signed_v<T>)
-        constexpr numeric(T v) : numeric(static_cast<uint64_t>(v)) { }
+        constexpr numeric(T v) noexcept : numeric(static_cast<uint64_t>(v)) { }
 
 #if 0 // FIXME - this is non-trivial...
         constexpr numeric(double d) {
@@ -942,7 +942,7 @@ namespace tds {
 #endif
 
         template<unsigned N2>
-        constexpr numeric(const numeric<N2>& n) {
+        constexpr numeric(const numeric<N2>& n) noexcept {
             low_part = n.low_part;
             high_part = n.high_part;
             neg = n.neg;
@@ -968,7 +968,7 @@ namespace tds {
         bool neg;
 
     private:
-        constexpr void ten_mult() {
+        constexpr void ten_mult() noexcept {
             if (low_part >= std::numeric_limits<uint64_t>::max() / 10) {
                 auto lp1 = low_part << 1;
                 auto lp2 = low_part << 3;
@@ -988,7 +988,7 @@ namespace tds {
             }
         }
 
-        constexpr void ten_div() {
+        constexpr void ten_div() noexcept {
             low_part /= 10;
 
             if (high_part != 0) {
