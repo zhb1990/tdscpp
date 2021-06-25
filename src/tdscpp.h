@@ -958,7 +958,19 @@ namespace tds {
             }
         }
 
-        // FIXME - operators (int64_t, uint64_t, double)
+        constexpr operator int64_t() noexcept {
+            if constexpr (N == 0)
+                return neg ? -low_part : low_part;
+            else {
+                numeric<0> n = *this;
+
+                return neg ? -n.low_part : n.low_part;
+            }
+        }
+
+        // FIXME - operator uint64_t?
+        // FIXME - operator double
+        // FIXME - operator numeric<N2>?
 
         // FIXME - bcp
         // FIXME - tds::value

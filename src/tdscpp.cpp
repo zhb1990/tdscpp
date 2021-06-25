@@ -9867,4 +9867,14 @@ namespace tds {
     static_assert(test_numeric<0>(numeric<28>(42), 42, 0, false));
     static_assert(test_numeric<0>(numeric<29>(42), 42, 0, false));
     static_assert(test_numeric<18>(numeric<19>(42), 0x46ddf97976680000, 0x2, false));
+    static_assert((int64_t)numeric<0>(0) == 0);
+    static_assert((int64_t)numeric<5>(0) == 0);
+    static_assert((int64_t)numeric<0>(42) == 42);
+    static_assert((int64_t)numeric<5>(42) == 42);
+    static_assert((int64_t)numeric<0>(-17) == -17);
+    static_assert((int64_t)numeric<5>(-17) == -17);
+    static_assert((uint64_t)numeric<0>(0) == 0);
+    static_assert((uint64_t)numeric<5>(0) == 0);
+    static_assert((uint64_t)numeric<0>(42) == 42);
+    static_assert((uint64_t)numeric<5>(42) == 42);
 };
