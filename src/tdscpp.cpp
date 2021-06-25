@@ -7596,6 +7596,47 @@ namespace tds {
         return bufsize;
     }
 
+    static const pair<uint64_t, uint64_t> numeric_limit_vals[] = {
+        { 0xa, 0x0 },
+        { 0x64, 0x0 },
+        { 0x3e8, 0x0 },
+        { 0x2710, 0x0 },
+        { 0x186a0, 0x0 },
+        { 0xf4240, 0x0 },
+        { 0x989680, 0x0 },
+        { 0x5f5e100, 0x0 },
+        { 0x3b9aca00, 0x0 },
+        { 0x2540be400, 0x0 },
+        { 0x174876e800, 0x0 },
+        { 0xe8d4a51000, 0x0 },
+        { 0x9184e72a000, 0x0 },
+        { 0x5af3107a4000, 0x0 },
+        { 0x38d7ea4c68000, 0x0 },
+        { 0x2386f26fc10000, 0x0 },
+        { 0x16345785d8a0000, 0x0 },
+        { 0xde0b6b3a7640000, 0x0 },
+        { 0x8ac7230489e80000, 0x0 },
+        { 0x6bc75e2d63100000, 0x5 },
+        { 0x35c9adc5dea00000, 0x36 },
+        { 0x19e0c9bab2400000, 0x21e },
+        { 0x2c7e14af6800000, 0x152d },
+        { 0x1bcecceda1000000, 0xd3c2 },
+        { 0x161401484a000000, 0x84595 },
+        { 0xdcc80cd2e4000000, 0x52b7d2 },
+        { 0x9fd0803ce8000000, 0x33b2e3c },
+        { 0x3e25026110000000, 0x204fce5e },
+        { 0x6d7217caa0000000, 0x1431e0fae },
+        { 0x4674edea40000000, 0xc9f2c9cd0 },
+        { 0xc0914b2680000000, 0x7e37be2022 },
+        { 0x85acef8100000000, 0x4ee2d6d415b },
+        { 0x38c15b0a00000000, 0x314dc6448d93 },
+        { 0x378d8e6400000000, 0x1ed09bead87c0 },
+        { 0x2b878fe800000000, 0x13426172c74d82 },
+        { 0xb34b9f1000000000, 0xc097ce7bc90715 },
+        { 0xf436a000000000, 0x785ee10d5da46d9 },
+        { 0x98a224000000000, 0x4b3b4ca85a86c47a },
+    };
+
     void tds::bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const u16string_view& col_name) {
         switch (col.type) {
             case sql_type::INTN:
@@ -8297,17 +8338,8 @@ namespace tds {
                     switch (type) {
                         case sql_type::NUMERIC:
                         case sql_type::DECIMAL: {
-                            if (precision == col.precision && scale == col.scale) {
-                                *ptr = (uint8_t)data.length();
-                                ptr++;
-                                memcpy(ptr, data.data(), data.length());
-                                ptr += data.length();
-                                break;
-                            }
-
+                            const auto& lim = numeric_limit_vals[col.precision - 1];
                             numeric<0> n;
-
-                            n.neg = data[0] == 0;
 
                             if (data.length() >= 9)
                                 n.low_part = *(uint64_t*)&data[1];
@@ -8321,6 +8353,26 @@ namespace tds {
                             else
                                 n.high_part = 0;
 
+                            if (n.high_part > lim.second || (n.high_part == lim.second && n.low_part >= lim.first)) {
+                                if (n.neg) {
+                                    throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                        col.scale, utf16_to_utf8(col_name));
+                                } else {
+                                    throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                        col.scale, utf16_to_utf8(col_name));
+                                }
+                            }
+
+                            if (precision == col.precision && scale == col.scale) {
+                                *ptr = (uint8_t)data.length();
+                                ptr++;
+                                memcpy(ptr, data.data(), data.length());
+                                ptr += data.length();
+                                break;
+                            }
+
+                            n.neg = data[0] == 0;
+
                             for (auto i = scale; i < col.scale; i++) {
                                 n.ten_mult();
                             }
@@ -8328,8 +8380,6 @@ namespace tds {
                             for (auto i = col.scale; i < scale; i++) {
                                 n.ten_div();
                             }
-
-                            // FIXME - throw exception if range errors
 
                             if (col.precision < 10) { // 4 bytes
                                 *ptr = 5;
