@@ -1034,18 +1034,6 @@ namespace tds {
             }
         }
 
-        // FIXME - operator uint64_t?
-        // FIXME - operator double
-        // FIXME - operator numeric<N2>?
-
-        // FIXME - bcp
-
-        uint64_t low_part, high_part;
-        bool neg;
-
-        friend value;
-
-    private:
         constexpr void ten_mult() noexcept {
             if (low_part >= std::numeric_limits<uint64_t>::max() / 10) {
                 auto lp1 = low_part << 1;
@@ -1076,6 +1064,13 @@ namespace tds {
                 low_part += 0x199999999999999a * hp1;
             }
         }
+
+        // FIXME - operator uint64_t?
+        // FIXME - operator double
+        // FIXME - operator numeric<N2>?
+
+        uint64_t low_part, high_part;
+        bool neg;
     };
 };
 

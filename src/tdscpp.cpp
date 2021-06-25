@@ -8266,72 +8266,187 @@ namespace tds {
                     *ptr = 0;
                     ptr++;
                 } else {
-                    bool neg = false;
-                    double d;
+                    auto type = vv.type;
+                    auto precision = vv.precision;
+                    auto scale = vv.scale;
+                    string_view data = vv.val;
 
-                    try {
-                        d = (double)vv;
-                    } catch (const exception& e) {
-                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                    }
+                    if (type == sql_type::SQL_VARIANT) {
+                        type = (sql_type)data[0];
 
-                    if (d < 0) {
-                        neg = true;
-                        d = -d;
-                    }
+                        data = data.substr(1);
 
-                    for (unsigned int j = 0; j < col.scale; j++) {
-                        d *= 10;
-                    }
+                        auto propbytes = (uint8_t)data[0];
 
-                    // FIXME - avoid doing pow every time?
+                        data = data.substr(1);
 
-                    if (d > pow(10, col.precision)) {
-                        if (neg) {
-                            throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
-                                                  col.scale, utf16_to_utf8(col_name));
-                        } else {
-                            throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
-                                                  col.scale, utf16_to_utf8(col_name));
+                        switch (type) {
+                            case sql_type::NUMERIC:
+                            case sql_type::DECIMAL:
+                                precision = data[0];
+                                scale = data[1];
+                                break;
+
+                            default:
+                                break;
                         }
+
+                        data = data.substr(propbytes);
                     }
 
-                    if (col.precision < 10) { // 4 bytes
-                        *ptr = 5;
-                        ptr++;
+                    switch (type) {
+                        case sql_type::NUMERIC:
+                        case sql_type::DECIMAL: {
+                            if (precision == col.precision && scale == col.scale) {
+                                *ptr = (uint8_t)data.length();
+                                ptr++;
+                                memcpy(ptr, data.data(), data.length());
+                                ptr += data.length();
+                                break;
+                            }
 
-                        *ptr = neg ? 0 : 1;
-                        ptr++;
+                            numeric<0> n;
 
-                        *(uint32_t*)ptr = (uint32_t)d;
-                        ptr += sizeof(uint32_t);
-                    } else if (col.precision < 20) { // 8 bytes
-                        *ptr = 9;
-                        ptr++;
+                            n.neg = data[0] == 0;
 
-                        *ptr = neg ? 0 : 1;
-                        ptr++;
+                            if (data.length() >= 9)
+                                n.low_part = *(uint64_t*)&data[1];
+                            else
+                                n.low_part = *(uint32_t*)&data[1];
 
-                        *(uint64_t*)ptr = (uint64_t)d;
-                        ptr += sizeof(uint64_t);
-                    } else if (col.precision < 29) { // 12 bytes
-                        *ptr = 13;
-                        ptr++;
+                            if (data.length() >= 17)
+                                n.high_part = *(uint64_t*)&data[1 + sizeof(uint64_t)];
+                            else if (data.length() >= 13)
+                                n.high_part = *(uint32_t*)&data[1 + sizeof(uint64_t)];
+                            else
+                                n.high_part = 0;
 
-                        *ptr = neg ? 0 : 1;
-                        ptr++;
+                            for (auto i = scale; i < col.scale; i++) {
+                                n.ten_mult();
+                            }
 
-                        double_to_int<12>(d, ptr);
-                        ptr += 12;
-                    } else { // 16 bytes
-                        *ptr = 17;
-                        ptr++;
+                            for (auto i = col.scale; i < scale; i++) {
+                                n.ten_div();
+                            }
 
-                        *ptr = neg ? 0 : 1;
-                        ptr++;
+                            // FIXME - throw exception if range errors
 
-                        double_to_int<16>(d, ptr);
-                        ptr += 16;
+                            if (col.precision < 10) { // 4 bytes
+                                *ptr = 5;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint32_t*)ptr = (uint32_t)n.low_part;
+                                ptr += sizeof(uint32_t);
+                            } else if (col.precision < 20) { // 8 bytes
+                                *ptr = 9;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint64_t*)ptr = n.low_part;
+                                ptr += sizeof(uint64_t);
+                            } else if (col.precision < 29) { // 12 bytes
+                                *ptr = 13;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint64_t*)ptr = n.low_part;
+                                ptr += sizeof(uint64_t);
+
+                                *(uint32_t*)ptr = (uint32_t)n.high_part;
+                                ptr += sizeof(uint32_t);
+                            } else { // 16 bytes
+                                *ptr = 17;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint64_t*)ptr = n.low_part;
+                                ptr += sizeof(uint64_t);
+
+                                *(uint64_t*)ptr = n.high_part;
+                                ptr += sizeof(uint64_t);
+                            }
+
+                            break;
+                        }
+
+                        default: {
+                            bool neg = false;
+                            double d;
+
+                            try {
+                                d = (double)vv;
+                            } catch (const exception& e) {
+                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                            }
+
+                            if (d < 0) {
+                                neg = true;
+                                d = -d;
+                            }
+
+                            for (unsigned int j = 0; j < col.scale; j++) {
+                                d *= 10;
+                            }
+
+                            // FIXME - avoid doing pow every time?
+
+                            if (d > pow(10, col.precision)) {
+                                if (neg) {
+                                    throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                        col.scale, utf16_to_utf8(col_name));
+                                } else {
+                                    throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                        col.scale, utf16_to_utf8(col_name));
+                                }
+                            }
+
+                            if (col.precision < 10) { // 4 bytes
+                                *ptr = 5;
+                                ptr++;
+
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint32_t*)ptr = (uint32_t)d;
+                                ptr += sizeof(uint32_t);
+                            } else if (col.precision < 20) { // 8 bytes
+                                *ptr = 9;
+                                ptr++;
+
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint64_t*)ptr = (uint64_t)d;
+                                ptr += sizeof(uint64_t);
+                            } else if (col.precision < 29) { // 12 bytes
+                                *ptr = 13;
+                                ptr++;
+
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
+
+                                double_to_int<12>(d, ptr);
+                                ptr += 12;
+                            } else { // 16 bytes
+                                *ptr = 17;
+                                ptr++;
+
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
+
+                                double_to_int<16>(d, ptr);
+                                ptr += 16;
+                            }
+                        }
                     }
                 }
             break;
