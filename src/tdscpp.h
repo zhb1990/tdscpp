@@ -974,7 +974,6 @@ namespace tds {
 
         // FIXME - bcp
         // FIXME - tds::value
-        // FIXME - fmt specialization
 
         uint64_t low_part, high_part;
         bool neg;
@@ -1329,6 +1328,102 @@ struct fmt::formatter<tds::column> {
     template<typename format_context>
     auto format(const tds::column& c, format_context& ctx) const {
         return fmt::format_to(ctx.out(), "{}", static_cast<tds::value>(c));
+    }
+};
+
+
+template<unsigned N>
+struct fmt::formatter<tds::numeric<N>> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(const tds::numeric<N>& n, format_context& ctx) const {
+        uint8_t scratch[38];
+        char s[80], *p, *dot;
+        unsigned int pos;
+
+        // double dabble
+
+        *(uint64_t*)scratch = n.low_part;
+        *(uint64_t*)&scratch[sizeof(uint64_t)] = n.high_part;
+        memset(&scratch[2 * sizeof(uint64_t)], 0, sizeof(scratch) - (2 * sizeof(uint64_t)));
+
+        for (unsigned int iter = 0; iter < 16 * 8; iter++) {
+            for (unsigned int i = 16; i < 38; i++) {
+                if (scratch[i] >> 4 >= 5) {
+                    uint8_t v = scratch[i] >> 4;
+
+                    v += 3;
+
+                    scratch[i] = (uint8_t)((scratch[i] & 0xf) | (v << 4));
+                }
+
+                if ((scratch[i] & 0xf) >= 5) {
+                    uint8_t v = scratch[i] & 0xf;
+
+                    v += 3;
+
+                    scratch[i] = (uint8_t)((scratch[i] & 0xf0) | v);
+                }
+            }
+
+            bool carry = false;
+
+            for (unsigned int i = 0; i < sizeof(scratch); i++) {
+                bool b = scratch[i] & 0x80;
+
+                scratch[i] <<= 1;
+
+                if (carry)
+                    scratch[i] |= 1;
+
+                carry = b;
+            }
+        }
+
+        p = s;
+        pos = 0;
+        for (unsigned int i = 37; i >= 16; i--) {
+            *p = (char)((scratch[i] >> 4) + '0');
+            p++;
+            pos++;
+
+            if (pos == 77 - (16 * 2) - N - 1) {
+                *p = '.';
+                dot = p;
+                p++;
+            }
+
+            *p = (char)((scratch[i] & 0xf) + '0');
+            p++;
+            pos++;
+
+            if (pos == 77 - (16 * 2) - N - 1) {
+                *p = '.';
+                dot = p;
+                p++;
+            }
+        }
+        *p = 0;
+
+        // remove leading zeroes
+
+        for (p = s; p < dot - 1; p++) {
+            if (*p != '0')
+                break;
+        }
+
+        if constexpr (N == 0) // remove trailing dot
+            p[strlen(p) - 1] = 0;
+
+        return fmt::format_to(ctx.out(), "{}{}", n.neg ? "-" : "", p);
     }
 };
 
