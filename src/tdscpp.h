@@ -322,6 +322,10 @@ namespace tds {
         { std::span<std::byte>{t} };
     };
 
+    template<unsigned N>
+    requires (N <= 38)
+    class numeric;
+
     class TDSCPP WARN_UNUSED value {
     public:
         // make sure pointers don't get interpreted as bools
@@ -389,6 +393,17 @@ namespace tds {
 
         template<typename T, typename U>
         value(std::chrono::duration<T, U> t) : value(std::chrono::duration_cast<time_t>(t)) { }
+
+        template<unsigned N>
+        value(const numeric<N>& n) noexcept {
+            type = sql_type::NUMERIC;
+            precision = 38;
+            scale = N;
+            val.resize(17);
+            val[0] = n.neg ? 1 : 0;
+            *(uint64_t*)&val[1] = n.low_part;
+            *(uint64_t*)&val[1 + sizeof(uint64_t)] = n.high_part;
+        }
 
         explicit operator std::string() const;
         explicit operator std::u16string() const;
