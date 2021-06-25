@@ -464,8 +464,18 @@ namespace tds {
                     numeric<N> n;
 
                     n.neg = d[0] == 0;
-                    n.low_part = *(uint64_t*)&d[1];
-                    n.high_part = *(uint64_t*)&d[1 + sizeof(uint64_t)];
+
+                    if (d.length() >= 9)
+                        n.low_part = *(uint64_t*)&d[1];
+                    else
+                        n.low_part = *(uint32_t*)&d[1];
+
+                    if (d.length() >= 17)
+                        n.high_part = *(uint64_t*)&d[1 + sizeof(uint64_t)];
+                    else if (d.length() >= 13)
+                        n.high_part = *(uint32_t*)&d[1 + sizeof(uint64_t)];
+                    else
+                        n.high_part = 0;
 
                     if (N < scale) {
                         for (unsigned int i = N; i < scale; i++) {
