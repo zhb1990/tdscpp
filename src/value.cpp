@@ -552,12 +552,6 @@ namespace tds {
         memcpy(val.data(), sv.data(), val.length());
     }
 
-    value::value(const u16string& sv) : value(u16string_view(sv)) {
-    }
-
-    value::value(const char16_t* sv) : value(u16string_view(sv)) {
-    }
-
     value::value(const optional<u16string_view>& sv) {
         type = sql_type::NVARCHAR;
 
@@ -575,12 +569,6 @@ namespace tds {
         memcpy(val.data(), sv.data(), val.length());
     }
 
-    value::value(const string& sv) : value(string_view(sv)) {
-    }
-
-    value::value(const char* sv) : value(string_view(sv)) {
-    }
-
     value::value(const optional<string_view>& sv) {
         type = sql_type::VARCHAR;
 
@@ -592,18 +580,11 @@ namespace tds {
         }
     }
 
-#ifdef __cpp_char8_t
     value::value(const u8string_view& sv) {
         type = sql_type::VARCHAR;
         utf8 = true;
         val.resize(sv.length());
         memcpy(val.data(), sv.data(), sv.length());
-    }
-
-    value::value(const u8string& sv) : value(u8string_view(sv)) {
-    }
-
-    value::value(const char8_t* sv) : value(u8string_view(sv)) {
     }
 
     value::value(const optional<u8string_view>& sv) {
@@ -617,7 +598,6 @@ namespace tds {
             memcpy(val.data(), sv.value().data(), sv.value().length());
         }
     }
-#endif
 
     value::value(float f) {
         type = sql_type::FLTN;

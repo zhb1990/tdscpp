@@ -342,19 +342,32 @@ namespace tds {
         value(const std::optional<uint32_t>& i);
         value(wchar_t) = delete;
         value(const std::u16string_view& sv);
-        value(const std::u16string& sv);
-        value(const char16_t* sv);
+
+        value(const std::u16string& sv) : value(std::u16string_view(sv)) {
+        }
+
+        value(const char16_t* sv) : value(std::u16string_view(sv)) {
+        }
+
         value(const std::optional<std::u16string_view>& sv);
         value(const std::string_view& sv);
-        value(const std::string& sv);
-        value(const char* sv);
+
+        value(const std::string& sv) : value(std::string_view(sv)) {
+        }
+
+        value(const char* sv) : value(std::string_view(sv)) {
+        }
+
         value(const std::optional<std::string_view>& sv);
-#ifdef __cpp_char8_t
         value(const std::u8string_view& sv);
-        value(const std::u8string& sv);
-        value(const char8_t* sv);
+
+        value(const std::u8string& sv) : value(std::u8string_view(sv)) {
+        }
+
+        value(const char8_t* sv) : value(std::u8string_view(sv)) {
+        }
+
         value(const std::optional<std::u8string_view>& sv);
-#endif
         value(float f);
         value(const std::optional<float>& f);
         value(double d);
