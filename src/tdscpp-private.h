@@ -806,3 +806,83 @@ enum class krb5_minor {
     KRB5_TRACE_NOSUPP = -1765328129L
 };
 #endif
+
+static constexpr int ymd_to_num(const std::chrono::year_month_day& d) noexcept {
+    int m2 = ((int)(unsigned int)d.month() - 14) / 12;
+    long long n;
+
+    n = (1461 * ((int)d.year() + 4800 + m2)) / 4;
+    n += (367 * ((int)(unsigned int)d.month() - 2 - (12 * m2))) / 12;
+    n -= (3 * (((int)d.year() + 4900 + m2)/100)) / 4;
+    n += (unsigned int)d.day();
+    n -= 2447096;
+
+    return static_cast<int>(n);
+}
+
+static_assert(ymd_to_num({std::chrono::year{1}, std::chrono::January, std::chrono::day{1}}) == -693595);
+static_assert(ymd_to_num({std::chrono::year{1900}, std::chrono::January, std::chrono::day{1}}) == 0);
+
+static constexpr std::chrono::year_month_day num_to_ymd(int num) noexcept {
+    signed long long j, e, f, g, h;
+    uint8_t day, month;
+    uint16_t year;
+
+    j = num + 2415021;
+
+    f = (4 * j) + 274277;
+    f /= 146097;
+    f *= 3;
+    f /= 4;
+    f += j;
+    f += 1363;
+
+    e = (4 * f) + 3;
+    g = (e % 1461) / 4;
+    h = (5 * g) + 2;
+
+    day = (uint8_t)(((h % 153) / 5) + 1);
+    month = (uint8_t)(((h / 153) + 2) % 12 + 1);
+    year = static_cast<uint16_t>((e / 1461) - 4716 + ((14 - month) / 12));
+
+    return {std::chrono::year{year}, std::chrono::month{month}, std::chrono::day{day}};
+}
+
+static_assert(num_to_ymd(-693595) == std::chrono::year_month_day{std::chrono::year{1}, std::chrono::January, std::chrono::day{1}});
+static_assert(num_to_ymd(0) == std::chrono::year_month_day{std::chrono::year{1900}, std::chrono::January, std::chrono::day{1}});
+
+static std::u16string_view extract_message(const std::string_view& sv) {
+    return std::u16string_view((char16_t*)&sv[8], *(uint16_t*)&sv[6]);
+}
+
+template<unsigned N>
+static void buf_lshift(uint8_t* scratch) {
+    bool carry = false;
+
+    for (unsigned int i = 0; i < N; i++) {
+        bool b = scratch[i] & 0x80;
+
+        scratch[i] <<= 1;
+
+        if (carry)
+            scratch[i] |= 1;
+
+        carry = b;
+    }
+}
+
+template<unsigned N>
+static void buf_rshift(uint8_t* scratch) {
+    bool carry = false;
+
+    for (int i = N - 1; i >= 0; i--) {
+        bool b = scratch[i] & 0x1;
+
+        scratch[i] >>= 1;
+
+        if (carry)
+            scratch[i] |= 0x80;
+
+        carry = b;
+    }
+}

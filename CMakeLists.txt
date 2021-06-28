@@ -37,7 +37,8 @@ add_definitions(-DTDSCPP_EXPORT)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-set(SRC_FILES src/tdscpp.cpp)
+set(SRC_FILES src/tdscpp.cpp
+    src/bcp.cpp)
 
 add_library(tdscpp SHARED ${SRC_FILES})
 
