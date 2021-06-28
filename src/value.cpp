@@ -12,12 +12,6 @@ using namespace std;
 static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
     uint8_t h, m, s;
     string_view frac;
-    cmatch rm;
-    static const regex r1("^:([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]{1,7}))?( *)([AaPp])[Mm]");
-    static const regex r2("^:([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]{1,7}))?");
-    static const regex r3("^( *)([AaPp])[Mm]");
-    static const regex r4("^:([0-9]{1,2})( *)([AaPp])[Mm]");
-    static const regex r5("^:([0-9]{1,2})");
 
     {
         auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), h);
@@ -28,45 +22,65 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
         t = t.substr(ptr - t.data());
     }
 
-    if (regex_search(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s am
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
-        from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), s);
-
-        auto ap = rm[6].str().front();
-
-        if (ap == 'P' || ap == 'p')
-            h += 12;
-
-        frac = rm[4].str();
-    } else if (regex_search(&t[0], t.data() + t.length(), rm, r2)) { // hh:mm:ss.s
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
-        from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), s);
-
-        frac = rm[4].str();
-    } else if (regex_search(&t[0], t.data() + t.length(), rm, r3)) { // hh am
-        m = 0;
-        s = 0;
-
-        auto ap = rm[2].str().front();
-
-        if (ap == 'P' || ap == 'p')
-            h += 12;
-    } else if (regex_search(&t[0], t.data() + t.length(), rm, r4)) { // hh:mm am
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
-        s = 0;
-
-        auto ap = rm[3].str().front();
-
-        if (ap == 'P' || ap == 'p')
-            h += 12;
-    } else if (regex_search(&t[0], t.data() + t.length(), rm, r5)) { // hh:mm
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
-        s = 0;
-    } else
+    if (t.empty())
         return false;
 
-    if (m > 60 || s > 60)
-        return false;
+    if (t.front() == ':') {
+        static const regex r1("^([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]{1,7}))?( *)([AaPp])[Mm]");
+        static const regex r2("^([0-9]{1,2}):([0-9]{1,2})(\\.([0-9]{1,7}))?");
+        static const regex r4("^([0-9]{1,2})( *)([AaPp])[Mm]");
+        static const regex r5("^([0-9]{1,2})");
+        cmatch rm;
+
+        if (regex_search(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s am
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
+            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), s);
+
+            auto ap = rm[6].str().front();
+
+            if (ap == 'P' || ap == 'p')
+                h += 12;
+
+            frac = rm[4].str();
+        } else if (regex_search(&t[0], t.data() + t.length(), rm, r2)) { // hh:mm:ss.s
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
+            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), s);
+
+            frac = rm[4].str();
+        } else if (regex_search(&t[0], t.data() + t.length(), rm, r4)) { // hh:mm am
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
+            s = 0;
+
+            auto ap = rm[3].str().front();
+
+            if (ap == 'P' || ap == 'p')
+                h += 12;
+        } else if (regex_search(&t[0], t.data() + t.length(), rm, r5)) { // hh:mm
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), m);
+            s = 0;
+        } else
+            return false;
+
+        if (m > 60 || s > 60)
+            return false;
+
+        t = t.substr((size_t)rm[0].length());
+    } else {
+        while (!t.empty() && t.front() == ' ') {
+            t = t.substr(1);
+        }
+
+        if (t.length() >= 2 && (t[0] == 'A' || t[0] == 'a' || t[0] == 'P' || t[0] == 'p') && (t[1] == 'M' || t[1] == 'm')) { // hh am
+            m = 0;
+            s = 0;
+
+            if (t[0] == 'P' || t[0] == 'p')
+                h += 12;
+
+            t = t.substr(2);
+        } else
+            return false;
+    }
 
     dur = chrono::hours{h} + chrono::minutes{m} + chrono::seconds{s};
 
@@ -81,8 +95,6 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
 
         dur += tds::time_t{v};
     }
-
-    t = t.substr((size_t)rm[0].length());
 
     while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
         t = t.substr(1);
