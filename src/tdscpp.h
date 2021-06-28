@@ -957,7 +957,7 @@ namespace tds {
 
     template<unsigned N>
     requires (N <= 38)
-    class numeric {
+    class WARN_UNUSED numeric {
     public:
         numeric() = default;
 
