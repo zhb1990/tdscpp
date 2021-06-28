@@ -394,11 +394,11 @@ static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
     return true;
 }
 
-static bool is_valid_date(uint16_t y, uint8_t m, uint8_t d) {
+static constexpr bool is_valid_date(uint16_t y, uint8_t m, uint8_t d) {
     if (y == 0 || m == 0 || d == 0)
         return false;
 
-    if (d > 31)
+    if (d > 31 || m > 12)
         return false;
 
     if (d == 31 && (m == 4 || m == 6 || m == 9 || m == 11))
@@ -417,6 +417,17 @@ static bool is_valid_date(uint16_t y, uint8_t m, uint8_t d) {
 
     return true;
 }
+
+static_assert(!is_valid_date(0, 1, 1));
+static_assert(!is_valid_date(1900, 0, 1));
+static_assert(!is_valid_date(1900, 1, 0));
+static_assert(is_valid_date(1900, 1, 1));
+static_assert(!is_valid_date(1900, 2, 29));
+static_assert(is_valid_date(2000, 2, 29));
+static_assert(!is_valid_date(2000, 2, 30));
+static_assert(!is_valid_date(2000, 13, 1));
+static_assert(!is_valid_date(2000, 12, 32));
+static_assert(!is_valid_date(2000, 6, 31));
 
 static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, tds::time_t& dur) {
     {
