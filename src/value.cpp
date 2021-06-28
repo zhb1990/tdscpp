@@ -11,7 +11,7 @@ using namespace std;
 
 static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
     uint8_t h, m, s;
-    string_view frac;
+    uint32_t fracval = 0;
 
     {
         auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), h);
@@ -38,11 +38,9 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
         }
 
         if (!t.empty() && t.front() == ':') {
-            static const regex r1("^(\\.([0-9]{1,7}))?( *)([AaPp])[Mm]");
-            static const regex r2("^(\\.([0-9]{1,7}))?");
-            cmatch rm;
-
             t = t.substr(1);
+
+            // hh:mm:ss.s and hh:mm:ss.s am
 
             {
                 auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), s);
@@ -53,19 +51,31 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
                 t = t.substr(ptr - t.data());
             }
 
-            if (regex_search(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s am
-                auto ap = rm[4].str().front();
+            if (!t.empty() && t.front() == '.') {
+                t = t.substr(1);
 
-                if (ap == 'P' || ap == 'p')
+                auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), fracval);
+
+                if (ptr == t.data() || ptr > t.data() + 7)
+                    return false;
+
+                for (auto i = ptr - t.data(); i < 7; i++) {
+                    fracval *= 10;
+                }
+
+                t = t.substr(ptr - t.data());
+            }
+
+            while (!t.empty() && t.front() == ' ') {
+                t = t.substr(1);
+            }
+
+            if (t.length() >= 2 && (t[0] == 'A' || t[0] == 'a' || t[0] == 'P' || t[0] == 'p') && (t[1] == 'M' || t[1] == 'm')) {
+                if (t[0] == 'P' || t[0] == 'p')
                     h += 12;
 
-                frac = rm[2].str();
-            } else if (regex_search(&t[0], t.data() + t.length(), rm, r2)) // hh:mm:ss.s
-                frac = rm[2].str();
-            else
-                return false;
-
-            t = t.substr((size_t)rm[0].length());
+                t = t.substr(2);
+            }
         } else {
             while (!t.empty() && t.front() == ' ') {
                 t = t.substr(1);
@@ -74,8 +84,6 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
             s = 0;
 
             if (t.length() >= 2 && (t[0] == 'A' || t[0] == 'a' || t[0] == 'P' || t[0] == 'p') && (t[1] == 'M' || t[1] == 'm')) { // hh:mm am
-                s = 0;
-
                 if (t[0] == 'P' || t[0] == 'p')
                     h += 12;
 
@@ -101,19 +109,7 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
             return false;
     }
 
-    dur = chrono::hours{h} + chrono::minutes{m} + chrono::seconds{s};
-
-    if (!frac.empty()) {
-        uint32_t v;
-
-        from_chars(frac.data(), frac.data() + frac.length(), v);
-
-        for (auto i = frac.length(); i < 7; i++) {
-            v *= 10;
-        }
-
-        dur += tds::time_t{v};
-    }
+    dur = chrono::hours{h} + chrono::minutes{m} + chrono::seconds{s} + tds::time_t{fracval};
 
     while (!t.empty() && (t.front() == ' ' || t.front() == '\t')) {
         t = t.substr(1);
