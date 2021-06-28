@@ -993,29 +993,23 @@ namespace tds {
         requires std::is_integral_v<T> && (!std::is_signed_v<T>)
         constexpr numeric(T v) noexcept : numeric(static_cast<uint64_t>(v)) { }
 
-#if 0 // FIXME - this is non-trivial...
-        constexpr numeric(double d) {
+        template<typename T>
+        requires std::is_same_v<T, float> || std::is_same_v<T, double>
+        constexpr numeric(T d) noexcept {
+            auto db = fmt::detail::dragonbox::to_decimal(d);
+
             neg = d < 0;
+            low_part = db.significand;
+            high_part = 0;
 
-            if (neg)
-                d = -d;
-
-            // FIXME? Introduces inaccuracies if N is large
-            for (unsigned int i = 0; i < N; i++) {
-                d *= 10.0;
+            for (int i = N; i < -db.exponent; i++) {
+                ten_div();
             }
 
-            if (d < (double)std::numeric_limits<uint64_t>::max()) {
-                low_part = (uint64_t)d;
-                high_part = 0;
-            } else {
-                // FIXME
-//                 throw std::runtime_error("!");
+            for (int i = -db.exponent; i < (int)N; i++) {
+                ten_mult();
             }
         }
-
-        // FIXME - float to double
-#endif
 
         template<unsigned N2>
         constexpr numeric(const numeric<N2>& n) noexcept {
