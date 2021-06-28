@@ -26,7 +26,6 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
         return false;
 
     if (t.front() == ':') {
-
         t = t.substr(1);
 
         {
@@ -39,32 +38,34 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
         }
 
         if (!t.empty() && t.front() == ':') {
-            static const regex r1("^([0-9]{1,2})(\\.([0-9]{1,7}))?( *)([AaPp])[Mm]");
-            static const regex r2("^([0-9]{1,2})(\\.([0-9]{1,7}))?");
+            static const regex r1("^(\\.([0-9]{1,7}))?( *)([AaPp])[Mm]");
+            static const regex r2("^(\\.([0-9]{1,7}))?");
             cmatch rm;
 
             t = t.substr(1);
 
-            if (regex_search(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s am
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), s);
+            {
+                auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), s);
 
-                auto ap = rm[5].str().front();
+                if (ptr == t.data() || ptr > t.data() + 2 || s > 60)
+                    return false;
+
+                t = t.substr(ptr - t.data());
+            }
+
+            if (regex_search(&t[0], t.data() + t.length(), rm, r1)) { // hh:mm:ss.s am
+                auto ap = rm[4].str().front();
 
                 if (ap == 'P' || ap == 'p')
                     h += 12;
 
-                frac = rm[3].str();
-            } else if (regex_search(&t[0], t.data() + t.length(), rm, r2)) { // hh:mm:ss.s
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), s);
-
-                frac = rm[3].str();
-            } else
+                frac = rm[2].str();
+            } else if (regex_search(&t[0], t.data() + t.length(), rm, r2)) // hh:mm:ss.s
+                frac = rm[2].str();
+            else
                 return false;
 
             t = t.substr((size_t)rm[0].length());
-
-            if (s > 60)
-                return false;
         } else {
             while (!t.empty() && t.front() == ' ') {
                 t = t.substr(1);
