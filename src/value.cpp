@@ -16,6 +16,7 @@ static constexpr from_chars_result from_chars_constexpr(const char* first, const
     from_chars_result res;
 
     res.ptr = first;
+    res.ec = {};
 
     if (first == last || *first < '0' || *first > '9')
         return res;
@@ -39,7 +40,7 @@ static constexpr bool parse_time(string_view t, tds::time_t& dur, int16_t& offse
     {
         auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), h);
 
-        if (ptr == t.data() || ptr > t.data() + 2 || h >= 24)
+        if (ptr == t.data() || ptr - t.data() > 2 || h >= 24)
             return false;
 
         t = t.substr(ptr - t.data());
@@ -54,7 +55,7 @@ static constexpr bool parse_time(string_view t, tds::time_t& dur, int16_t& offse
         {
             auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), m);
 
-            if (ptr == t.data() || ptr > t.data() + 2 || m >= 60)
+            if (ptr == t.data() || ptr - t.data() > 2 || m >= 60)
                 return false;
 
             t = t.substr(ptr - t.data());
@@ -68,7 +69,7 @@ static constexpr bool parse_time(string_view t, tds::time_t& dur, int16_t& offse
             {
                 auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), s);
 
-                if (ptr == t.data() || ptr > t.data() + 2 || s >= 60)
+                if (ptr == t.data() || ptr - t.data() > 2 || s >= 60)
                     return false;
 
                 t = t.substr(ptr - t.data());
@@ -79,7 +80,7 @@ static constexpr bool parse_time(string_view t, tds::time_t& dur, int16_t& offse
 
                 auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), fracval);
 
-                if (ptr == t.data() || ptr > t.data() + 7)
+                if (ptr == t.data() || ptr - t.data() > 7)
                     return false;
 
                 for (auto i = ptr - t.data(); i < 7; i++) {
