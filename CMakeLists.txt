@@ -38,7 +38,8 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_BINAR
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(SRC_FILES src/tdscpp.cpp
-    src/bcp.cpp)
+    src/bcp.cpp
+    src/value.cpp)
 
 add_library(tdscpp SHARED ${SRC_FILES})
 
