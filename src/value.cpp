@@ -9,14 +9,37 @@
 
 using namespace std;
 
-static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
-    uint8_t h, m, s;
+// hopefully from_chars will be constexpr some day - see P2291R0
+template<typename T>
+requires is_integral_v<T> && is_unsigned_v<T>
+static constexpr from_chars_result from_chars_constexpr(const char* first, const char* last, T& t) {
+    from_chars_result res;
+
+    res.ptr = first;
+
+    if (first == last || *first < '0' || *first > '9')
+        return res;
+
+    t = 0;
+
+    while (first != last && *first >= '0' && *first <= '9') {
+        t *= 10;
+        t += (T)(*first - '0');
+        first++;
+        res.ptr++;
+    }
+
+    return res;
+}
+
+static constexpr bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) noexcept {
+    uint8_t h = 0, m, s;
     uint32_t fracval = 0;
 
     {
-        auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), h);
+        auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), h);
 
-        if (ptr == t.data() || ptr > t.data() + 2 || h > 24)
+        if (ptr == t.data() || ptr > t.data() + 2 || h >= 24)
             return false;
 
         t = t.substr(ptr - t.data());
@@ -29,9 +52,9 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
         t = t.substr(1);
 
         {
-            auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), m);
+            auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), m);
 
-            if (ptr == t.data() || ptr > t.data() + 2 || m > 60)
+            if (ptr == t.data() || ptr > t.data() + 2 || m >= 60)
                 return false;
 
             t = t.substr(ptr - t.data());
@@ -43,9 +66,9 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
             // hh:mm:ss.s and hh:mm:ss.s am
 
             {
-                auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), s);
+                auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), s);
 
-                if (ptr == t.data() || ptr > t.data() + 2 || s > 60)
+                if (ptr == t.data() || ptr > t.data() + 2 || s >= 60)
                     return false;
 
                 t = t.substr(ptr - t.data());
@@ -54,7 +77,7 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
             if (!t.empty() && t.front() == '.') {
                 t = t.substr(1);
 
-                auto [ptr, ec] = from_chars(t.data(), t.data() + t.length(), fracval);
+                auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), fracval);
 
                 if (ptr == t.data() || ptr > t.data() + 7)
                     return false;
@@ -71,8 +94,10 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
             }
 
             if (t.length() >= 2 && (t[0] == 'A' || t[0] == 'a' || t[0] == 'P' || t[0] == 'p') && (t[1] == 'M' || t[1] == 'm')) {
-                if (t[0] == 'P' || t[0] == 'p')
+                if ((t[0] == 'P' || t[0] == 'p') && h < 12)
                     h += 12;
+                else if (h == 12 && (t[0] == 'A' || t[0] == 'a'))
+                    h = 0;
 
                 t = t.substr(2);
             }
@@ -84,8 +109,10 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
             s = 0;
 
             if (t.length() >= 2 && (t[0] == 'A' || t[0] == 'a' || t[0] == 'P' || t[0] == 'p') && (t[1] == 'M' || t[1] == 'm')) { // hh:mm am
-                if (t[0] == 'P' || t[0] == 'p')
+                if ((t[0] == 'P' || t[0] == 'p') && h < 12)
                     h += 12;
+                else if (h == 12 && (t[0] == 'A' || t[0] == 'a'))
+                    h = 0;
 
                 t = t.substr(2);
             }
@@ -101,8 +128,10 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
             m = 0;
             s = 0;
 
-            if (t[0] == 'P' || t[0] == 'p')
+            if ((t[0] == 'P' || t[0] == 'p') && h < 12)
                 h += 12;
+            else if (h == 12 && (t[0] == 'A' || t[0] == 'a'))
+                h = 0;
 
             t = t.substr(2);
         } else
@@ -133,7 +162,7 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
 
     uint16_t offset_hours, offset_mins;
 
-    auto fcr = from_chars(t.data(), t.data() + t.length(), offset_hours);
+    auto fcr = from_chars_constexpr(t.data(), t.data() + t.length(), offset_hours);
 
     if (fcr.ec != errc())
         return false;
@@ -168,7 +197,7 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
 
     t = t.substr(1);
 
-    fcr = from_chars(t.data(), t.data() + t.length(), offset_mins);
+    fcr = from_chars_constexpr(t.data(), t.data() + t.length(), offset_mins);
 
     if (fcr.ec != errc())
         return false;
@@ -183,6 +212,51 @@ static bool parse_time(string_view t, tds::time_t& dur, int16_t& offset) {
 
     return true;
 }
+
+static constexpr bool test_parse_time(string_view t, bool exp_valid, tds::time_t exp_dur, int16_t exp_offset) {
+    tds::time_t dur;
+    int16_t offset;
+
+    auto valid = parse_time(t, dur, offset);
+
+    if (!exp_valid)
+        return !valid;
+
+    if (!valid)
+        return false;
+
+    return dur == exp_dur && offset == exp_offset;
+}
+
+static_assert(test_parse_time("", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("12", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("not a time value", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("12 aM", true, chrono::hours{0}, 0));
+static_assert(test_parse_time("12pM", true, chrono::hours{12}, 0));
+static_assert(test_parse_time("1 am", true, chrono::hours{1}, 0));
+static_assert(test_parse_time("3 pm", true, chrono::hours{15}, 0));
+static_assert(test_parse_time("01:23:45", true, chrono::hours{1} + chrono::minutes{23} + chrono::seconds{45}, 0));
+static_assert(test_parse_time("01:23:45  PM", true, chrono::hours{13} + chrono::minutes{23} + chrono::seconds{45}, 0));
+static_assert(test_parse_time("13:45", true, chrono::hours{13} + chrono::minutes{45}, 0));
+static_assert(test_parse_time("1:45 Pm", true, chrono::hours{13} + chrono::minutes{45}, 0));
+static_assert(test_parse_time("01:23:45.67", true, chrono::hours{1} + chrono::minutes{23} + chrono::seconds{45} + tds::time_t{6700000}, 0));
+static_assert(test_parse_time("11:56:12.6789012  PM", true, chrono::hours{23} + chrono::minutes{56} + chrono::seconds{12} + tds::time_t{6789012}, 0));
+static_assert(test_parse_time("01:23:45.67890123", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("01:23:60.6789012", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("01:60:45.6789012", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("24:23:45.6789012", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("12 aM +00:00", true, chrono::hours{0}, 0));
+static_assert(test_parse_time("12pM -00:30", true, chrono::hours{12}, -30));
+static_assert(test_parse_time("1 am +01:00", true, chrono::hours{1}, 60));
+static_assert(test_parse_time("3 pm -01:30", true, chrono::hours{15}, -90));
+static_assert(test_parse_time("01:23:45 +02:00", true, chrono::hours{1} + chrono::minutes{23} + chrono::seconds{45}, 120));
+static_assert(test_parse_time("01:23:45  PM -02:30", true, chrono::hours{13} + chrono::minutes{23} + chrono::seconds{45}, -150));
+static_assert(test_parse_time("13:45  +03:00", true, chrono::hours{13} + chrono::minutes{45}, 180));
+static_assert(test_parse_time("1:45 Pm-03:30", true, chrono::hours{13} + chrono::minutes{45}, -210));
+static_assert(test_parse_time("01:23:45.67+04:00", true, chrono::hours{1} + chrono::minutes{23} + chrono::seconds{45} + tds::time_t{6700000}, 240));
+static_assert(test_parse_time("11:56:12.6789012  PM   -04:45", true, chrono::hours{23} + chrono::minutes{56} + chrono::seconds{12} + tds::time_t{6789012}, -285));
+static_assert(test_parse_time("01:23:45.6789012 +00:60", false, tds::time_t::zero(), 0));
+static_assert(test_parse_time("01:23:45.6789012 -24:00", false, tds::time_t::zero(), 0));
 
 static uint8_t parse_month_name(const string_view& sv) {
     if (sv.length() < 3 || sv.length() > 9)
