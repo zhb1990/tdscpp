@@ -259,69 +259,73 @@ static_assert(test_parse_time("11:56:12.6789012  PM   -04:45", true, chrono::hou
 static_assert(test_parse_time("01:23:45.6789012 +00:60", false, tds::time_t::zero(), 0));
 static_assert(test_parse_time("01:23:45.6789012 -24:00", false, tds::time_t::zero(), 0));
 
-static uint8_t parse_month_name(const string_view& sv) {
+template<unsigned N>
+static constexpr bool __inline same_string(const string_view& sv, const char (&str)[N]) noexcept {
+    if (sv.length() != N - 1)
+        return false;
+
+    for (unsigned int i = 0; i < N - 1; i++) {
+        if ((sv[i] | 0x20) != str[i])
+            return false;
+    }
+
+    return true;
+}
+
+static constexpr uint8_t parse_month_name(const string_view& sv) noexcept {
     if (sv.length() < 3 || sv.length() > 9)
         return 0;
 
-    string s(sv);
-
-    for (auto& c : s) {
-        if (c >= 'A' && c <= 'Z')
-            c = c - 'A' + 'a';
-        else if (c < 'a' || c > 'z')
-            return 0;
-    }
-
     if (sv.length() == 3) {
-        if (s == "jan")
+        if (same_string(sv, "jan"))
             return 1;
-        else if (s == "feb")
+        else if (same_string(sv, "feb"))
             return 2;
-        else if (s == "mar")
+        else if (same_string(sv, "mar"))
             return 3;
-        else if (s == "apr")
+        else if (same_string(sv, "apr"))
             return 4;
-        else if (s == "may")
+        else if (same_string(sv, "may"))
             return 5;
-        else if (s == "jun")
+        else if (same_string(sv, "jun"))
             return 6;
-        else if (s == "jul")
+        else if (same_string(sv, "jul"))
             return 7;
-        else if (s == "aug")
+        else if (same_string(sv, "aug"))
             return 8;
-        else if (s == "sep")
+        else if (same_string(sv, "sep"))
             return 9;
-        else if (s == "oct")
+        else if (same_string(sv, "oct"))
             return 10;
-        else if (s == "nov")
+        else if (same_string(sv, "nov"))
             return 11;
-        else if (s == "dec")
+        else if (same_string(sv, "dec"))
             return 12;
 
         return 0;
     }
 
-    if (s == "january")
+    if (same_string(sv, "january"))
         return 1;
-    else if (s == "february")
+    else if (same_string(sv, "february"))
         return 2;
-    else if (s == "march")
+    else if (same_string(sv, "march"))
         return 3;
-    else if (s == "april")
+    else if (same_string(sv, "april"))
         return 4;
-    else if (s == "june")
+    else if (same_string(sv, "june"))
         return 6;
-    else if (s == "july")
+    else if (same_string(sv, "july"))
         return 7;
-    else if (s == "august")
+    else if (same_string(sv, "august"))
         return 8;
-    else if (s == "september")
+    else if (same_string(sv, "september"))
         return 9;
-    else if (s == "october")
+    else if (same_string(sv, "october"))
         return 10;
-    else if (s == "november")
+    else if (same_string(sv, "november"))
         return 11;
-    else if (s == "december")
+    else if (same_string(sv, "december"))
         return 12;
 
     return 0;
