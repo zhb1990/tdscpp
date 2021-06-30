@@ -332,71 +332,86 @@ static constexpr uint8_t parse_month_name(const string_view& sv) noexcept {
 }
 
 static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
-    cmatch rm;
-    static const regex r1("^([0-9]{4})([\\-/]?)([0-9]{2})([\\-/]?)([0-9]{2})");
-    static const regex r2("^([0-9]{1,2})([\\-/])([0-9]{1,2})([\\-/])([0-9]{4})");
-    static const regex r3("^([0-9]{1,2})([\\-/]?)([0-9]{1,2})([\\-/]?)([0-9]{1,2})");
-    static const regex r4("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{4})");
-    static const regex r5("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{2})");
-    static const regex r6("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{4})");
-    static const regex r7("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{2})");
-    static const regex r8("^([A-Za-z]*)( ?)([0-9]{4})");
-
-    // FIXME - allow option for American-style dates?
-
-    if (regex_search(&s[0], s.data() + s.length(), rm, r1)) { // ISO style
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
-        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), d);
-    } else if (regex_search(&s[0], s.data() + s.length(), rm, r2)) { // dd/mm/yyyy
-        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-    } else if (regex_search(&s[0], s.data() + s.length(), rm, r3)) { // dd/mm/yy
-        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-
-        if (y >= 50)
-            y += 1900;
-        else
-            y += 2000;
-    } else if (regex_search(&s[0], s.data() + s.length(), rm, r4)) { // dd/mon/yyyy
-        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-        m = parse_month_name(rm[3].str());
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-    } else if (regex_search(&s[0], s.data() + s.length(), rm, r5)) { // dd/mon/yy
-        from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-        m = parse_month_name(rm[3].str());
-        from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
-
-        if (y >= 50)
-            y += 1900;
-        else
-            y += 2000;
-    } else if (regex_search(&s[0], s.data() + s.length(), rm, r6)) { // mon dd, yyyy
-        from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
-        m = parse_month_name(rm[1].str());
-        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-    } else if (regex_search(&s[0], s.data() + s.length(), rm, r7)) { // mon dd, yy
-        from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
-        m = parse_month_name(rm[1].str());
-        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-
-        if (y >= 50)
-            y += 1900;
-        else
-            y += 2000;
-    } else if (regex_search(&s[0], s.data() + s.length(), rm, r8)) { // mon yyyy
-        from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
-        m = parse_month_name(rm[1].str());
-        d = 1;
-    } else
+    if (s.empty())
         return false;
 
-    s = s.substr((size_t)rm[0].length());
+    if (s.front() >= '0' && s.front() <= '9') {
+        cmatch rm;
+        static const regex r1("^([0-9]{4})([\\-/]?)([0-9]{2})([\\-/]?)([0-9]{2})");
+        static const regex r2("^([0-9]{1,2})([\\-/])([0-9]{1,2})([\\-/])([0-9]{4})");
+        static const regex r3("^([0-9]{1,2})([\\-/]?)([0-9]{1,2})([\\-/]?)([0-9]{1,2})");
+        static const regex r4("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{4})");
+        static const regex r5("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{2})");
 
-    return true;
+        // FIXME - allow option for American-style dates?
+
+        if (regex_search(&s[0], s.data() + s.length(), rm, r1)) { // ISO style
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), d);
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r2)) { // dd/mm/yyyy
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r3)) { // dd/mm/yy
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+
+            if (y >= 50)
+                y += 1900;
+            else
+                y += 2000;
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r4)) { // dd/mon/yyyy
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+            m = parse_month_name(rm[3].str());
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r5)) { // dd/mon/yy
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+            m = parse_month_name(rm[3].str());
+            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
+
+            if (y >= 50)
+                y += 1900;
+            else
+                y += 2000;
+        } else
+            return false;
+
+        s = s.substr((size_t)rm[0].length());
+
+        return true;
+    } else if ((s.front() >= 'A' && s.front() <= 'Z') || (s.front() >= 'a' && s.front() <= 'z')) {
+        cmatch rm;
+        static const regex r6("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{4})");
+        static const regex r7("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{2})");
+        static const regex r8("^([A-Za-z]*)( ?)([0-9]{4})");
+
+        if (regex_search(&s[0], s.data() + s.length(), rm, r6)) { // mon dd, yyyy
+            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
+            m = parse_month_name(rm[1].str());
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r7)) { // mon dd, yy
+            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
+            m = parse_month_name(rm[1].str());
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+
+            if (y >= 50)
+                y += 1900;
+            else
+                y += 2000;
+        } else if (regex_search(&s[0], s.data() + s.length(), rm, r8)) { // mon yyyy
+            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
+            m = parse_month_name(rm[1].str());
+            d = 1;
+        } else
+            return false;
+
+        s = s.substr((size_t)rm[0].length());
+
+        return true;
+    } else
+        return false;
 }
 
 static constexpr bool is_valid_date(uint16_t y, uint8_t m, uint8_t d) {
