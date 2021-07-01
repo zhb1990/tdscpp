@@ -363,20 +363,88 @@ static bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8_t& d) {
     auto s = s2;
 
     if (s.front() >= '0' && s.front() <= '9') {
+        uint32_t num;
+
+        auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)8), num);
+
+        if (ptr == s.data() + 8) { // yyyymmdd
+            y = (uint16_t)(num / 10000);
+            m = (uint8_t)((num % 10000) / 100);
+            d = (uint8_t)(num % 100);
+
+            s = s.substr(8);
+            s2 = s;
+            return true;
+        } else if (ptr == s.data() + 6) { // yyyymm[\\-/]dd
+            s = s.substr(6);
+
+            if (!s.empty() && (s.front() == '-' || s.front() == '/'))
+                s = s.substr(1);
+
+            y = (uint16_t)(num / 100);
+            m = (uint8_t)(num % 100);
+
+            if (s.length() < 2)
+                return false;
+
+            auto [ptr, ec] = from_chars(s.data(), s.data() + 2, num);
+
+            if (ptr != s.data() + 2)
+                return false;
+
+            d = (uint8_t)num;
+
+            s = s.substr(2);
+            s2 = s;
+            return true;
+        } else if (ptr == s.data() + 4) { // yyyy[\\-/]mm[\\-/]dd
+            s = s.substr(4);
+
+            if (!s.empty() && (s.front() == '-' || s.front() == '/'))
+                s = s.substr(1);
+
+            y = (uint16_t)num;
+
+            if (s.length() < 2)
+                return false;
+
+            {
+                auto [ptr, ec] = from_chars(s.data(), s.data() + 2, m);
+
+                if (ptr != s.data() + 2)
+                    return false;
+            }
+
+            s = s.substr(2);
+
+            if (!s.empty() && (s.front() == '-' || s.front() == '/'))
+                s = s.substr(1);
+
+            if (s.length() < 2)
+                return false;
+
+            {
+                auto [ptr, ec] = from_chars(s.data(), s.data() + 2, d);
+
+                if (ptr != s.data() + 2)
+                    return false;
+            }
+
+            s = s.substr(2);
+            s2 = s;
+
+            return true;
+        }
+
         cmatch rm;
-        static const regex r1("^([0-9]{4})([\\-/]?)([0-9]{2})([\\-/]?)([0-9]{2})");
         static const regex r2("^([0-9]{1,2})([\\-/])([0-9]{1,2})([\\-/])([0-9]{4})");
-        static const regex r3("^([0-9]{1,2})([\\-/]?)([0-9]{1,2})([\\-/]?)([0-9]{1,2})");
+        static const regex r3("^([0-9]{1,2})([\\-/])([0-9]{1,2})([\\-/]?)([0-9]{1,2})");
         static const regex r4("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{4})");
         static const regex r5("^([0-9]{1,2})([\\-/]?)([A-Za-z]*)([\\-/]?)([0-9]{2})");
 
         // FIXME - allow option for American-style dates?
 
-        if (regex_search(&s[0], s.data() + s.length(), rm, r1)) { // ISO style
-            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
-            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), d);
-        } else if (regex_search(&s[0], s.data() + s.length(), rm, r2)) { // dd/mm/yyyy
+        if (regex_search(&s[0], s.data() + s.length(), rm, r2)) { // dd/mm/yyyy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
             from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), m);
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
