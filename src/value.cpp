@@ -356,7 +356,7 @@ static constexpr uint8_t parse_month_name(string_view& sv) noexcept {
     return 0;
 }
 
-static bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8_t& d) {
+static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8_t& d) noexcept {
     if (s2.empty())
         return false;
 
@@ -446,79 +446,54 @@ static bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8_t& d) {
 
         d = (uint8_t)num;
 
-        if (s.empty() && (s.front() == '-' || s.front() == '/'))
+        if (!s.empty() && (s.front() == '-' || s.front() == '/'))
             s = s.substr(1);
 
         if (s.empty())
             return false;
 
-        auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)2), m);
+        {
+            auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)2), m);
 
-        if (ptr == s.data()) {
-            cmatch rm;
-            static const regex r4("^([A-Za-z]*)([\\-/]?)([0-9]{4})");
-            static const regex r5("^([A-Za-z]*)([\\-/]?)([0-9]{2})");
+            if (ptr == s.data()) {
+                m = parse_month_name(s);
 
-            if (regex_search(&s[0], s.data() + s.length(), rm, r4)) { // dd/mon/yyyy
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
-                auto sv = string_view{rm[1].str()};
-                m = parse_month_name(sv);
-            } else if (regex_search(&s[0], s.data() + s.length(), rm, r5)) { // dd/mon/yy
-                from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
-                auto sv = string_view{rm[1].str()};
-                m = parse_month_name(sv);
-
-                if (y >= 50)
-                    y += 1900;
-                else
-                    y += 2000;
+                if (m == 0)
+                    return false;
             } else
-                return false;
+                s = s.substr(ptr - s.data());
+        }
 
-            s = s.substr((size_t)rm[0].length());
-            s2 = s;
+        if (!s.empty() && (s.front() == '-' || s.front() == '/'))
+            s = s.substr(1);
 
-            return true;
-        } else if (ptr == s.data() + 1 || ptr == s.data() + 2) {
-            if (ptr == s.data() + 1)
-                s = s.substr(1);
+        if (s.empty())
+            return false;
+
+        auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)4), y);
+
+        if (ptr == s.data() + 4) // dd/mm/yyyy
+            s = s.substr(4);
+        else if (ptr == s.data() + 1 || ptr == s.data() + 2) {
+            s = s.substr(ptr - s.data());
+
+            if (y >= 50)
+                y += 1900;
             else
-                s = s.substr(2);
-
-            if (s.empty() && (s.front() == '-' || s.front() == '/'))
-                s = s.substr(1);
-
-            cmatch rm;
-            static const regex r2("^([0-9]{4})");
-            static const regex r3("^([0-9]{1,2})");
-
-            // FIXME - allow option for American-style dates?
-
-            if (regex_search(&s[0], s.data() + s.length(), rm, r2)) // dd/mm/yyyy
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-            else if (regex_search(&s[0], s.data() + s.length(), rm, r3)) { // dd/mm/yy
-                from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-
-                if (y >= 50)
-                    y += 1900;
-                else
-                    y += 2000;
-            } else
-                return false;
-
-            s = s.substr((size_t)rm[0].length());
-            s2 = s;
-
-            return true;
+                y += 2000;
         } else
             return false;
+
+        s2 = s;
+
+        return true;
     } else if ((s.front() >= 'A' && s.front() <= 'Z') || (s.front() >= 'a' && s.front() <= 'z')) {
         m = parse_month_name(s);
 
         if (m == 0)
             return false;
 
-        if (s.empty() && (s.front() == '-' || s.front() == '/' || s.front() == ' '))
+        if (!s.empty() && (s.front() == '-' || s.front() == '/' || s.front() == ' '))
             s = s.substr(1);
 
         uint16_t num;
@@ -543,7 +518,7 @@ static bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8_t& d) {
 
         d = (uint8_t)num;
 
-        if (s.empty() && s.front() == ',')
+        if (!s.empty() && s.front() == ',')
             s = s.substr(1);
 
         auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)4), num);
