@@ -260,8 +260,8 @@ static_assert(test_parse_time("01:23:45.6789012 +00:60", false, tds::time_t::zer
 static_assert(test_parse_time("01:23:45.6789012 -24:00", false, tds::time_t::zero(), 0));
 
 template<unsigned N>
-static constexpr bool __inline same_string(const string_view& sv, const char (&str)[N]) noexcept {
-    if (sv.length() != N - 1)
+static constexpr bool __inline string_match(const string_view& sv, const char (&str)[N]) noexcept {
+    if (sv.length() < N - 1)
         return false;
 
     for (unsigned int i = 0; i < N - 1; i++) {
@@ -273,88 +273,93 @@ static constexpr bool __inline same_string(const string_view& sv, const char (&s
 }
 
 static constexpr uint8_t parse_month_name(string_view& sv) noexcept {
-    if (sv.length() < 3 || sv.length() > 9)
+    if (sv.length() < 3)
         return 0;
 
-    if (sv.length() == 3) {
-        if (same_string(sv, "jan")) {
-            sv = sv.substr(3);
-            return 1;
-        } else if (same_string(sv, "feb")) {
-            sv = sv.substr(3);
-            return 2;
-        } else if (same_string(sv, "mar")) {
-            sv = sv.substr(3);
-            return 3;
-        } else if (same_string(sv, "apr")) {
-            sv = sv.substr(3);
-            return 4;
-        } else if (same_string(sv, "may")) {
-            sv = sv.substr(3);
-            return 5;
-        } else if (same_string(sv, "jun")) {
-            sv = sv.substr(3);
-            return 6;
-        } else if (same_string(sv, "jul")) {
-            sv = sv.substr(3);
-            return 7;
-        } else if (same_string(sv, "aug")) {
-            sv = sv.substr(3);
-            return 8;
-        } else if (same_string(sv, "sep")) {
-            sv = sv.substr(3);
-            return 9;
-        } else if (same_string(sv, "oct")) {
-            sv = sv.substr(3);
-            return 10;
-        } else if (same_string(sv, "nov")) {
-            sv = sv.substr(3);
-            return 11;
-        } else if (same_string(sv, "dec")) {
-            sv = sv.substr(3);
-            return 12;
-        }
-
-        return 0;
-    }
-
-    if (same_string(sv, "january")) {
+    if (string_match(sv, "january")) {
         sv = sv.substr(7);
         return 1;
-    } else if (same_string(sv, "february")) {
+    } else if (string_match(sv, "february")) {
         sv = sv.substr(8);
         return 2;
-    } else if (same_string(sv, "march")) {
+    } else if (string_match(sv, "march")) {
         sv = sv.substr(5);
         return 3;
-    } else if (same_string(sv, "april")) {
+    } else if (string_match(sv, "april")) {
         sv = sv.substr(5);
         return 4;
-    } else if (same_string(sv, "june")) {
+    } else if (string_match(sv, "may")) {
+        sv = sv.substr(3);
+        return 5;
+    } else if (string_match(sv, "june")) {
         sv = sv.substr(4);
         return 6;
-    } else if (same_string(sv, "july")) {
+    } else if (string_match(sv, "july")) {
         sv = sv.substr(4);
         return 7;
-    } else if (same_string(sv, "august")) {
+    } else if (string_match(sv, "august")) {
         sv = sv.substr(6);
         return 8;
-    } else if (same_string(sv, "september")) {
+    } else if (string_match(sv, "september")) {
         sv = sv.substr(9);
         return 9;
-    } else if (same_string(sv, "october")) {
+    } else if (string_match(sv, "october")) {
         sv = sv.substr(7);
         return 10;
-    } else if (same_string(sv, "november")) {
+    } else if (string_match(sv, "november")) {
         sv = sv.substr(8);
         return 11;
-    } else if (same_string(sv, "december")) {
+    } else if (string_match(sv, "december")) {
         sv = sv.substr(8);
         return 12;
     }
 
+    if (sv.length() >= 3) {
+        if (string_match(sv, "jan")) {
+            sv = sv.substr(3);
+            return 1;
+        } else if (string_match(sv, "feb")) {
+            sv = sv.substr(3);
+            return 2;
+        } else if (string_match(sv, "mar")) {
+            sv = sv.substr(3);
+            return 3;
+        } else if (string_match(sv, "apr")) {
+            sv = sv.substr(3);
+            return 4;
+        } else if (string_match(sv, "jun")) {
+            sv = sv.substr(3);
+            return 6;
+        } else if (string_match(sv, "jul")) {
+            sv = sv.substr(3);
+            return 7;
+        } else if (string_match(sv, "aug")) {
+            sv = sv.substr(3);
+            return 8;
+        } else if (string_match(sv, "sep")) {
+            sv = sv.substr(3);
+            return 9;
+        } else if (string_match(sv, "oct")) {
+            sv = sv.substr(3);
+            return 10;
+        } else if (string_match(sv, "nov")) {
+            sv = sv.substr(3);
+            return 11;
+        } else if (string_match(sv, "dec")) {
+            sv = sv.substr(3);
+            return 12;
+        }
+    }
+
     return 0;
 }
+
+static constexpr bool test_parse_month_name(string_view s, uint8_t exp) noexcept {
+    return parse_month_name(s) == exp;
+}
+
+static_assert(test_parse_month_name("jUl", 7));
+static_assert(test_parse_month_name("JuLy", 7));
 
 static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8_t& d) noexcept {
     if (s2.empty())
@@ -366,7 +371,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
         uint32_t num;
 
         {
-            auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)8), num);
+            auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)8), num);
 
             if (ptr == s.data() + 8) { // yyyymmdd
                 y = (uint16_t)(num / 10000);
@@ -385,17 +390,18 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
                 y = (uint16_t)(num / 100);
                 m = (uint8_t)(num % 100);
 
-                if (s.length() < 2)
+                if (s.empty())
                     return false;
 
-                auto [ptr, ec] = from_chars(s.data(), s.data() + 2, num);
+                auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)2), num);
 
-                if (ptr != s.data() + 2)
+                if (ptr == s.data())
                     return false;
+
+                s = s.substr(ptr - s.data());
 
                 d = (uint8_t)num;
 
-                s = s.substr(2);
                 s2 = s;
                 return true;
             } else if (ptr == s.data() + 4) { // yyyy[\\-/]mm[\\-/]dd
@@ -406,54 +412,52 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
 
                 y = (uint16_t)num;
 
-                if (s.length() < 2)
+                if (s.empty())
                     return false;
 
                 {
-                    auto [ptr, ec] = from_chars(s.data(), s.data() + 2, m);
+                    auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)2), m);
 
-                    if (ptr != s.data() + 2)
+                    if (ptr == s.data())
                         return false;
-                }
 
-                s = s.substr(2);
+                    s = s.substr(ptr - s.data());
+                }
 
                 if (!s.empty() && (s.front() == '-' || s.front() == '/'))
                     s = s.substr(1);
 
-                if (s.length() < 2)
+                if (s.empty())
                     return false;
 
                 {
-                    auto [ptr, ec] = from_chars(s.data(), s.data() + 2, d);
+                    auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)2), d);
 
-                    if (ptr != s.data() + 2)
+                    if (ptr == s.data())
                         return false;
+
+                    s = s.substr(ptr - s.data());
                 }
 
-                s = s.substr(2);
                 s2 = s;
 
                 return true;
             } else if (ptr != s.data() + 1 && ptr != s.data() + 2)
                 return false;
 
-            if (ptr == s.data() + 1)
-                s = s.substr(1);
-            else
-                s = s.substr(2);
+            s = s.substr(ptr - s.data());
         }
 
         d = (uint8_t)num;
 
-        if (!s.empty() && (s.front() == '-' || s.front() == '/'))
+        if (!s.empty() && (s.front() == ' ' || s.front() == '-' || s.front() == '/'))
             s = s.substr(1);
 
         if (s.empty())
             return false;
 
         {
-            auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)2), m);
+            auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)2), m);
 
             if (ptr == s.data()) {
                 m = parse_month_name(s);
@@ -464,13 +468,13 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
                 s = s.substr(ptr - s.data());
         }
 
-        if (!s.empty() && (s.front() == '-' || s.front() == '/'))
+        if (!s.empty() && (s.front() == ' ' || s.front() == '-' || s.front() == '/'))
             s = s.substr(1);
 
         if (s.empty())
             return false;
 
-        auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)4), y);
+        auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)4), y);
 
         if (ptr == s.data() + 4) // dd/mm/yyyy
             s = s.substr(4);
@@ -499,7 +503,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
         uint16_t num;
 
         {
-            auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)4), num);
+            auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)4), num);
 
             if (ptr == s.data() + 4) { // mon yyyy
                 y = num;
@@ -511,25 +515,29 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
 
             if (ptr != s.data() + 1 && ptr != s.data() + 2)
                 return false;
+
+            s = s.substr(ptr - s.data());
         }
-
-        if (num > 31)
-            return false;
-
-        d = (uint8_t)num;
 
         if (!s.empty() && s.front() == ',')
             s = s.substr(1);
 
-        auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)4), num);
+        if (!s.empty() && (s.front() == '-' || s.front() == '/' || s.front() == ' '))
+            s = s.substr(1);
+
+        uint16_t num2;
+
+        auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)4), num2);
 
         if (ptr == s.data() + 4) { // mon dd, yyyy
-            y = num;
+            y = num2;
+            d = (uint8_t)num;
             s = s.substr(4);
             s2 = s;
             return true;
         } else if (ptr == s.data() + 2) { // mon dd, yy
-            y = num;
+            y = num2;
+            d = (uint8_t)num;
 
             if (y >= 50)
                 y += 1900;
@@ -539,11 +547,118 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
             s = s.substr(2);
             s2 = s;
             return true;
-        } else
-            return false;
+        } else { // mon yy
+            y = num;
+            d = 1;
+
+            if (y >= 50)
+                y += 1900;
+            else
+                y += 2000;
+
+            return true;
+        }
     } else
         return false;
 }
+
+static constexpr bool test_parse_date(string_view s, bool exp_valid, uint16_t exp_y, uint8_t exp_m, uint8_t exp_d) noexcept {
+    uint16_t y;
+    uint8_t m, d;
+    bool valid;
+
+    valid = parse_date(s, y, m, d);
+
+    if (!valid)
+        return !exp_valid;
+
+    return y == exp_y && m == exp_m && d == exp_d;
+}
+
+static_assert(test_parse_date("not a date", false, 0, 0, 0));
+static_assert(test_parse_date("", false, 0, 0, 0));
+static_assert(test_parse_date("2021-07-01", true, 2021, 7, 1));
+static_assert(test_parse_date("2021/07/01", true, 2021, 7, 1));
+static_assert(test_parse_date("20210701", true, 2021, 7, 1));
+static_assert(test_parse_date("2021-7-1", true, 2021, 7, 1));
+static_assert(test_parse_date("2021-7-01", true, 2021, 7, 1));
+static_assert(test_parse_date("2021-07-1", true, 2021, 7, 1));
+static_assert(test_parse_date("2021-0701", true, 2021, 7, 1));
+static_assert(test_parse_date("202107-01", true, 2021, 7, 1));
+static_assert(test_parse_date("202107-1", true, 2021, 7, 1));
+static_assert(test_parse_date("2021/7/1", true, 2021, 7, 1));
+static_assert(test_parse_date("2021/7/01", true, 2021, 7, 1));
+static_assert(test_parse_date("2021/07/1", true, 2021, 7, 1));
+static_assert(test_parse_date("2021/0701", true, 2021, 7, 1));
+static_assert(test_parse_date("202107/01", true, 2021, 7, 1));
+static_assert(test_parse_date("1/7/21", true, 2021, 7, 1));
+static_assert(test_parse_date("01/7/21", true, 2021, 7, 1));
+static_assert(test_parse_date("1/07/21", true, 2021, 7, 1));
+static_assert(test_parse_date("01/07/21", true, 2021, 7, 1));
+static_assert(test_parse_date("01-07-21", true, 2021, 7, 1));
+static_assert(test_parse_date("1/7/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01/7/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("1/07/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01/07/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01-07-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("1/jUl/21", true, 2021, 7, 1));
+static_assert(test_parse_date("01/jUl/21", true, 2021, 7, 1));
+static_assert(test_parse_date("1-jUl-21", true, 2021, 7, 1));
+static_assert(test_parse_date("01-jUl-21", true, 2021, 7, 1));
+static_assert(test_parse_date("1 jUl 21", true, 2021, 7, 1));
+static_assert(test_parse_date("01 jUl 21", true, 2021, 7, 1));
+static_assert(test_parse_date("1/JuLy/21", true, 2021, 7, 1));
+static_assert(test_parse_date("01/JuLy/21", true, 2021, 7, 1));
+static_assert(test_parse_date("01-JuLy-21", true, 2021, 7, 1));
+static_assert(test_parse_date("1-JuLy-21", true, 2021, 7, 1));
+static_assert(test_parse_date("01-JuLy-21", true, 2021, 7, 1));
+static_assert(test_parse_date("1 JuLy 21", true, 2021, 7, 1));
+static_assert(test_parse_date("01 JuLy 21", true, 2021, 7, 1));
+static_assert(test_parse_date("1/jUl/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01/jUl/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("1-jUl-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01-jUl-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("1 jUl 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01 jUl 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("1/JuLy/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01/JuLy/2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01-JuLy-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("1-JuLy-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01-JuLy-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("1 JuLy 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("01 JuLy 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUL 21", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy 21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUL 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy 1,2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy 1 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy1-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy1,2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy-1,2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy-1-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy-1,-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl 1,2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl 1 2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl1-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl1,2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl-1,2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl-1-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl-1,-2021", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy 1,21", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy 1 21", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy1-21", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy1,21", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy-1,21", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy-1-21", true, 2021, 7, 1));
+static_assert(test_parse_date("JuLy-1,-21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl 1,21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl 1 21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl1-21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl1,21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl-1,21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl-1-21", true, 2021, 7, 1));
+static_assert(test_parse_date("jUl-1,-21", true, 2021, 7, 1));
 
 static constexpr bool is_valid_date(uint16_t y, uint8_t m, uint8_t d) {
     if (y == 0 || m == 0 || d == 0)
