@@ -272,61 +272,86 @@ static constexpr bool __inline same_string(const string_view& sv, const char (&s
     return true;
 }
 
-static constexpr uint8_t parse_month_name(const string_view& sv) noexcept {
+static constexpr uint8_t parse_month_name(string_view& sv) noexcept {
     if (sv.length() < 3 || sv.length() > 9)
         return 0;
 
     if (sv.length() == 3) {
-        if (same_string(sv, "jan"))
+        if (same_string(sv, "jan")) {
+            sv = sv.substr(3);
             return 1;
-        else if (same_string(sv, "feb"))
+        } else if (same_string(sv, "feb")) {
+            sv = sv.substr(3);
             return 2;
-        else if (same_string(sv, "mar"))
+        } else if (same_string(sv, "mar")) {
+            sv = sv.substr(3);
             return 3;
-        else if (same_string(sv, "apr"))
+        } else if (same_string(sv, "apr")) {
+            sv = sv.substr(3);
             return 4;
-        else if (same_string(sv, "may"))
+        } else if (same_string(sv, "may")) {
+            sv = sv.substr(3);
             return 5;
-        else if (same_string(sv, "jun"))
+        } else if (same_string(sv, "jun")) {
+            sv = sv.substr(3);
             return 6;
-        else if (same_string(sv, "jul"))
+        } else if (same_string(sv, "jul")) {
+            sv = sv.substr(3);
             return 7;
-        else if (same_string(sv, "aug"))
+        } else if (same_string(sv, "aug")) {
+            sv = sv.substr(3);
             return 8;
-        else if (same_string(sv, "sep"))
+        } else if (same_string(sv, "sep")) {
+            sv = sv.substr(3);
             return 9;
-        else if (same_string(sv, "oct"))
+        } else if (same_string(sv, "oct")) {
+            sv = sv.substr(3);
             return 10;
-        else if (same_string(sv, "nov"))
+        } else if (same_string(sv, "nov")) {
+            sv = sv.substr(3);
             return 11;
-        else if (same_string(sv, "dec"))
+        } else if (same_string(sv, "dec")) {
+            sv = sv.substr(3);
             return 12;
+        }
 
         return 0;
     }
 
-    if (same_string(sv, "january"))
+    if (same_string(sv, "january")) {
+        sv = sv.substr(7);
         return 1;
-    else if (same_string(sv, "february"))
+    } else if (same_string(sv, "february")) {
+        sv = sv.substr(8);
         return 2;
-    else if (same_string(sv, "march"))
+    } else if (same_string(sv, "march")) {
+        sv = sv.substr(5);
         return 3;
-    else if (same_string(sv, "april"))
+    } else if (same_string(sv, "april")) {
+        sv = sv.substr(5);
         return 4;
-    else if (same_string(sv, "june"))
+    } else if (same_string(sv, "june")) {
+        sv = sv.substr(4);
         return 6;
-    else if (same_string(sv, "july"))
+    } else if (same_string(sv, "july")) {
+        sv = sv.substr(4);
         return 7;
-    else if (same_string(sv, "august"))
+    } else if (same_string(sv, "august")) {
+        sv = sv.substr(6);
         return 8;
-    else if (same_string(sv, "september"))
+    } else if (same_string(sv, "september")) {
+        sv = sv.substr(9);
         return 9;
-    else if (same_string(sv, "october"))
+    } else if (same_string(sv, "october")) {
+        sv = sv.substr(7);
         return 10;
-    else if (same_string(sv, "november"))
+    } else if (same_string(sv, "november")) {
+        sv = sv.substr(8);
         return 11;
-    else if (same_string(sv, "december"))
+    } else if (same_string(sv, "december")) {
+        sv = sv.substr(8);
         return 12;
+    }
 
     return 0;
 }
@@ -364,11 +389,13 @@ static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
                 y += 2000;
         } else if (regex_search(&s[0], s.data() + s.length(), rm, r4)) { // dd/mon/yyyy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-            m = parse_month_name(rm[3].str());
+            auto sv = string_view{rm[3].str()};
+            m = parse_month_name(sv);
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
         } else if (regex_search(&s[0], s.data() + s.length(), rm, r5)) { // dd/mon/yy
             from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-            m = parse_month_name(rm[3].str());
+            auto sv = string_view{rm[3].str()};
+            m = parse_month_name(sv);
             from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), d);
 
             if (y >= 50)
@@ -382,27 +409,29 @@ static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
 
         return true;
     } else if ((s.front() >= 'A' && s.front() <= 'Z') || (s.front() >= 'a' && s.front() <= 'z')) {
+        m = parse_month_name(s);
+
+        if (m == 0)
+            return false;
+
         cmatch rm;
-        static const regex r6("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{4})");
-        static const regex r7("^([A-Za-z]*)([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{2})");
-        static const regex r8("^([A-Za-z]*)( ?)([0-9]{4})");
+        static const regex r6("^([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{4})");
+        static const regex r7("^([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{2})");
+        static const regex r8("^( ?)([0-9]{4})");
 
         if (regex_search(&s[0], s.data() + s.length(), rm, r6)) { // mon dd, yyyy
-            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
-            m = parse_month_name(rm[1].str());
-            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), d);
         } else if (regex_search(&s[0], s.data() + s.length(), rm, r7)) { // mon dd, yy
-            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), y);
-            m = parse_month_name(rm[1].str());
-            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
+            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
+            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), d);
 
             if (y >= 50)
                 y += 1900;
             else
                 y += 2000;
         } else if (regex_search(&s[0], s.data() + s.length(), rm, r8)) { // mon yyyy
-            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), y);
-            m = parse_month_name(rm[1].str());
+            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), y);
             d = 1;
         } else
             return false;
