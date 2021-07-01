@@ -15,7 +15,6 @@
 #include <list>
 #include <map>
 #include <charconv>
-#include <regex>
 #include <fmt/format.h>
 #include <sys/types.h>
 
