@@ -356,9 +356,11 @@ static constexpr uint8_t parse_month_name(string_view& sv) noexcept {
     return 0;
 }
 
-static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
-    if (s.empty())
+static bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8_t& d) {
+    if (s2.empty())
         return false;
+
+    auto s = s2;
 
     if (s.front() >= '0' && s.front() <= '9') {
         cmatch rm;
@@ -406,6 +408,7 @@ static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
             return false;
 
         s = s.substr((size_t)rm[0].length());
+        s2 = s;
 
         return true;
     } else if ((s.front() >= 'A' && s.front() <= 'Z') || (s.front() >= 'a' && s.front() <= 'z')) {
@@ -414,31 +417,54 @@ static bool parse_date(string_view& s, uint16_t& y, uint8_t& m, uint8_t& d) {
         if (m == 0)
             return false;
 
-        cmatch rm;
-        static const regex r6("^([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{4})");
-        static const regex r7("^([\\-/ ]?)([0-9]{1,2})(,?)([\\-/ ])([0-9]{2})");
-        static const regex r8("^( ?)([0-9]{4})");
+        if (s.empty() && (s.front() == '-' || s.front() == '/' || s.front() == ' '))
+            s = s.substr(1);
 
-        if (regex_search(&s[0], s.data() + s.length(), rm, r6)) { // mon dd, yyyy
-            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), d);
-        } else if (regex_search(&s[0], s.data() + s.length(), rm, r7)) { // mon dd, yy
-            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), y);
-            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), d);
+        uint16_t num;
+
+        {
+            auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)4), num);
+
+            if (ptr == s.data() + 4) { // mon yyyy
+                y = num;
+                d = 1;
+                s = s.substr(4);
+                s2 = s;
+                return true;
+            }
+
+            if (ptr != s.data() + 1 && ptr != s.data() + 2)
+                return false;
+        }
+
+        if (num > 31)
+            return false;
+
+        d = (uint8_t)num;
+
+        if (s.empty() && s.front() == ',')
+            s = s.substr(1);
+
+        auto [ptr, ec] = from_chars(s.data(), s.data() + min(s.length(), (size_t)4), num);
+
+        if (ptr == s.data() + 4) { // mon dd, yyyy
+            y = num;
+            s = s.substr(4);
+            s2 = s;
+            return true;
+        } else if (ptr == s.data() + 2) { // mon dd, yy
+            y = num;
 
             if (y >= 50)
                 y += 1900;
             else
                 y += 2000;
-        } else if (regex_search(&s[0], s.data() + s.length(), rm, r8)) { // mon yyyy
-            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), y);
-            d = 1;
+
+            s = s.substr(2);
+            s2 = s;
+            return true;
         } else
             return false;
-
-        s = s.substr((size_t)rm[0].length());
-
-        return true;
     } else
         return false;
 }
