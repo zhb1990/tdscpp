@@ -778,39 +778,80 @@ static_assert(!is_valid_date(2000, 13, 1));
 static_assert(!is_valid_date(2000, 12, 32));
 static_assert(!is_valid_date(2000, 6, 31));
 
-static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, tds::time_t& dur) {
-    {
-        cmatch rm;
-        uint8_t h, min, s;
-        static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]{1,7}))?(Z|([+\\-][0-9]{2}:[0-9]{2}))?$");
+static constexpr bool __inline is_digit(char c) noexcept {
+    return c >= '0' && c <= '9';
+}
 
-        if (regex_match(&t[0], t.data() + t.length(), rm, iso_date)) {
-            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
-            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-            from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
-            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
-            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
+static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, tds::time_t& dur) noexcept {
+    // ISO date
+    if (t.length() >= 19 && is_digit(t[0]) && is_digit(t[1]) && is_digit(t[2]) && is_digit(t[3]) &&
+        t[4] == '-' && is_digit(t[5]) && is_digit(t[6]) && t[7] == '-' && is_digit(t[8]) &&
+        is_digit(t[9]) && t[10] == 'T' && is_digit(t[11]) && is_digit(t[12]) && t[13] == ':' &&
+        is_digit(t[14]) && is_digit(t[15]) && t[16] == ':' && is_digit(t[17]) && is_digit(t[18])) {
+        uint8_t h, mins, s;
 
-            if (!is_valid_date(y, mon, d) || h >= 24 || min >= 60 || s >= 60)
+        from_chars(&t[0], &t[4], y);
+        from_chars(&t[5], &t[7], mon);
+        from_chars(&t[8], &t[10], d);
+        from_chars(&t[11], &t[13], h);
+        from_chars(&t[14], &t[16], mins);
+        from_chars(&t[17], &t[19], s);
+
+        if (!is_valid_date(y, mon, d) || h >= 24 || mins >= 60 || s >= 60)
+            return false;
+
+        t = t.substr(19);
+
+        dur = chrono::hours{h} + chrono::minutes{mins} + chrono::seconds{s};
+
+        if (t.empty())
+            return true;
+
+        if (t[0] == '.') {
+            uint32_t v;
+
+            t = t.substr(1);
+
+            if (t.empty())
+                return true;
+
+            auto [ptr, ec] = from_chars(t.data(), t.data() + min(t.length(), (size_t)7), v);
+
+            auto fraclen = ptr - t.data();
+
+            if (fraclen == 0)
                 return false;
 
-            dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
+            t = t.substr(fraclen);
 
-            if (rm[8].length() != 0) {
-                uint32_t v;
-
-                from_chars(rm[8].str().data(), rm[8].str().data() + rm[8].length(), v);
-
-                for (auto i = rm[8].length(); i < 7; i++) {
-                    v *= 10;
-                }
-
-                dur += tds::time_t{v};
+            for (auto i = fraclen; i < 7; i++) {
+                v *= 10;
             }
 
-            return true;
+            if (!t.empty() && is_digit(t[0]))
+                return false;
+
+            dur += tds::time_t{v};
+
+            if (t.empty())
+                return true;
         }
+
+        if (t.length() == 1 && t[0] == 'Z')
+            return true;
+
+        if (t[0] != '+' && t[0] != '-')
+            return false;
+
+        t = t.substr(1);
+
+        if (t.length() < 5)
+            return false;
+
+        if (!is_digit(t[0]) || !is_digit(t[1]) || t[2] != ':' || !is_digit(t[3]) || !is_digit(t[4]))
+            return false;
+
+        return true;
     }
 
     if (parse_date(t, y, mon, d)) {
