@@ -373,7 +373,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
         {
             auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)8), num);
 
-            if (ptr == s.data() + 8) { // yyyymmdd
+            if (s.length() >= 8 && ptr == s.data() + 8) { // yyyymmdd
                 y = (uint16_t)(num / 10000);
                 m = (uint8_t)((num % 10000) / 100);
                 d = (uint8_t)(num % 100);
@@ -381,7 +381,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
                 s = s.substr(8);
                 s2 = s;
                 return true;
-            } else if (ptr == s.data() + 6) { // yyyymm[\\-/]dd
+            } else if (s.length() >= 6 && ptr == s.data() + 6) { // yyyymm[\\-/]dd
                 s = s.substr(6);
 
                 if (!s.empty() && (s.front() == '-' || s.front() == '/'))
@@ -404,7 +404,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
 
                 s2 = s;
                 return true;
-            } else if (ptr == s.data() + 4) { // yyyy[\\-/]mm[\\-/]dd
+            } else if (s.length() >= 4 && ptr == s.data() + 4) { // yyyy[\\-/]mm[\\-/]dd
                 s = s.substr(4);
 
                 if (!s.empty() && (s.front() == '-' || s.front() == '/'))
@@ -442,7 +442,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
                 s2 = s;
 
                 return true;
-            } else if (ptr != s.data() + 1 && ptr != s.data() + 2)
+            } else if (s.length() < 2 || (ptr != s.data() + 1 && ptr != s.data() + 2))
                 return false;
 
             s = s.substr(ptr - s.data());
@@ -476,9 +476,9 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
 
         auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)4), y);
 
-        if (ptr == s.data() + 4) // dd/mm/yyyy
+        if (s.length() >= 4 && ptr == s.data() + 4) // dd/mm/yyyy
             s = s.substr(4);
-        else if (ptr == s.data() + 1 || ptr == s.data() + 2) {
+        else if ((s.length() >= 1 && ptr == s.data() + 1) || (s.length() >= 2 && ptr == s.data() + 2)) {
             s = s.substr(ptr - s.data());
 
             if (y >= 50)
@@ -505,7 +505,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
         {
             auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)4), num);
 
-            if (ptr == s.data() + 4) { // mon yyyy
+            if (s.length() >= 4 && ptr == s.data() + 4) { // mon yyyy
                 y = num;
                 d = 1;
                 s = s.substr(4);
@@ -513,7 +513,7 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
                 return true;
             }
 
-            if (ptr != s.data() + 1 && ptr != s.data() + 2)
+            if (s.length() < 2 || (ptr != s.data() + 1 && ptr != s.data() + 2))
                 return false;
 
             s = s.substr(ptr - s.data());
@@ -529,13 +529,13 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
 
         auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)4), num2);
 
-        if (ptr == s.data() + 4) { // mon dd, yyyy
+        if (s.length() >= 4 && ptr == s.data() + 4) { // mon dd, yyyy
             y = num2;
             d = (uint8_t)num;
             s = s.substr(4);
             s2 = s;
             return true;
-        } else if (ptr == s.data() + 2) { // mon dd, yy
+        } else if (s.length() >= 2 && ptr == s.data() + 2) { // mon dd, yy
             y = num2;
             d = (uint8_t)num;
 
