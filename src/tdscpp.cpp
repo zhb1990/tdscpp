@@ -135,6 +135,1144 @@ struct fmt::formatter<enum tds::token> {
     }
 };
 
+static size_t fixed_len_size(enum tds::sql_type type) {
+    switch (type) {
+        case tds::sql_type::TINYINT:
+            return 1;
+
+        case tds::sql_type::SMALLINT:
+            return 2;
+
+        case tds::sql_type::INT:
+            return 4;
+
+        case tds::sql_type::BIGINT:
+            return 8;
+
+        case tds::sql_type::DATETIME:
+            return 8;
+
+        case tds::sql_type::DATETIM4:
+            return 4;
+
+        case tds::sql_type::SMALLMONEY:
+            return 4;
+
+        case tds::sql_type::MONEY:
+            return 8;
+
+        case tds::sql_type::REAL:
+            return 4;
+
+        case tds::sql_type::FLOAT:
+            return 8;
+
+        case tds::sql_type::BIT:
+            return 1;
+
+        case tds::sql_type::SQL_NULL:
+            return 0;
+
+        default:
+            return 0;
+    }
+}
+
+static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, string_view& sv) {
+    switch (type) {
+        case tds::sql_type::SQL_NULL:
+        case tds::sql_type::TINYINT:
+        case tds::sql_type::BIT:
+        case tds::sql_type::SMALLINT:
+        case tds::sql_type::INT:
+        case tds::sql_type::DATETIM4:
+        case tds::sql_type::REAL:
+        case tds::sql_type::MONEY:
+        case tds::sql_type::DATETIME:
+        case tds::sql_type::FLOAT:
+        case tds::sql_type::SMALLMONEY:
+        case tds::sql_type::BIGINT:
+        {
+            auto len = fixed_len_size(type);
+
+            if (sv.length() < len)
+                return false;
+
+            sv = sv.substr(len);
+
+            break;
+        }
+
+        case tds::sql_type::UNIQUEIDENTIFIER:
+        case tds::sql_type::INTN:
+        case tds::sql_type::DECIMAL:
+        case tds::sql_type::NUMERIC:
+        case tds::sql_type::BITN:
+        case tds::sql_type::FLTN:
+        case tds::sql_type::MONEYN:
+        case tds::sql_type::DATETIMN:
+        case tds::sql_type::DATE:
+        case tds::sql_type::TIME:
+        case tds::sql_type::DATETIME2:
+        case tds::sql_type::DATETIMEOFFSET:
+        {
+            if (sv.length() < sizeof(uint8_t))
+                return false;
+
+            auto len = *(uint8_t*)sv.data();
+
+            sv = sv.substr(1);
+
+            if (sv.length() < len)
+                return false;
+
+            sv = sv.substr(len);
+
+            break;
+        }
+
+        case tds::sql_type::VARCHAR:
+        case tds::sql_type::NVARCHAR:
+        case tds::sql_type::VARBINARY:
+        case tds::sql_type::CHAR:
+        case tds::sql_type::NCHAR:
+        case tds::sql_type::BINARY:
+        case tds::sql_type::XML:
+            if (max_length == 0xffff || type == tds::sql_type::XML) {
+                if (sv.length() < sizeof(uint64_t))
+                    return false;
+
+                auto len = *(uint64_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint64_t));
+
+                if (len == 0xffffffffffffffff)
+                    return true;
+
+                do {
+                    if (sv.length() < sizeof(uint32_t))
+                        return false;
+
+                    auto chunk_len = *(uint32_t*)sv.data();
+
+                    sv = sv.substr(sizeof(uint32_t));
+
+                    if (chunk_len == 0)
+                        break;
+
+                    if (sv.length() < chunk_len)
+                        return false;
+
+                    sv = sv.substr(chunk_len);
+                } while (true);
+            } else {
+                if (sv.length() < sizeof(uint16_t))
+                    return false;
+
+                auto len = *(uint16_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint16_t));
+
+                if (len == 0xffff)
+                    return true;
+
+                if (sv.length() < len)
+                    return false;
+
+                sv = sv.substr(len);
+            }
+
+            break;
+
+        case tds::sql_type::SQL_VARIANT:
+        {
+            if (sv.length() < sizeof(uint32_t))
+                return false;
+
+            auto len = *(uint32_t*)sv.data();
+
+            sv = sv.substr(sizeof(uint32_t));
+
+            if (len == 0xffffffff)
+                return true;
+
+            if (sv.length() < len)
+                return false;
+
+            sv = sv.substr(len);
+
+            break;
+        }
+
+        case tds::sql_type::IMAGE:
+        case tds::sql_type::NTEXT:
+        case tds::sql_type::TEXT:
+        {
+            // text pointer
+
+            if (sv.length() < sizeof(uint8_t))
+                return false;
+
+            auto textptrlen = (uint8_t)sv[0];
+
+            sv = sv.substr(1);
+
+            if (sv.length() < textptrlen)
+                return false;
+
+            sv = sv.substr(textptrlen);
+
+            if (textptrlen != 0) {
+                // timestamp
+
+                if (sv.length() < 8)
+                    return false;
+
+                sv = sv.substr(8);
+
+                // data
+
+                if (sv.length() < sizeof(uint32_t))
+                    return false;
+
+                auto len = *(uint32_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint32_t));
+
+                if (sv.length() < len)
+                    return false;
+
+                sv = sv.substr(len);
+            }
+
+            break;
+        }
+
+        default:
+            throw formatted_error("Unhandled type {} in ROW message.", type);
+    }
+
+    return true;
+}
+
+static constexpr bool is_byte_len_type(enum tds::sql_type type) noexcept {
+    switch (type) {
+        case tds::sql_type::UNIQUEIDENTIFIER:
+        case tds::sql_type::INTN:
+        case tds::sql_type::DECIMAL:
+        case tds::sql_type::NUMERIC:
+        case tds::sql_type::BITN:
+        case tds::sql_type::FLTN:
+        case tds::sql_type::MONEYN:
+        case tds::sql_type::DATETIMN:
+        case tds::sql_type::DATE:
+        case tds::sql_type::TIME:
+        case tds::sql_type::DATETIME2:
+        case tds::sql_type::DATETIMEOFFSET:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::column>& buf_columns) {
+    while (!sv.empty()) {
+        auto type = (tds::token)sv[0];
+
+        switch (type) {
+            case tds::token::TABNAME:
+            case tds::token::COLINFO:
+            case tds::token::ORDER:
+            case tds::token::TDS_ERROR:
+            case tds::token::INFO:
+            case tds::token::LOGINACK:
+            case tds::token::ENVCHANGE:
+            case tds::token::SSPI: {
+                if (sv.length() < 1 + sizeof(uint16_t))
+                    return;
+
+                auto len = *(uint16_t*)&sv[1];
+
+                if (sv.length() < (size_t)(1 + sizeof(uint16_t) + len))
+                    return;
+
+                tokens.emplace_back(sv.substr(0, 1 + sizeof(uint16_t) + len));
+                sv = sv.substr(1 + sizeof(uint16_t) + len);
+
+                break;
+            }
+
+            case tds::token::DONE:
+            case tds::token::DONEPROC:
+            case tds::token::DONEINPROC:
+                if (sv.length() < 1 + sizeof(tds_done_msg))
+                    return;
+
+                tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_done_msg)));
+                sv = sv.substr(1 + sizeof(tds_done_msg));
+            break;
+
+            case tds::token::COLMETADATA: {
+                if (sv.length() < 5)
+                    return;
+
+                auto num_columns = *(uint16_t*)&sv[1];
+
+                if (num_columns == 0) {
+                    buf_columns.clear();
+                    tokens.emplace_back(sv.substr(0, 5));
+                    sv = sv.substr(5);
+                    continue;
+                }
+
+                vector<tds::column> cols;
+
+                cols.reserve(num_columns);
+
+                string_view sv2 = sv;
+
+                sv2 = sv2.substr(1 + sizeof(uint16_t));
+
+                for (unsigned int i = 0; i < num_columns; i++) {
+                    if (sv2.length() < sizeof(tds::tds_colmetadata_col))
+                        return;
+
+                    cols.emplace_back();
+
+                    auto& col = cols.back();
+
+                    auto& c = *(tds::tds_colmetadata_col*)&sv2[0];
+
+                    col.type = c.type;
+
+                    sv2 = sv2.substr(sizeof(tds::tds_colmetadata_col));
+
+                    switch (c.type) {
+                        case tds::sql_type::SQL_NULL:
+                        case tds::sql_type::TINYINT:
+                        case tds::sql_type::BIT:
+                        case tds::sql_type::SMALLINT:
+                        case tds::sql_type::INT:
+                        case tds::sql_type::DATETIM4:
+                        case tds::sql_type::REAL:
+                        case tds::sql_type::MONEY:
+                        case tds::sql_type::DATETIME:
+                        case tds::sql_type::FLOAT:
+                        case tds::sql_type::SMALLMONEY:
+                        case tds::sql_type::BIGINT:
+                        case tds::sql_type::DATE:
+                            // nop
+                        break;
+
+                        case tds::sql_type::INTN:
+                        case tds::sql_type::FLTN:
+                        case tds::sql_type::TIME:
+                        case tds::sql_type::DATETIME2:
+                        case tds::sql_type::DATETIMN:
+                        case tds::sql_type::DATETIMEOFFSET:
+                        case tds::sql_type::BITN:
+                        case tds::sql_type::MONEYN:
+                        case tds::sql_type::UNIQUEIDENTIFIER:
+                            if (sv2.length() < sizeof(uint8_t))
+                                return;
+
+                            col.max_length = *(uint8_t*)sv2.data();
+
+                            sv2 = sv2.substr(1);
+                        break;
+
+                        case tds::sql_type::VARCHAR:
+                        case tds::sql_type::NVARCHAR:
+                        case tds::sql_type::CHAR:
+                        case tds::sql_type::NCHAR:
+                            if (sv2.length() < sizeof(uint16_t) + sizeof(tds::collation))
+                                return;
+
+                            col.max_length = *(uint16_t*)sv2.data();
+
+                            sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds::collation));
+                        break;
+
+                        case tds::sql_type::VARBINARY:
+                        case tds::sql_type::BINARY:
+                            if (sv2.length() < sizeof(uint16_t))
+                                return;
+
+                            col.max_length = *(uint16_t*)sv2.data();
+
+                            sv2 = sv2.substr(sizeof(uint16_t));
+                        break;
+
+                        case tds::sql_type::XML:
+                            if (sv2.length() < sizeof(uint8_t))
+                                return;
+
+                            sv2 = sv2.substr(sizeof(uint8_t));
+                        break;
+
+                        case tds::sql_type::DECIMAL:
+                        case tds::sql_type::NUMERIC:
+                            if (sv2.length() < 1)
+                                return;
+
+                            col.max_length = *(uint8_t*)sv2.data();
+
+                            sv2 = sv2.substr(1);
+
+                            if (sv2.length() < 2)
+                                return;
+
+                            sv2 = sv2.substr(2);
+                        break;
+
+                        case tds::sql_type::SQL_VARIANT:
+                            if (sv2.length() < sizeof(uint32_t))
+                                return;
+
+                            col.max_length = *(uint32_t*)sv2.data();
+
+                            sv2 = sv2.substr(sizeof(uint32_t));
+                        break;
+
+                        case tds::sql_type::IMAGE:
+                        case tds::sql_type::NTEXT:
+                        case tds::sql_type::TEXT:
+                        {
+                            if (sv2.length() < sizeof(uint32_t))
+                                return;
+
+                            col.max_length = *(uint32_t*)sv2.data();
+
+                            sv2 = sv2.substr(sizeof(uint32_t));
+
+                            if (c.type == tds::sql_type::TEXT || c.type == tds::sql_type::NTEXT) {
+                                if (sv2.length() < sizeof(tds::collation))
+                                    return;
+
+                                sv2 = sv2.substr(sizeof(tds::collation));
+                            }
+
+                            if (sv2.length() < 1)
+                                return;
+
+                            auto num_parts = (uint8_t)sv2[0];
+
+                            sv2 = sv2.substr(1);
+
+                            for (uint8_t j = 0; j < num_parts; j++) {
+                                if (sv2.length() < sizeof(uint16_t))
+                                    return;
+
+                                auto partlen = *(uint16_t*)sv2.data();
+
+                                sv2 = sv2.substr(sizeof(uint16_t));
+
+                                if (sv2.length() < partlen * sizeof(char16_t))
+                                    return;
+
+                                sv2 = sv2.substr(partlen * sizeof(char16_t));
+                            }
+
+                            break;
+                        }
+
+                        default:
+                            throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
+                    }
+
+                    if (sv2.length() < 1)
+                        return;
+
+                    auto name_len = (uint8_t)sv2[0];
+
+                    sv2 = sv2.substr(1);
+
+                    if (sv2.length() < name_len * sizeof(char16_t))
+                        return;
+
+                    sv2 = sv2.substr(name_len * sizeof(char16_t));
+                }
+
+                auto len = (size_t)(sv2.data() - sv.data());
+
+                tokens.emplace_back(sv.substr(0, len));
+                sv = sv.substr(len);
+
+                buf_columns = cols;
+
+                break;
+            }
+
+            case tds::token::ROW: {
+                auto sv2 = sv.substr(1);
+
+                for (unsigned int i = 0; i < buf_columns.size(); i++) {
+                    if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
+                        return;
+                }
+
+                auto len = (size_t)(sv2.data() - sv.data());
+
+                tokens.emplace_back(sv.substr(0, len));
+                sv = sv.substr(len);
+
+                break;
+            }
+
+            case tds::token::NBCROW:
+            {
+                if (buf_columns.empty())
+                    break;
+
+                auto sv2 = sv.substr(1);
+
+                auto bitset_length = (buf_columns.size() + 7) / 8;
+
+                if (sv2.length() < bitset_length)
+                    return;
+
+                string_view bitset(sv2.data(), bitset_length);
+                auto bsv = (uint8_t)bitset[0];
+
+                sv2 = sv2.substr(bitset_length);
+
+                for (unsigned int i = 0; i < buf_columns.size(); i++) {
+                    if (i != 0) {
+                        if ((i & 7) == 0) {
+                            bitset = bitset.substr(1);
+                            bsv = (uint8_t)bitset[0];
+                        } else
+                            bsv >>= 1;
+                    }
+
+                    if (!(bsv & 1)) { // not NULL
+                        if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
+                            return;
+                    }
+                }
+
+                auto len = (size_t)(sv2.data() - sv.data());
+
+                tokens.emplace_back(sv.substr(0, len));
+                sv = sv.substr(len);
+
+                break;
+            }
+
+            case tds::token::RETURNSTATUS:
+            {
+                if (sv.length() < 1 + sizeof(int32_t))
+                    return;
+
+                tokens.emplace_back(sv.substr(0, 1 + sizeof(int32_t)));
+                sv = sv.substr(1 + sizeof(int32_t));
+
+                break;
+            }
+
+            case tds::token::RETURNVALUE:
+            {
+                auto h = (tds_return_value*)&sv[1];
+
+                if (sv.length() < 1 + sizeof(tds_return_value))
+                    return;
+
+                // FIXME - param name
+
+                if (is_byte_len_type(h->type)) {
+                    uint8_t len;
+
+                    if (sv.length() < 1 + sizeof(tds_return_value) + 2)
+                        return;
+
+                    len = *((uint8_t*)&sv[1] + sizeof(tds_return_value) + 1);
+
+                    if (sv.length() < 1 + sizeof(tds_return_value) + 2 + len)
+                        return;
+
+                    tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_return_value) + 2 + len));
+                    sv = sv.substr(1 + sizeof(tds_return_value) + 2 + len);
+                } else
+                    throw formatted_error("Unhandled type {} in RETURNVALUE message.", h->type);
+
+                break;
+            }
+
+            case tds::token::FEATUREEXTACK:
+            {
+                auto sv2 = sv.substr(1);
+
+                while (true) {
+                    if (sv2.length() < 1)
+                        return;
+
+                    if ((uint8_t)sv2[0] == 0xff) {
+                        sv2 = sv2.substr(1);
+                        break;
+                    }
+
+                    if (sv2.length() < 1 + sizeof(uint32_t))
+                        return;
+
+                    auto len = *(uint32_t*)&sv2[1];
+
+                    sv2 = sv2.substr(1 + sizeof(uint32_t));
+
+                    if (sv2.length() < len)
+                        return;
+
+                    sv2 = sv2.substr(len);
+                }
+
+                auto token_len = (size_t)(sv2.data() - sv.data());
+
+                tokens.emplace_back(sv.substr(0, token_len));
+                sv = sv.substr(token_len);
+
+                break;
+            }
+
+            default:
+                throw formatted_error("Unhandled token type {} while parsing tokens.", type);
+        }
+    }
+}
+
+static unsigned int coll_to_cp(const tds::collation& coll) {
+    if (coll.sort_id == 0) { // Windows collations
+        switch (coll.lcid & 0xffff) {
+            case 1054: // th-TH
+                return 874;
+
+            case 1041: // ja-JP
+                return 932;
+
+            case 2052: // zh-CN
+                return 936;
+
+            case 1042: // ko-KR
+                return 949;
+
+            case 1028: // zh-TW
+            case 3076: // zh-HK
+            case 5124: // zh-MO
+                return 950;
+
+            case 1029: // cs-CZ
+            case 1038: // hu-HU
+            case 1045: // pl-PL
+            case 1048: // ro-RO
+            case 1050: // hr-HR
+            case 1051: // sk-SK
+            case 1052: // sq-AL
+            case 1060: // sl-SI
+            case 1090: // tk-TM
+            case 2074: // sr-Latn-CS
+            case 5146: // bs-Latn-BA
+                return 1250;
+
+            case 1049: // ru-RU
+            case 1058: // uk-UA
+            case 1071: // mk-MK
+            case 1087: // kk-KZ
+            case 1092: // tt-RU
+            case 1133: // ba-RU
+            case 1157: // sah-RU
+            case 2092: // az-Cyrl-AZ
+            case 3098: // sr-Cyrl-CS
+            case 8218: // bs-Cyrl-BA
+                return 1251;
+
+            case 1030: // da-DK
+            case 1031: // de-DE
+            case 1033: // en-US
+            case 1034: // es-ES_tradnl
+            case 1035: // fi-FI
+            case 1036: // fr-FR
+            case 1039: // is-IS
+            case 1047: // rm-CH
+            case 1044: // nb-NO
+            case 1070: // hsb-DE
+            case 1079: // ka-GE
+            case 1083: // se-NO
+            case 1106: // cy-GB
+            case 1122: // fy-NL
+            case 1146: // arn-CL
+            case 1148: // moh-CA
+            case 1150: // br-FR
+            case 1155: // co-FR
+            case 2107: // se-SE
+            case 2143: // tzm-Latn-DZ
+            case 3082: // es-ES
+                return 1252;
+
+            case 1032: // el-GR
+                return 1253;
+
+            case 1055: // tr-TR
+            case 1068: // az-Latn-AZ
+            case 1091: // uz-Latn-UZ
+                return 1254;
+
+            case 1037: // he-IL
+                return 1255;
+
+            case 1025: // ar-SA
+            case 1056: // ur-PK
+            case 1065: // fa-IR
+            case 1152: // ug-CN
+            case 1164: // prs-AF
+                return 1256;
+
+            case 1061: // et-EE
+            case 1062: // lv-LV
+            case 1063: // lt-LT
+                return 1257;
+
+            case 1066: // vi-VN
+                return 1258;
+
+            default:
+                throw formatted_error("Could not map LCID {} to codepage.", coll.lcid);
+        }
+    } else { // SQL collations
+        switch (coll.sort_id) {
+            case 30:
+            case 31:
+            case 32:
+            case 33:
+            case 34:
+                return 437;
+
+            case 40:
+            case 41:
+            case 42:
+            case 44:
+            case 49:
+            case 55:
+            case 56:
+            case 57:
+            case 58:
+            case 59:
+            case 60:
+            case 61:
+                return 850;
+
+            case 80:
+            case 81:
+            case 82:
+            case 83:
+            case 84:
+            case 85:
+            case 86:
+            case 87:
+            case 88:
+            case 89:
+            case 90:
+            case 91:
+            case 92:
+            case 93:
+            case 94:
+            case 95:
+            case 96:
+                return 1250;
+
+            case 104:
+            case 105:
+            case 106:
+            case 107:
+            case 108:
+                return 1251;
+
+            case 51:
+            case 52:
+            case 53:
+            case 54:
+            case 183:
+            case 184:
+            case 185:
+            case 186:
+                return 1252;
+
+            case 112:
+            case 113:
+            case 114:
+            case 121:
+            case 124:
+                return 1253;
+
+            case 128:
+            case 129:
+            case 130:
+                return 1254;
+
+            case 136:
+            case 137:
+            case 138:
+                return 1255;
+
+            case 144:
+            case 145:
+            case 146:
+                return 1256;
+
+            case 152:
+            case 153:
+            case 154:
+            case 155:
+            case 156:
+            case 157:
+            case 158:
+            case 159:
+            case 160:
+                return 1257;
+
+            default:
+                throw formatted_error("Could not map sort ID {} to codepage.", coll.sort_id);
+        }
+    }
+}
+
+static string decode_charset(const string_view& s, unsigned int codepage) {
+    string ret;
+
+    if (s.empty())
+        return "";
+
+    u16string us;
+
+#ifdef _WIN32
+    auto len = MultiByteToWideChar(codepage, 0, s.data(), (int)s.length(), nullptr, 0);
+
+    if (len == 0)
+        throw runtime_error("MultiByteToWideChar 1 failed.");
+
+    us.resize(len);
+
+    len = MultiByteToWideChar(codepage, 0, s.data(), (int)s.length(), (wchar_t*)us.data(), len);
+
+    if (len == 0)
+        throw runtime_error("MultiByteToWideChar 2 failed.");
+#else
+    UErrorCode status = U_ZERO_ERROR;
+    const char* cp;
+
+    switch (codepage) {
+        case 437:
+            cp = "ibm-437_P100-1995";
+            break;
+
+        case 850:
+            cp = "ibm-850_P100-1995";
+            break;
+
+        case 874:
+            cp = "windows-874-2000";
+            break;
+
+        case 932:
+            cp = "ibm-942_P12A-1999";
+            break;
+
+        case 936:
+            cp = "ibm-1386_P100-2001";
+            break;
+
+        case 949:
+            cp = "windows-949-2000";
+            break;
+
+        case 950:
+            cp = "windows-950-2000";
+            break;
+
+        case 1250:
+            cp = "ibm-1250_P100-1995";
+            break;
+
+        case 1251:
+            cp = "ibm-1251_P100-1995";
+            break;
+
+        case 1252:
+            cp = "ibm-5348_P100-1997";
+            break;
+
+        case 1253:
+            cp = "ibm-1253_P100-1995";
+            break;
+
+        case 1254:
+            cp = "ibm-1254_P100-1995";
+            break;
+
+        case 1255:
+            cp = "ibm-1255_P100-1995";
+            break;
+
+        case 1256:
+            cp = "ibm-1256_P110-1997";
+            break;
+
+        case 1257:
+            cp = "ibm-1257_P100-1995";
+            break;
+
+        case 1258:
+            cp = "ibm-1258_P100-1997";
+            break;
+
+        default:
+            throw formatted_error("Could not find ICU name for Windows code page {}.", codepage);
+    }
+
+    UConverter* conv = ucnv_open(cp, &status);
+
+    if (U_FAILURE(status))
+        throw formatted_error("ucnv_open failed for code page {} ({})", cp, u_errorName(status));
+
+    us.resize(s.length() * 2); // sic - each input byte might expand to 2 char16_ts
+
+    auto len = ucnv_toUChars(conv, us.data(), (int32_t)us.length() / sizeof(char16_t), s.data(), (int32_t)s.length(), &status);
+
+    if (us.length() > (uint32_t)len)
+        us = us.substr(0, (uint32_t)len);
+
+    ucnv_close(conv);
+#endif
+
+    return tds::utf16_to_utf8(us);
+}
+
+static void value_cp_to_utf8(tds::value& v, const tds::collation& coll) {
+    auto cp = coll_to_cp(coll);
+
+    if (cp == CP_UTF8)
+        return;
+
+    auto str = decode_charset(v.val, cp);
+
+    v.val = str;
+}
+
+static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned int max_length,
+                           const tds::collation& coll, string_view& sv) {
+    switch (type) {
+        case tds::sql_type::SQL_NULL:
+        case tds::sql_type::TINYINT:
+        case tds::sql_type::BIT:
+        case tds::sql_type::SMALLINT:
+        case tds::sql_type::INT:
+        case tds::sql_type::DATETIM4:
+        case tds::sql_type::REAL:
+        case tds::sql_type::MONEY:
+        case tds::sql_type::DATETIME:
+        case tds::sql_type::FLOAT:
+        case tds::sql_type::SMALLMONEY:
+        case tds::sql_type::BIGINT:
+        {
+            auto len = fixed_len_size(type);
+
+            col.val.resize(len);
+
+            if (sv.length() < len)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+
+            memcpy(col.val.data(), sv.data(), len);
+
+            sv = sv.substr(len);
+
+            break;
+        }
+
+        case tds::sql_type::UNIQUEIDENTIFIER:
+        case tds::sql_type::INTN:
+        case tds::sql_type::DECIMAL:
+        case tds::sql_type::NUMERIC:
+        case tds::sql_type::BITN:
+        case tds::sql_type::FLTN:
+        case tds::sql_type::MONEYN:
+        case tds::sql_type::DATETIMN:
+        case tds::sql_type::DATE:
+        case tds::sql_type::TIME:
+        case tds::sql_type::DATETIME2:
+        case tds::sql_type::DATETIMEOFFSET:
+        {
+            if (sv.length() < sizeof(uint8_t))
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
+
+            auto len = *(uint8_t*)sv.data();
+
+            sv = sv.substr(1);
+
+            col.val.resize(len);
+            col.is_null = len == 0;
+
+            if (sv.length() < len)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+
+            memcpy(col.val.data(), sv.data(), len);
+            sv = sv.substr(len);
+
+            break;
+        }
+
+        case tds::sql_type::VARCHAR:
+        case tds::sql_type::NVARCHAR:
+        case tds::sql_type::VARBINARY:
+        case tds::sql_type::CHAR:
+        case tds::sql_type::NCHAR:
+        case tds::sql_type::BINARY:
+        case tds::sql_type::XML:
+            if (max_length == 0xffff || type == tds::sql_type::XML) {
+                if (sv.length() < sizeof(uint64_t))
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
+
+                auto len = *(uint64_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint64_t));
+
+                col.val.clear();
+
+                if (len == 0xffffffffffffffff) {
+                    col.is_null = true;
+                    return;
+                }
+
+                col.is_null = false;
+
+                if (len != 0xfffffffffffffffe) // unknown length
+                    col.val.reserve(len);
+
+                do {
+                    if (sv.length() < sizeof(uint32_t))
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
+
+                    auto chunk_len = *(uint32_t*)sv.data();
+
+                    sv = sv.substr(sizeof(uint32_t));
+
+                    if (chunk_len == 0)
+                        break;
+
+                    if (sv.length() < chunk_len)
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), chunk_len);
+
+                    col.val += sv.substr(0, chunk_len);
+                    sv = sv.substr(chunk_len);
+                } while (true);
+            } else {
+                if (sv.length() < sizeof(uint16_t))
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 2).", sv.length());
+
+                auto len = *(uint16_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint16_t));
+
+                if (len == 0xffff) {
+                    col.is_null = true;
+                    return;
+                }
+
+                col.val.resize(len);
+                col.is_null = false;
+
+                if (sv.length() < len)
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+
+                memcpy(col.val.data(), sv.data(), len);
+                sv = sv.substr(len);
+            }
+
+            if ((type == tds::sql_type::VARCHAR || type == tds::sql_type::CHAR)) {
+                if (coll.utf8)
+                    col.utf8 = true;
+                else
+                    value_cp_to_utf8(col, coll);
+            }
+
+            break;
+
+        case tds::sql_type::SQL_VARIANT:
+        {
+            if (sv.length() < sizeof(uint32_t))
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
+
+            auto len = *(uint32_t*)sv.data();
+
+            sv = sv.substr(sizeof(uint32_t));
+
+            col.val.resize(len);
+            col.is_null = len == 0xffffffff;
+
+            if (!col.is_null) {
+                if (sv.length() < len)
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+
+                memcpy(col.val.data(), sv.data(), len);
+                sv = sv.substr(len);
+            }
+
+            break;
+        }
+
+        case tds::sql_type::IMAGE:
+        case tds::sql_type::NTEXT:
+        case tds::sql_type::TEXT:
+        {
+            // text pointer
+
+            if (sv.length() < sizeof(uint8_t))
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
+
+            auto textptrlen = (uint8_t)sv[0];
+
+            sv = sv.substr(1);
+
+            if (sv.length() < textptrlen)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), textptrlen);
+
+            sv = sv.substr(textptrlen);
+
+            col.is_null = textptrlen == 0;
+
+            if (!col.is_null) {
+                // timestamp
+
+                if (sv.length() < 8)
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
+
+                sv = sv.substr(8);
+
+                // data
+
+                if (sv.length() < sizeof(uint32_t))
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
+
+                auto len = *(uint32_t*)sv.data();
+
+                sv = sv.substr(sizeof(uint32_t));
+
+                col.val.resize(len);
+                col.is_null = len == 0xffffffff;
+
+                if (!col.is_null) {
+                    if (sv.length() < len)
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+
+                    memcpy(col.val.data(), sv.data(), len);
+                    sv = sv.substr(len);
+                }
+            }
+
+            break;
+        }
+
+        default:
+            throw formatted_error("Unhandled type {} in ROW message.", type);
+    }
+}
 
 namespace tds {
     u16string utf8_to_utf16(const string_view& sv) {
@@ -1315,27 +2453,6 @@ private:
 };
 #endif
 
-static bool is_byte_len_type(enum tds::sql_type type) {
-    switch (type) {
-        case tds::sql_type::UNIQUEIDENTIFIER:
-        case tds::sql_type::INTN:
-        case tds::sql_type::DECIMAL:
-        case tds::sql_type::NUMERIC:
-        case tds::sql_type::BITN:
-        case tds::sql_type::FLTN:
-        case tds::sql_type::MONEYN:
-        case tds::sql_type::DATETIMN:
-        case tds::sql_type::DATE:
-        case tds::sql_type::TIME:
-        case tds::sql_type::DATETIME2:
-        case tds::sql_type::DATETIMEOFFSET:
-            return true;
-
-        default:
-            return false;
-    }
-}
-
 namespace tds {
     tds::tds(const string& server, const string_view& user, const string_view& password,
              const string_view& app_name, const msg_handler& message_handler,
@@ -1575,589 +2692,6 @@ namespace tds {
         bool ctx_handle_set = false;
     };
 #endif
-
-    static size_t fixed_len_size(enum sql_type type) {
-        switch (type) {
-            case sql_type::TINYINT:
-                return 1;
-
-            case sql_type::SMALLINT:
-                return 2;
-
-            case sql_type::INT:
-                return 4;
-
-            case sql_type::BIGINT:
-                return 8;
-
-            case sql_type::DATETIME:
-                return 8;
-
-            case sql_type::DATETIM4:
-                return 4;
-
-            case sql_type::SMALLMONEY:
-                return 4;
-
-            case sql_type::MONEY:
-                return 8;
-
-            case sql_type::REAL:
-                return 4;
-
-            case sql_type::FLOAT:
-                return 8;
-
-            case sql_type::BIT:
-                return 1;
-
-            case sql_type::SQL_NULL:
-                return 0;
-
-            default:
-                return 0;
-        }
-    }
-
-    static bool parse_row_col(enum sql_type type, unsigned int max_length, string_view& sv) {
-        switch (type) {
-            case sql_type::SQL_NULL:
-            case sql_type::TINYINT:
-            case sql_type::BIT:
-            case sql_type::SMALLINT:
-            case sql_type::INT:
-            case sql_type::DATETIM4:
-            case sql_type::REAL:
-            case sql_type::MONEY:
-            case sql_type::DATETIME:
-            case sql_type::FLOAT:
-            case sql_type::SMALLMONEY:
-            case sql_type::BIGINT:
-            {
-                auto len = fixed_len_size(type);
-
-                if (sv.length() < len)
-                    return false;
-
-                sv = sv.substr(len);
-
-                break;
-            }
-
-            case sql_type::UNIQUEIDENTIFIER:
-            case sql_type::INTN:
-            case sql_type::DECIMAL:
-            case sql_type::NUMERIC:
-            case sql_type::BITN:
-            case sql_type::FLTN:
-            case sql_type::MONEYN:
-            case sql_type::DATETIMN:
-            case sql_type::DATE:
-            case sql_type::TIME:
-            case sql_type::DATETIME2:
-            case sql_type::DATETIMEOFFSET:
-            {
-                if (sv.length() < sizeof(uint8_t))
-                    return false;
-
-                auto len = *(uint8_t*)sv.data();
-
-                sv = sv.substr(1);
-
-                if (sv.length() < len)
-                    return false;
-
-                sv = sv.substr(len);
-
-                break;
-            }
-
-            case sql_type::VARCHAR:
-            case sql_type::NVARCHAR:
-            case sql_type::VARBINARY:
-            case sql_type::CHAR:
-            case sql_type::NCHAR:
-            case sql_type::BINARY:
-            case sql_type::XML:
-                if (max_length == 0xffff || type == sql_type::XML) {
-                    if (sv.length() < sizeof(uint64_t))
-                        return false;
-
-                    auto len = *(uint64_t*)sv.data();
-
-                    sv = sv.substr(sizeof(uint64_t));
-
-                    if (len == 0xffffffffffffffff)
-                        return true;
-
-                    do {
-                        if (sv.length() < sizeof(uint32_t))
-                            return false;
-
-                        auto chunk_len = *(uint32_t*)sv.data();
-
-                        sv = sv.substr(sizeof(uint32_t));
-
-                        if (chunk_len == 0)
-                            break;
-
-                        if (sv.length() < chunk_len)
-                            return false;
-
-                        sv = sv.substr(chunk_len);
-                    } while (true);
-                } else {
-                    if (sv.length() < sizeof(uint16_t))
-                        return false;
-
-                    auto len = *(uint16_t*)sv.data();
-
-                    sv = sv.substr(sizeof(uint16_t));
-
-                    if (len == 0xffff)
-                        return true;
-
-                    if (sv.length() < len)
-                        return false;
-
-                    sv = sv.substr(len);
-                }
-
-                break;
-
-            case sql_type::SQL_VARIANT:
-            {
-                if (sv.length() < sizeof(uint32_t))
-                    return false;
-
-                auto len = *(uint32_t*)sv.data();
-
-                sv = sv.substr(sizeof(uint32_t));
-
-                if (len == 0xffffffff)
-                    return true;
-
-                if (sv.length() < len)
-                    return false;
-
-                sv = sv.substr(len);
-
-                break;
-            }
-
-            case sql_type::IMAGE:
-            case sql_type::NTEXT:
-            case sql_type::TEXT:
-            {
-                // text pointer
-
-                if (sv.length() < sizeof(uint8_t))
-                    return false;
-
-                auto textptrlen = (uint8_t)sv[0];
-
-                sv = sv.substr(1);
-
-                if (sv.length() < textptrlen)
-                    return false;
-
-                sv = sv.substr(textptrlen);
-
-                if (textptrlen != 0) {
-                    // timestamp
-
-                    if (sv.length() < 8)
-                        return false;
-
-                    sv = sv.substr(8);
-
-                    // data
-
-                    if (sv.length() < sizeof(uint32_t))
-                        return false;
-
-                    auto len = *(uint32_t*)sv.data();
-
-                    sv = sv.substr(sizeof(uint32_t));
-
-                    if (sv.length() < len)
-                        return false;
-
-                    sv = sv.substr(len);
-                }
-
-                break;
-            }
-
-            default:
-                throw formatted_error("Unhandled type {} in ROW message.", type);
-        }
-
-        return true;
-    }
-
-    static void parse_tokens(string_view& sv, list<string>& tokens, vector<column>& buf_columns) {
-        while (!sv.empty()) {
-            auto type = (token)sv[0];
-
-            switch (type) {
-                case token::TABNAME:
-                case token::COLINFO:
-                case token::ORDER:
-                case token::TDS_ERROR:
-                case token::INFO:
-                case token::LOGINACK:
-                case token::ENVCHANGE:
-                case token::SSPI: {
-                    if (sv.length() < 1 + sizeof(uint16_t))
-                        return;
-
-                    auto len = *(uint16_t*)&sv[1];
-
-                    if (sv.length() < (size_t)(1 + sizeof(uint16_t) + len))
-                        return;
-
-                    tokens.emplace_back(sv.substr(0, 1 + sizeof(uint16_t) + len));
-                    sv = sv.substr(1 + sizeof(uint16_t) + len);
-
-                    break;
-                }
-
-                case token::DONE:
-                case token::DONEPROC:
-                case token::DONEINPROC:
-                    if (sv.length() < 1 + sizeof(tds_done_msg))
-                        return;
-
-                    tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_done_msg)));
-                    sv = sv.substr(1 + sizeof(tds_done_msg));
-                break;
-
-                case token::COLMETADATA: {
-                    if (sv.length() < 5)
-                        return;
-
-                    auto num_columns = *(uint16_t*)&sv[1];
-
-                    if (num_columns == 0) {
-                        buf_columns.clear();
-                        tokens.emplace_back(sv.substr(0, 5));
-                        sv = sv.substr(5);
-                        continue;
-                    }
-
-                    vector<column> cols;
-
-                    cols.reserve(num_columns);
-
-                    string_view sv2 = sv;
-
-                    sv2 = sv2.substr(1 + sizeof(uint16_t));
-
-                    for (unsigned int i = 0; i < num_columns; i++) {
-                        if (sv2.length() < sizeof(tds_colmetadata_col))
-                            return;
-
-                        cols.emplace_back();
-
-                        auto& col = cols.back();
-
-                        auto& c = *(tds_colmetadata_col*)&sv2[0];
-
-                        col.type = c.type;
-
-                        sv2 = sv2.substr(sizeof(tds_colmetadata_col));
-
-                        switch (c.type) {
-                            case sql_type::SQL_NULL:
-                            case sql_type::TINYINT:
-                            case sql_type::BIT:
-                            case sql_type::SMALLINT:
-                            case sql_type::INT:
-                            case sql_type::DATETIM4:
-                            case sql_type::REAL:
-                            case sql_type::MONEY:
-                            case sql_type::DATETIME:
-                            case sql_type::FLOAT:
-                            case sql_type::SMALLMONEY:
-                            case sql_type::BIGINT:
-                            case sql_type::DATE:
-                                // nop
-                            break;
-
-                            case sql_type::INTN:
-                            case sql_type::FLTN:
-                            case sql_type::TIME:
-                            case sql_type::DATETIME2:
-                            case sql_type::DATETIMN:
-                            case sql_type::DATETIMEOFFSET:
-                            case sql_type::BITN:
-                            case sql_type::MONEYN:
-                            case sql_type::UNIQUEIDENTIFIER:
-                                if (sv2.length() < sizeof(uint8_t))
-                                    return;
-
-                                col.max_length = *(uint8_t*)sv2.data();
-
-                                sv2 = sv2.substr(1);
-                            break;
-
-                            case sql_type::VARCHAR:
-                            case sql_type::NVARCHAR:
-                            case sql_type::CHAR:
-                            case sql_type::NCHAR:
-                                if (sv2.length() < sizeof(uint16_t) + sizeof(collation))
-                                    return;
-
-                                col.max_length = *(uint16_t*)sv2.data();
-
-                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(collation));
-                            break;
-
-                            case sql_type::VARBINARY:
-                            case sql_type::BINARY:
-                                if (sv2.length() < sizeof(uint16_t))
-                                    return;
-
-                                col.max_length = *(uint16_t*)sv2.data();
-
-                                sv2 = sv2.substr(sizeof(uint16_t));
-                            break;
-
-                            case sql_type::XML:
-                                if (sv2.length() < sizeof(uint8_t))
-                                    return;
-
-                                sv2 = sv2.substr(sizeof(uint8_t));
-                            break;
-
-                            case sql_type::DECIMAL:
-                            case sql_type::NUMERIC:
-                                if (sv2.length() < 1)
-                                    return;
-
-                                col.max_length = *(uint8_t*)sv2.data();
-
-                                sv2 = sv2.substr(1);
-
-                                if (sv2.length() < 2)
-                                    return;
-
-                                sv2 = sv2.substr(2);
-                            break;
-
-                            case sql_type::SQL_VARIANT:
-                                if (sv2.length() < sizeof(uint32_t))
-                                    return;
-
-                                col.max_length = *(uint32_t*)sv2.data();
-
-                                sv2 = sv2.substr(sizeof(uint32_t));
-                            break;
-
-                            case sql_type::IMAGE:
-                            case sql_type::NTEXT:
-                            case sql_type::TEXT:
-                            {
-                                if (sv2.length() < sizeof(uint32_t))
-                                    return;
-
-                                col.max_length = *(uint32_t*)sv2.data();
-
-                                sv2 = sv2.substr(sizeof(uint32_t));
-
-                                if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
-                                    if (sv2.length() < sizeof(collation))
-                                        return;
-
-                                    sv2 = sv2.substr(sizeof(collation));
-                                }
-
-                                if (sv2.length() < 1)
-                                    return;
-
-                                auto num_parts = (uint8_t)sv2[0];
-
-                                sv2 = sv2.substr(1);
-
-                                for (uint8_t j = 0; j < num_parts; j++) {
-                                    if (sv2.length() < sizeof(uint16_t))
-                                        return;
-
-                                    auto partlen = *(uint16_t*)sv2.data();
-
-                                    sv2 = sv2.substr(sizeof(uint16_t));
-
-                                    if (sv2.length() < partlen * sizeof(char16_t))
-                                        return;
-
-                                    sv2 = sv2.substr(partlen * sizeof(char16_t));
-                                }
-
-                                break;
-                            }
-
-                            default:
-                                throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
-                        }
-
-                        if (sv2.length() < 1)
-                            return;
-
-                        auto name_len = (uint8_t)sv2[0];
-
-                        sv2 = sv2.substr(1);
-
-                        if (sv2.length() < name_len * sizeof(char16_t))
-                            return;
-
-                        sv2 = sv2.substr(name_len * sizeof(char16_t));
-                    }
-
-                    auto len = (size_t)(sv2.data() - sv.data());
-
-                    tokens.emplace_back(sv.substr(0, len));
-                    sv = sv.substr(len);
-
-                    buf_columns = cols;
-
-                    break;
-                }
-
-                case token::ROW: {
-                    auto sv2 = sv.substr(1);
-
-                    for (unsigned int i = 0; i < buf_columns.size(); i++) {
-                        if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
-                            return;
-                    }
-
-                    auto len = (size_t)(sv2.data() - sv.data());
-
-                    tokens.emplace_back(sv.substr(0, len));
-                    sv = sv.substr(len);
-
-                    break;
-                }
-
-                case token::NBCROW:
-                {
-                    if (buf_columns.empty())
-                        break;
-
-                    auto sv2 = sv.substr(1);
-
-                    auto bitset_length = (buf_columns.size() + 7) / 8;
-
-                    if (sv2.length() < bitset_length)
-                        return;
-
-                    string_view bitset(sv2.data(), bitset_length);
-                    auto bsv = (uint8_t)bitset[0];
-
-                    sv2 = sv2.substr(bitset_length);
-
-                    for (unsigned int i = 0; i < buf_columns.size(); i++) {
-                        if (i != 0) {
-                            if ((i & 7) == 0) {
-                                bitset = bitset.substr(1);
-                                bsv = (uint8_t)bitset[0];
-                            } else
-                                bsv >>= 1;
-                        }
-
-                        if (!(bsv & 1)) { // not NULL
-                            if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
-                                return;
-                        }
-                    }
-
-                    auto len = (size_t)(sv2.data() - sv.data());
-
-                    tokens.emplace_back(sv.substr(0, len));
-                    sv = sv.substr(len);
-
-                    break;
-                }
-
-                case token::RETURNSTATUS:
-                {
-                    if (sv.length() < 1 + sizeof(int32_t))
-                        return;
-
-                    tokens.emplace_back(sv.substr(0, 1 + sizeof(int32_t)));
-                    sv = sv.substr(1 + sizeof(int32_t));
-
-                    break;
-                }
-
-                case token::RETURNVALUE:
-                {
-                    auto h = (tds_return_value*)&sv[1];
-
-                    if (sv.length() < 1 + sizeof(tds_return_value))
-                        return;
-
-                    // FIXME - param name
-
-                    if (is_byte_len_type(h->type)) {
-                        uint8_t len;
-
-                        if (sv.length() < 1 + sizeof(tds_return_value) + 2)
-                            return;
-
-                        len = *((uint8_t*)&sv[1] + sizeof(tds_return_value) + 1);
-
-                        if (sv.length() < 1 + sizeof(tds_return_value) + 2 + len)
-                            return;
-
-                        tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_return_value) + 2 + len));
-                        sv = sv.substr(1 + sizeof(tds_return_value) + 2 + len);
-                    } else
-                        throw formatted_error("Unhandled type {} in RETURNVALUE message.", h->type);
-
-                    break;
-                }
-
-                case token::FEATUREEXTACK:
-                {
-                    auto sv2 = sv.substr(1);
-
-                    while (true) {
-                        if (sv2.length() < 1)
-                            return;
-
-                        if ((uint8_t)sv2[0] == 0xff) {
-                            sv2 = sv2.substr(1);
-                            break;
-                        }
-
-                        if (sv2.length() < 1 + sizeof(uint32_t))
-                            return;
-
-                        auto len = *(uint32_t*)&sv2[1];
-
-                        sv2 = sv2.substr(1 + sizeof(uint32_t));
-
-                        if (sv2.length() < len)
-                            return;
-
-                        sv2 = sv2.substr(len);
-                    }
-
-                    auto token_len = (size_t)(sv2.data() - sv.data());
-
-                    tokens.emplace_back(sv.substr(0, token_len));
-                    sv = sv.substr(token_len);
-
-                    break;
-                }
-
-                default:
-                    throw formatted_error("Unhandled token type {} while parsing tokens.", type);
-            }
-        }
-    }
 
     void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server,
                                   const string_view& app_name) {
@@ -2904,540 +3438,6 @@ namespace tds {
 
         message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), tim->msgno, line_number,
                         tim->state, tim->severity, error);
-    }
-
-    static unsigned int coll_to_cp(const collation& coll) {
-        if (coll.sort_id == 0) { // Windows collations
-            switch (coll.lcid & 0xffff) {
-                case 1054: // th-TH
-                    return 874;
-
-                case 1041: // ja-JP
-                    return 932;
-
-                case 2052: // zh-CN
-                    return 936;
-
-                case 1042: // ko-KR
-                    return 949;
-
-                case 1028: // zh-TW
-                case 3076: // zh-HK
-                case 5124: // zh-MO
-                    return 950;
-
-                case 1029: // cs-CZ
-                case 1038: // hu-HU
-                case 1045: // pl-PL
-                case 1048: // ro-RO
-                case 1050: // hr-HR
-                case 1051: // sk-SK
-                case 1052: // sq-AL
-                case 1060: // sl-SI
-                case 1090: // tk-TM
-                case 2074: // sr-Latn-CS
-                case 5146: // bs-Latn-BA
-                    return 1250;
-
-                case 1049: // ru-RU
-                case 1058: // uk-UA
-                case 1071: // mk-MK
-                case 1087: // kk-KZ
-                case 1092: // tt-RU
-                case 1133: // ba-RU
-                case 1157: // sah-RU
-                case 2092: // az-Cyrl-AZ
-                case 3098: // sr-Cyrl-CS
-                case 8218: // bs-Cyrl-BA
-                    return 1251;
-
-                case 1030: // da-DK
-                case 1031: // de-DE
-                case 1033: // en-US
-                case 1034: // es-ES_tradnl
-                case 1035: // fi-FI
-                case 1036: // fr-FR
-                case 1039: // is-IS
-                case 1047: // rm-CH
-                case 1044: // nb-NO
-                case 1070: // hsb-DE
-                case 1079: // ka-GE
-                case 1083: // se-NO
-                case 1106: // cy-GB
-                case 1122: // fy-NL
-                case 1146: // arn-CL
-                case 1148: // moh-CA
-                case 1150: // br-FR
-                case 1155: // co-FR
-                case 2107: // se-SE
-                case 2143: // tzm-Latn-DZ
-                case 3082: // es-ES
-                    return 1252;
-
-                case 1032: // el-GR
-                    return 1253;
-
-                case 1055: // tr-TR
-                case 1068: // az-Latn-AZ
-                case 1091: // uz-Latn-UZ
-                    return 1254;
-
-                case 1037: // he-IL
-                    return 1255;
-
-                case 1025: // ar-SA
-                case 1056: // ur-PK
-                case 1065: // fa-IR
-                case 1152: // ug-CN
-                case 1164: // prs-AF
-                    return 1256;
-
-                case 1061: // et-EE
-                case 1062: // lv-LV
-                case 1063: // lt-LT
-                    return 1257;
-
-                case 1066: // vi-VN
-                    return 1258;
-
-                default:
-                    throw formatted_error("Could not map LCID {} to codepage.", coll.lcid);
-            }
-        } else { // SQL collations
-            switch (coll.sort_id) {
-                case 30:
-                case 31:
-                case 32:
-                case 33:
-                case 34:
-                    return 437;
-
-                case 40:
-                case 41:
-                case 42:
-                case 44:
-                case 49:
-                case 55:
-                case 56:
-                case 57:
-                case 58:
-                case 59:
-                case 60:
-                case 61:
-                    return 850;
-
-                case 80:
-                case 81:
-                case 82:
-                case 83:
-                case 84:
-                case 85:
-                case 86:
-                case 87:
-                case 88:
-                case 89:
-                case 90:
-                case 91:
-                case 92:
-                case 93:
-                case 94:
-                case 95:
-                case 96:
-                    return 1250;
-
-                case 104:
-                case 105:
-                case 106:
-                case 107:
-                case 108:
-                    return 1251;
-
-                case 51:
-                case 52:
-                case 53:
-                case 54:
-                case 183:
-                case 184:
-                case 185:
-                case 186:
-                    return 1252;
-
-                case 112:
-                case 113:
-                case 114:
-                case 121:
-                case 124:
-                    return 1253;
-
-                case 128:
-                case 129:
-                case 130:
-                    return 1254;
-
-                case 136:
-                case 137:
-                case 138:
-                    return 1255;
-
-                case 144:
-                case 145:
-                case 146:
-                    return 1256;
-
-                case 152:
-                case 153:
-                case 154:
-                case 155:
-                case 156:
-                case 157:
-                case 158:
-                case 159:
-                case 160:
-                    return 1257;
-
-                default:
-                    throw formatted_error("Could not map sort ID {} to codepage.", coll.sort_id);
-            }
-        }
-    }
-
-    static string decode_charset(const string_view& s, unsigned int codepage) {
-        string ret;
-
-        if (s.empty())
-            return "";
-
-        u16string us;
-
-#ifdef _WIN32
-        auto len = MultiByteToWideChar(codepage, 0, s.data(), (int)s.length(), nullptr, 0);
-
-        if (len == 0)
-            throw runtime_error("MultiByteToWideChar 1 failed.");
-
-        us.resize(len);
-
-        len = MultiByteToWideChar(codepage, 0, s.data(), (int)s.length(), (wchar_t*)us.data(), len);
-
-        if (len == 0)
-            throw runtime_error("MultiByteToWideChar 2 failed.");
-#else
-        UErrorCode status = U_ZERO_ERROR;
-        const char* cp;
-
-        switch (codepage) {
-            case 437:
-                cp = "ibm-437_P100-1995";
-                break;
-
-            case 850:
-                cp = "ibm-850_P100-1995";
-                break;
-
-            case 874:
-                cp = "windows-874-2000";
-                break;
-
-            case 932:
-                cp = "ibm-942_P12A-1999";
-                break;
-
-            case 936:
-                cp = "ibm-1386_P100-2001";
-                break;
-
-            case 949:
-                cp = "windows-949-2000";
-                break;
-
-            case 950:
-                cp = "windows-950-2000";
-                break;
-
-            case 1250:
-                cp = "ibm-1250_P100-1995";
-                break;
-
-            case 1251:
-                cp = "ibm-1251_P100-1995";
-                break;
-
-            case 1252:
-                cp = "ibm-5348_P100-1997";
-                break;
-
-            case 1253:
-                cp = "ibm-1253_P100-1995";
-                break;
-
-            case 1254:
-                cp = "ibm-1254_P100-1995";
-                break;
-
-            case 1255:
-                cp = "ibm-1255_P100-1995";
-                break;
-
-            case 1256:
-                cp = "ibm-1256_P110-1997";
-                break;
-
-            case 1257:
-                cp = "ibm-1257_P100-1995";
-                break;
-
-            case 1258:
-                cp = "ibm-1258_P100-1997";
-                break;
-
-            default:
-                throw formatted_error("Could not find ICU name for Windows code page {}.", codepage);
-        }
-
-        UConverter* conv = ucnv_open(cp, &status);
-
-        if (U_FAILURE(status))
-            throw formatted_error("ucnv_open failed for code page {} ({})", cp, u_errorName(status));
-
-        us.resize(s.length() * 2); // sic - each input byte might expand to 2 char16_ts
-
-        auto len = ucnv_toUChars(conv, us.data(), (int32_t)us.length() / sizeof(char16_t), s.data(), (int32_t)s.length(), &status);
-
-        if (us.length() > (uint32_t)len)
-            us = us.substr(0, (uint32_t)len);
-
-        ucnv_close(conv);
-#endif
-
-        return utf16_to_utf8(us);
-    }
-
-    static void value_cp_to_utf8(value& v, const collation& coll) {
-        auto cp = coll_to_cp(coll);
-
-        if (cp == CP_UTF8)
-            return;
-
-        auto str = decode_charset(v.val, cp);
-
-        v.val = str;
-    }
-
-    static void handle_row_col(value& col, enum sql_type type, unsigned int max_length, const collation& coll, string_view& sv) {
-        switch (type) {
-            case sql_type::SQL_NULL:
-            case sql_type::TINYINT:
-            case sql_type::BIT:
-            case sql_type::SMALLINT:
-            case sql_type::INT:
-            case sql_type::DATETIM4:
-            case sql_type::REAL:
-            case sql_type::MONEY:
-            case sql_type::DATETIME:
-            case sql_type::FLOAT:
-            case sql_type::SMALLMONEY:
-            case sql_type::BIGINT:
-            {
-                auto len = fixed_len_size(type);
-
-                col.val.resize(len);
-
-                if (sv.length() < len)
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
-
-                memcpy(col.val.data(), sv.data(), len);
-
-                sv = sv.substr(len);
-
-                break;
-            }
-
-            case sql_type::UNIQUEIDENTIFIER:
-            case sql_type::INTN:
-            case sql_type::DECIMAL:
-            case sql_type::NUMERIC:
-            case sql_type::BITN:
-            case sql_type::FLTN:
-            case sql_type::MONEYN:
-            case sql_type::DATETIMN:
-            case sql_type::DATE:
-            case sql_type::TIME:
-            case sql_type::DATETIME2:
-            case sql_type::DATETIMEOFFSET:
-            {
-                if (sv.length() < sizeof(uint8_t))
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
-
-                auto len = *(uint8_t*)sv.data();
-
-                sv = sv.substr(1);
-
-                col.val.resize(len);
-                col.is_null = len == 0;
-
-                if (sv.length() < len)
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
-
-                memcpy(col.val.data(), sv.data(), len);
-                sv = sv.substr(len);
-
-                break;
-            }
-
-            case sql_type::VARCHAR:
-            case sql_type::NVARCHAR:
-            case sql_type::VARBINARY:
-            case sql_type::CHAR:
-            case sql_type::NCHAR:
-            case sql_type::BINARY:
-            case sql_type::XML:
-                if (max_length == 0xffff || type == sql_type::XML) {
-                    if (sv.length() < sizeof(uint64_t))
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
-
-                    auto len = *(uint64_t*)sv.data();
-
-                    sv = sv.substr(sizeof(uint64_t));
-
-                    col.val.clear();
-
-                    if (len == 0xffffffffffffffff) {
-                        col.is_null = true;
-                        return;
-                    }
-
-                    col.is_null = false;
-
-                    if (len != 0xfffffffffffffffe) // unknown length
-                        col.val.reserve(len);
-
-                    do {
-                        if (sv.length() < sizeof(uint32_t))
-                            throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
-
-                        auto chunk_len = *(uint32_t*)sv.data();
-
-                        sv = sv.substr(sizeof(uint32_t));
-
-                        if (chunk_len == 0)
-                            break;
-
-                        if (sv.length() < chunk_len)
-                            throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), chunk_len);
-
-                        col.val += sv.substr(0, chunk_len);
-                        sv = sv.substr(chunk_len);
-                    } while (true);
-                } else {
-                    if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least 2).", sv.length());
-
-                    auto len = *(uint16_t*)sv.data();
-
-                    sv = sv.substr(sizeof(uint16_t));
-
-                    if (len == 0xffff) {
-                        col.is_null = true;
-                        return;
-                    }
-
-                    col.val.resize(len);
-                    col.is_null = false;
-
-                    if (sv.length() < len)
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
-
-                    memcpy(col.val.data(), sv.data(), len);
-                    sv = sv.substr(len);
-                }
-
-                if ((type == sql_type::VARCHAR || type == sql_type::CHAR)) {
-                    if (coll.utf8)
-                        col.utf8 = true;
-                    else
-                        value_cp_to_utf8(col, coll);
-                }
-
-                break;
-
-            case sql_type::SQL_VARIANT:
-            {
-                if (sv.length() < sizeof(uint32_t))
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
-
-                auto len = *(uint32_t*)sv.data();
-
-                sv = sv.substr(sizeof(uint32_t));
-
-                col.val.resize(len);
-                col.is_null = len == 0xffffffff;
-
-                if (!col.is_null) {
-                    if (sv.length() < len)
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
-
-                    memcpy(col.val.data(), sv.data(), len);
-                    sv = sv.substr(len);
-                }
-
-                break;
-            }
-
-            case sql_type::IMAGE:
-            case sql_type::NTEXT:
-            case sql_type::TEXT:
-            {
-                // text pointer
-
-                if (sv.length() < sizeof(uint8_t))
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
-
-                auto textptrlen = (uint8_t)sv[0];
-
-                sv = sv.substr(1);
-
-                if (sv.length() < textptrlen)
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), textptrlen);
-
-                sv = sv.substr(textptrlen);
-
-                col.is_null = textptrlen == 0;
-
-                if (!col.is_null) {
-                    // timestamp
-
-                    if (sv.length() < 8)
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
-
-                    sv = sv.substr(8);
-
-                    // data
-
-                    if (sv.length() < sizeof(uint32_t))
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
-
-                    auto len = *(uint32_t*)sv.data();
-
-                    sv = sv.substr(sizeof(uint32_t));
-
-                    col.val.resize(len);
-                    col.is_null = len == 0xffffffff;
-
-                    if (!col.is_null) {
-                        if (sv.length() < len)
-                            throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
-
-                        memcpy(col.val.data(), sv.data(), len);
-                        sv = sv.substr(len);
-                    }
-                }
-
-                break;
-            }
-
-            default:
-                throw formatted_error("Unhandled type {} in ROW message.", type);
-        }
     }
 
     void rpc::do_rpc(tds& conn, const string_view& name) {
