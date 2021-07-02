@@ -571,6 +571,8 @@ static constexpr bool test_parse_date(string_view s, bool exp_valid, uint16_t ex
 
     if (!valid)
         return !exp_valid;
+    else if (!exp_valid)
+        return false;
 
     return y == exp_y && m == exp_m && d == exp_d;
 }
@@ -782,7 +784,7 @@ static constexpr bool __inline is_digit(char c) noexcept {
     return c >= '0' && c <= '9';
 }
 
-static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, tds::time_t& dur) noexcept {
+static constexpr bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, tds::time_t& dur) noexcept {
     // ISO date
     if (t.length() >= 19 && is_digit(t[0]) && is_digit(t[1]) && is_digit(t[2]) && is_digit(t[3]) &&
         t[4] == '-' && is_digit(t[5]) && is_digit(t[6]) && t[7] == '-' && is_digit(t[8]) &&
@@ -790,12 +792,12 @@ static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d,
         is_digit(t[14]) && is_digit(t[15]) && t[16] == ':' && is_digit(t[17]) && is_digit(t[18])) {
         uint8_t h, mins, s;
 
-        from_chars(&t[0], &t[4], y);
-        from_chars(&t[5], &t[7], mon);
-        from_chars(&t[8], &t[10], d);
-        from_chars(&t[11], &t[13], h);
-        from_chars(&t[14], &t[16], mins);
-        from_chars(&t[17], &t[19], s);
+        from_chars_constexpr(t.data(), t.data() + 4, y);
+        from_chars_constexpr(t.data() + 5, t.data() + 7, mon);
+        from_chars_constexpr(t.data() + 8, t.data() + 10, d);
+        from_chars_constexpr(t.data() + 11, t.data() + 13, h);
+        from_chars_constexpr(t.data() + 14, t.data() + 16, mins);
+        from_chars_constexpr(t.data() + 17, t.data() + 19, s);
 
         if (!is_valid_date(y, mon, d) || h >= 24 || mins >= 60 || s >= 60)
             return false;
@@ -815,7 +817,7 @@ static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d,
             if (t.empty())
                 return true;
 
-            auto [ptr, ec] = from_chars(t.data(), t.data() + min(t.length(), (size_t)7), v);
+            auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + min(t.length(), (size_t)7), v);
 
             auto fraclen = ptr - t.data();
 
@@ -891,6 +893,43 @@ static bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d,
 
     return true;
 }
+
+static constexpr bool test_parse_datetime(const string_view& t, bool exp_valid, uint16_t exp_y, uint8_t exp_mon,
+                                          uint8_t exp_d, tds::time_t exp_dur) noexcept {
+    bool valid;
+    uint16_t y;
+    uint8_t mon, d;
+    tds::time_t dur;
+
+    valid = parse_datetime(t, y, mon, d, dur);
+
+    if (!valid)
+        return !exp_valid;
+    else if (!exp_valid)
+        return false;
+
+    return y == exp_y && mon == exp_mon && d == exp_d && dur == exp_dur;
+}
+
+static_assert(test_parse_datetime("not a datetime", false, 0, 0, 0, tds::time_t::zero()));
+static_assert(test_parse_datetime("2021-07-02T10:05:34", true, 2021, 7, 2, 10h + 5min + 34s));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.1234567", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345678", false, 0, 0, 0, tds::time_t::zero()));
+static_assert(test_parse_datetime("2021-07-02T10:05:34Z", true, 2021, 7, 2, 10h + 5min + 34s));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345Z", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.1234567Z", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345678Z", false, 0, 0, 0, tds::time_t::zero()));
+static_assert(test_parse_datetime("2021-07-02T10:05:34+01:00", true, 2021, 7, 2, 10h + 5min + 34s));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345+01:00", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.1234567+01:00", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345678+01:00", false, 0, 0, 0, tds::time_t::zero()));
+static_assert(test_parse_datetime("2021-07-02T10:05:34-12:34", true, 2021, 7, 2, 10h + 5min + 34s));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345-12:34", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.1234567-12:34", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}));
+static_assert(test_parse_datetime("2021-07-02T10:05:34.12345678-12:34", false, 0, 0, 0, tds::time_t::zero()));
+static_assert(test_parse_datetime("2021-07-02 10:05:34am", true, 2021, 7, 2, 10h + 5min + 34s));
+static_assert(test_parse_datetime("July 2, 2021 10:05:34 AM", true, 2021, 7, 2, 10h + 5min + 34s));
 
 static bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, tds::time_t& dur, int16_t& offset) {
     uint8_t h, min, s;
