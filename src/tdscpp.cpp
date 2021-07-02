@@ -5973,4 +5973,14 @@ namespace tds {
     static_assert((uint64_t)numeric<5>(0) == 0);
     static_assert((uint64_t)numeric<0>(42) == 42);
     static_assert((uint64_t)numeric<5>(42) == 42);
+    static_assert(numeric<0>(1) == numeric<0>(1));
+    static_assert(numeric<0>(-1) < numeric<0>(1));
+    static_assert(numeric<0>(1) > numeric<0>(-1));
+    static_assert(numeric<0>(7) > numeric<0>(4));
+    static_assert(numeric<0>(-7) < numeric<0>(-4));
+    static_assert(numeric<21>(1) == numeric<21>(1));
+    static_assert(numeric<21>(-1) < numeric<21>(1));
+    static_assert(numeric<21>(1) > numeric<21>(-1));
+    static_assert(numeric<21>(7) > numeric<21>(4));
+    static_assert(numeric<21>(-7) < numeric<21>(-4));
 };

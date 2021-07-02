@@ -1086,6 +1086,25 @@ namespace tds {
         // FIXME - operator double
         // FIXME - operator numeric<N2>?
 
+        constexpr std::strong_ordering operator<=>(const numeric<N>& n) const {
+            if (neg && !n.neg)
+                return std::strong_ordering::less;
+            else if (!neg && n.neg)
+                return std::strong_ordering::greater;
+
+            if (high_part < n.high_part)
+                return neg ? std::strong_ordering::greater : std::strong_ordering::less;
+            else if (high_part > n.high_part)
+                return neg ? std::strong_ordering::less : std::strong_ordering::greater;
+
+            if (low_part < n.low_part)
+                return neg ? std::strong_ordering::greater : std::strong_ordering::less;
+            else if (low_part > n.low_part)
+                return neg ? std::strong_ordering::less : std::strong_ordering::greater;
+
+            return std::strong_ordering::equal;
+        }
+
         uint64_t low_part, high_part;
         bool neg;
     };
