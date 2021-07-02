@@ -1077,6 +1077,44 @@ static constexpr bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& 
     return true;
 }
 
+static constexpr bool test_parse_datetimeoffset(const string_view& t, bool exp_valid, uint16_t exp_y, uint8_t exp_mon,
+                                                uint8_t exp_d, tds::time_t exp_dur, int16_t exp_offset) noexcept {
+    bool valid;
+    uint16_t y;
+    uint8_t mon, d;
+    int16_t offset;
+    tds::time_t dur;
+
+    valid = parse_datetimeoffset(t, y, mon, d, dur, offset);
+
+    if (!valid)
+        return !exp_valid;
+    else if (!exp_valid)
+        return false;
+
+    return y == exp_y && mon == exp_mon && d == exp_d && dur == exp_dur && offset == exp_offset;
+}
+
+static_assert(test_parse_datetimeoffset("not a datetimeoffset", false, 0, 0, 0, tds::time_t::zero(), 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34", true, 2021, 7, 2, 10h + 5min + 34s, 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}, 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.1234567", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}, 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345678", false, 0, 0, 0, tds::time_t::zero(), 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34Z", true, 2021, 7, 2, 10h + 5min + 34s, 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345Z", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}, 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.1234567Z", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}, 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345678Z", false, 0, 0, 0, tds::time_t::zero(), 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34+01:00", true, 2021, 7, 2, 10h + 5min + 34s, 60));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345-02:15", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}, -135));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.1234567+03:30", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}, 210));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345678-04:45", false, 0, 0, 0, tds::time_t::zero(), 0));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34+05:00", true, 2021, 7, 2, 10h + 5min + 34s, 300));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345-06:15", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234500}, -375));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.1234567+07:30", true, 2021, 7, 2, 10h + 5min + 34s + tds::time_t{1234567}, 450));
+static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345678-08:45", false, 0, 0, 0, tds::time_t::zero(), 0));
+static_assert(test_parse_datetimeoffset("2021-07-02 10:05:34am +09:00", true, 2021, 7, 2, 10h + 5min + 34s, 540));
+static_assert(test_parse_datetimeoffset("July 2, 2021 10:05:34 AM -10:15", true, 2021, 7, 2, 10h + 5min + 34s, -615));
+
 namespace tds {
     value::value() {
         type = (sql_type)0;
