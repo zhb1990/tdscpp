@@ -5,7 +5,6 @@
 #include "tdscpp.h"
 #include "tdscpp-private.h"
 #include <charconv>
-#include <regex>
 
 using namespace std;
 
@@ -931,65 +930,116 @@ static_assert(test_parse_datetime("2021-07-02T10:05:34.12345678-12:34", false, 0
 static_assert(test_parse_datetime("2021-07-02 10:05:34am", true, 2021, 7, 2, 10h + 5min + 34s));
 static_assert(test_parse_datetime("July 2, 2021 10:05:34 AM", true, 2021, 7, 2, 10h + 5min + 34s));
 
-static bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d, tds::time_t& dur, int16_t& offset) {
-    uint8_t h, min, s;
+static constexpr bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& mon, uint8_t& d,
+                                           tds::time_t& dur, int16_t& offset) noexcept {
+    uint8_t h, mins, s;
 
-    {
-        cmatch rm;
-        static const regex iso_date("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\\.([0-9]+))?(Z|([+\\-][0-9]{2}):([0-9]{2}))?$");
+    // ISO date
+    if (t.length() >= 19 && is_digit(t[0]) && is_digit(t[1]) && is_digit(t[2]) && is_digit(t[3]) &&
+        t[4] == '-' && is_digit(t[5]) && is_digit(t[6]) && t[7] == '-' && is_digit(t[8]) &&
+        is_digit(t[9]) && t[10] == 'T' && is_digit(t[11]) && is_digit(t[12]) && t[13] == ':' &&
+        is_digit(t[14]) && is_digit(t[15]) && t[16] == ':' && is_digit(t[17]) && is_digit(t[18])) {
+        from_chars_constexpr(t.data(), t.data() + 4, y);
+        from_chars_constexpr(t.data() + 5, t.data() + 7, mon);
+        from_chars_constexpr(t.data() + 8, t.data() + 10, d);
+        from_chars_constexpr(t.data() + 11, t.data() + 13, h);
+        from_chars_constexpr(t.data() + 14, t.data() + 16, mins);
+        from_chars_constexpr(t.data() + 17, t.data() + 19, s);
 
-        if (regex_match(&t[0], t.data() + t.length(), rm, iso_date)) {
-            from_chars(rm[1].str().data(), rm[1].str().data() + rm[1].length(), y);
-            from_chars(rm[2].str().data(), rm[2].str().data() + rm[2].length(), mon);
-            from_chars(rm[3].str().data(), rm[3].str().data() + rm[3].length(), d);
-            from_chars(rm[4].str().data(), rm[4].str().data() + rm[4].length(), h);
-            from_chars(rm[5].str().data(), rm[5].str().data() + rm[5].length(), min);
-            from_chars(rm[6].str().data(), rm[6].str().data() + rm[6].length(), s);
+        if (!is_valid_date(y, mon, d) || h >= 24 || mins >= 60 || s >= 60)
+            return false;
 
-            if (!is_valid_date(y, mon, d) || h >= 24 || min >= 60 || s >= 60)
-                return false;
+        t = t.substr(19);
 
-            dur = chrono::hours{h} + chrono::minutes{min} + chrono::seconds{s};
+        dur = chrono::hours{h} + chrono::minutes{mins} + chrono::seconds{s};
 
-            if (rm[8].length() != 0) {
-                uint32_t v;
+        if (t.empty()) {
+            offset = 0;
+            return true;
+        }
 
-                from_chars(rm[8].str().data(), rm[8].str().data() + rm[8].length(), v);
+        if (t[0] == '.') {
+            uint32_t v;
 
-                for (auto i = rm[8].length(); i < 7; i++) {
-                    v *= 10;
-                }
+            t = t.substr(1);
 
-                dur += tds::time_t{v};
-            }
-
-            if (rm[9].str().empty() || rm[9].str() == "Z") {
+            if (t.empty()) {
                 offset = 0;
                 return true;
             }
 
-            int offset_hours;
-            unsigned int offset_mins;
+            auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + min(t.length(), (size_t)7), v);
 
-            if (rm[10].str().front() == '+')
-                from_chars(rm[10].str().data() + 1, rm[10].str().data() + rm[10].length() - 1, offset_hours);
-            else
-                from_chars(rm[10].str().data(), rm[10].str().data() + rm[10].length(), offset_hours);
+            auto fraclen = ptr - t.data();
 
-            from_chars(rm[11].str().data(), rm[11].str().data() + rm[11].length(), offset_mins);
-
-            if (offset_hours < -24 || offset_hours > 24 || offset_mins >= 60)
+            if (fraclen == 0)
                 return false;
 
-            offset = (int16_t)(offset_hours * 60);
+            t = t.substr(fraclen);
 
-            if (offset_hours < 0)
-                offset -= (int16_t)offset_mins;
-            else
-                offset += (int16_t)offset_mins;
+            for (auto i = fraclen; i < 7; i++) {
+                v *= 10;
+            }
 
+            if (!t.empty() && is_digit(t[0]))
+                return false;
+
+            dur += tds::time_t{v};
+
+            if (t.empty()) {
+                offset = 0;
+                return true;
+            }
+        }
+
+        if (t.length() == 1 && t[0] == 'Z') {
+            offset = 0;
             return true;
         }
+
+        if (t[0] != '+' && t[0] != '-')
+            return false;
+
+        auto offset_neg = t[0] == '-';
+
+        t = t.substr(1);
+
+        if (t.length() < 5)
+            return false;
+
+        unsigned int offset_hours, offset_mins;
+
+        {
+            auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + 2, offset_hours);
+
+            if (ptr != t.data() + 2)
+                return false;
+        }
+
+        t = t.substr(2);
+
+        if (t[0] != ':')
+            return false;
+
+        t = t.substr(1);
+
+        {
+            auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + 2, offset_mins);
+
+            if (ptr != t.data() + 2)
+                return false;
+        }
+
+        if (offset_hours >= 24 || offset_mins >= 60)
+            return false;
+
+        offset = (int16_t)(offset_hours * 60);
+        offset += (int16_t)offset_mins;
+
+        if (offset_neg)
+            offset = -offset;
+
+        return true;
     }
 
     if (parse_date(t, y, mon, d)) {
