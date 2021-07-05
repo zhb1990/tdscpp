@@ -1151,6 +1151,8 @@ namespace tds {
                             else
                                 n.high_part = 0;
 
+                            n.neg = data[0] == 0;
+
                             if (n.high_part > lim.second || (n.high_part == lim.second && n.low_part >= lim.first)) {
                                 if (n.neg) {
                                     throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
@@ -1168,8 +1170,6 @@ namespace tds {
                                 ptr += data.length();
                                 break;
                             }
-
-                            n.neg = data[0] == 0;
 
                             for (auto i = scale; i < col.scale; i++) {
                                 n.ten_mult();
