@@ -489,898 +489,898 @@ namespace tds {
                 }
                 break;
 
-                        case sql_type::VARCHAR:
-                        case sql_type::CHAR:
-                            if (col.max_length == -1) {
-                                if (vv.is_null) {
-                                    *(uint64_t*)ptr = 0xffffffffffffffff;
-                                    ptr += sizeof(uint64_t);
-                                } else if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
-                                    *(uint64_t*)ptr = 0xfffffffffffffffe;
-                                    ptr += sizeof(uint64_t);
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+                if (col.max_length == -1) {
+                    if (vv.is_null) {
+                        *(uint64_t*)ptr = 0xffffffffffffffff;
+                        ptr += sizeof(uint64_t);
+                    } else if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
+                        *(uint64_t*)ptr = 0xfffffffffffffffe;
+                        ptr += sizeof(uint64_t);
 
-                                    if (!vv.val.empty()) {
-                                        *(uint32_t*)ptr = (uint32_t)vv.val.length();
-                                        ptr += sizeof(uint32_t);
+                        if (!vv.val.empty()) {
+                            *(uint32_t*)ptr = (uint32_t)vv.val.length();
+                            ptr += sizeof(uint32_t);
 
-                                        memcpy(ptr, vv.val.data(), vv.val.length());
-                                        ptr += vv.val.length();
-                                    }
+                            memcpy(ptr, vv.val.data(), vv.val.length());
+                            ptr += vv.val.length();
+                        }
 
-                                    *(uint32_t*)ptr = 0;
-                                    ptr += sizeof(uint32_t);
-                                } else if (col.codepage == CP_UTF8) {
-                                    auto s = (string)vv;
+                        *(uint32_t*)ptr = 0;
+                        ptr += sizeof(uint32_t);
+                    } else if (col.codepage == CP_UTF8) {
+                        auto s = (string)vv;
 
-                                    *(uint64_t*)ptr = 0xfffffffffffffffe;
-                                    ptr += sizeof(uint64_t);
+                        *(uint64_t*)ptr = 0xfffffffffffffffe;
+                        ptr += sizeof(uint64_t);
 
-                                    if (!s.empty()) {
-                                        *(uint32_t*)ptr = (uint32_t)s.length();
-                                        ptr += sizeof(uint32_t);
+                        if (!s.empty()) {
+                            *(uint32_t*)ptr = (uint32_t)s.length();
+                            ptr += sizeof(uint32_t);
 
-                                        memcpy(ptr, s.data(), s.length());
-                                        ptr += s.length();
-                                    }
+                            memcpy(ptr, s.data(), s.length());
+                            ptr += s.length();
+                        }
 
-                                    *(uint32_t*)ptr = 0;
-                                    ptr += sizeof(uint32_t);
-                                } else {
-                                    auto s = encode_charset((u16string)vv, col.codepage);
+                        *(uint32_t*)ptr = 0;
+                        ptr += sizeof(uint32_t);
+                    } else {
+                        auto s = encode_charset((u16string)vv, col.codepage);
 
-                                    *(uint64_t*)ptr = 0xfffffffffffffffe;
-                                    ptr += sizeof(uint64_t);
+                        *(uint64_t*)ptr = 0xfffffffffffffffe;
+                        ptr += sizeof(uint64_t);
 
-                                    if (!s.empty()) {
-                                        *(uint32_t*)ptr = (uint32_t)s.length();
-                                        ptr += sizeof(uint32_t);
+                        if (!s.empty()) {
+                            *(uint32_t*)ptr = (uint32_t)s.length();
+                            ptr += sizeof(uint32_t);
 
-                                        memcpy(ptr, s.data(), s.length());
-                                        ptr += s.length();
-                                    }
+                            memcpy(ptr, s.data(), s.length());
+                            ptr += s.length();
+                        }
 
-                                    *(uint32_t*)ptr = 0;
-                                    ptr += sizeof(uint32_t);
-                                }
-                            } else {
-                                if (vv.is_null) {
-                                    *(uint16_t*)ptr = 0xffff;
-                                    ptr += sizeof(uint16_t);
-                                } else if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
-                                    if (vv.val.length() > (uint16_t)col.max_length)
-                                        throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", vv.val, utf16_to_utf8(col_name), col.max_length);
+                        *(uint32_t*)ptr = 0;
+                        ptr += sizeof(uint32_t);
+                    }
+                } else {
+                    if (vv.is_null) {
+                        *(uint16_t*)ptr = 0xffff;
+                        ptr += sizeof(uint16_t);
+                    } else if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
+                        if (vv.val.length() > (uint16_t)col.max_length)
+                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", vv.val, utf16_to_utf8(col_name), col.max_length);
 
-                                    *(uint16_t*)ptr = (uint16_t)vv.val.length();
-                                    ptr += sizeof(uint16_t);
+                        *(uint16_t*)ptr = (uint16_t)vv.val.length();
+                        ptr += sizeof(uint16_t);
 
-                                    memcpy(ptr, vv.val.data(), vv.val.length());
-                                    ptr += vv.val.length();
-                                } else if (col.codepage == CP_UTF8) {
-                                    auto s = (string)vv;
+                        memcpy(ptr, vv.val.data(), vv.val.length());
+                        ptr += vv.val.length();
+                    } else if (col.codepage == CP_UTF8) {
+                        auto s = (string)vv;
 
-                                    if (s.length() > (uint16_t)col.max_length)
-                                        throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", s, utf16_to_utf8(col_name), col.max_length);
+                        if (s.length() > (uint16_t)col.max_length)
+                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", s, utf16_to_utf8(col_name), col.max_length);
 
-                                    *(uint16_t*)ptr = (uint16_t)s.length();
-                                    ptr += sizeof(uint16_t);
+                        *(uint16_t*)ptr = (uint16_t)s.length();
+                        ptr += sizeof(uint16_t);
 
-                                    memcpy(ptr, s.data(), s.length());
-                                    ptr += s.length();
-                                } else {
-                                    auto s = encode_charset((u16string)vv, col.codepage);
+                        memcpy(ptr, s.data(), s.length());
+                        ptr += s.length();
+                    } else {
+                        auto s = encode_charset((u16string)vv, col.codepage);
 
-                                    if (s.length() > (uint16_t)col.max_length)
-                                        throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", (string)vv, utf16_to_utf8(col_name), col.max_length);
+                        if (s.length() > (uint16_t)col.max_length)
+                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", (string)vv, utf16_to_utf8(col_name), col.max_length);
 
-                                    *(uint16_t*)ptr = (uint16_t)s.length();
-                                    ptr += sizeof(uint16_t);
+                        *(uint16_t*)ptr = (uint16_t)s.length();
+                        ptr += sizeof(uint16_t);
 
-                                    memcpy(ptr, s.data(), s.length());
-                                    ptr += s.length();
-                                }
-                            }
+                        memcpy(ptr, s.data(), s.length());
+                        ptr += s.length();
+                    }
+                }
+                break;
+
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
+                if (col.max_length == -1) {
+                    if (vv.is_null) {
+                        *(uint64_t*)ptr = 0xffffffffffffffff;
+                        ptr += sizeof(uint64_t);
+                    } else if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
+                        *(uint64_t*)ptr = 0xfffffffffffffffe;
+                        ptr += sizeof(uint64_t);
+
+                        if (!vv.val.empty()) {
+                            *(uint32_t*)ptr = (uint32_t)vv.val.length();
+                            ptr += sizeof(uint32_t);
+
+                            memcpy(ptr, vv.val.data(), vv.val.length());
+                            ptr += vv.val.length();
+                        }
+
+                        *(uint32_t*)ptr = 0;
+                        ptr += sizeof(uint32_t);
+                    } else {
+                        auto s = (u16string)vv;
+
+                        *(uint64_t*)ptr = 0xfffffffffffffffe;
+                        ptr += sizeof(uint64_t);
+
+                        if (!s.empty()) {
+                            *(uint32_t*)ptr = (uint32_t)(s.length() * sizeof(char16_t));
+                            ptr += sizeof(uint32_t);
+
+                            memcpy(ptr, s.data(), s.length() * sizeof(char16_t));
+                            ptr += s.length() * sizeof(char16_t);
+                        }
+
+                        *(uint32_t*)ptr = 0;
+                        ptr += sizeof(uint32_t);
+                    }
+                } else {
+                    if (vv.is_null) {
+                        *(uint16_t*)ptr = 0xffff;
+                        ptr += sizeof(uint16_t);
+                    } else if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
+                        if (vv.val.length() > (uint16_t)col.max_length) {
+                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
+                                                    utf16_to_utf8(u16string_view((char16_t*)vv.val.data(), vv.val.length() / sizeof(char16_t))),
+                                                    utf16_to_utf8(col_name), col.max_length / sizeof(char16_t));
+                        }
+
+                        *(uint16_t*)ptr = (uint16_t)vv.val.length();
+                        ptr += sizeof(uint16_t);
+
+                        memcpy(ptr, vv.val.data(), vv.val.length());
+                        ptr += vv.val.length();
+                    } else {
+                        auto s = (u16string)vv;
+
+                        if (s.length() > (uint16_t)col.max_length) {
+                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
+                                                    utf16_to_utf8(u16string_view((char16_t*)s.data(), s.length() / sizeof(char16_t))),
+                                                    utf16_to_utf8(col_name), col.max_length / sizeof(char16_t));
+                        }
+
+                        *(uint16_t*)ptr = (uint16_t)(s.length() * sizeof(char16_t));
+                        ptr += sizeof(uint16_t);
+
+                        memcpy(ptr, s.data(), s.length() * sizeof(char16_t));
+                        ptr += s.length() * sizeof(char16_t);
+                    }
+                }
+                break;
+
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
+                if (col.max_length == -1) {
+                    if (vv.is_null) {
+                        *(uint64_t*)ptr = 0xffffffffffffffff;
+                        ptr += sizeof(uint64_t);
+                    } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
+                        *(uint64_t*)ptr = 0xfffffffffffffffe;
+                        ptr += sizeof(uint64_t);
+
+                        if (!vv.val.empty()) {
+                            *(uint32_t*)ptr = (uint32_t)vv.val.length();
+                            ptr += sizeof(uint32_t);
+
+                            memcpy(ptr, vv.val.data(), vv.val.length());
+                            ptr += vv.val.length();
+                        }
+
+                        *(uint32_t*)ptr = 0;
+                        ptr += sizeof(uint32_t);
+                    } else
+                        throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
+                } else {
+                    if (vv.is_null) {
+                        *(uint16_t*)ptr = 0xffff;
+                        ptr += sizeof(uint16_t);
+                    } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
+                        if (vv.val.length() > (uint16_t)col.max_length)
+                            throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(col_name), vv.val.length(), col.max_length);
+
+                        *(uint16_t*)ptr = (uint16_t)vv.val.length();
+                        ptr += sizeof(uint16_t);
+
+                        memcpy(ptr, vv.val.data(), vv.val.length());
+                        ptr += vv.val.length();
+                    } else
+                        throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
+                }
+                break;
+
+            case sql_type::DATE:
+                if (vv.is_null) {
+                    *(uint8_t*)ptr = 0;
+                    ptr++;
+                } else {
+                    chrono::year_month_day d;
+
+                    try {
+                        d = (chrono::year_month_day)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    uint32_t n = ymd_to_num(d) + jan1900;
+
+                    *(uint8_t*)ptr = 3;
+                    ptr++;
+
+                    memcpy(ptr, &n, 3);
+                    ptr += 3;
+                }
+                break;
+
+            case sql_type::TIME:
+                if (vv.is_null) {
+                    *(uint8_t*)ptr = 0;
+                    ptr++;
+                } else {
+                    uint64_t ticks;
+
+                    try {
+                        ticks = time_t(vv).count();
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    for (int j = 0; j < 7 - col.scale; j++) {
+                        ticks /= 10;
+                    }
+
+                    if (col.scale <= 2) {
+                        *(uint8_t*)ptr = 3;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 3);
+                        ptr += 3;
+                    } else if (col.scale <= 4) {
+                        *(uint8_t*)ptr = 4;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 4);
+                        ptr += 4;
+                    } else {
+                        *(uint8_t*)ptr = 5;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 5);
+                        ptr += 5;
+                    }
+                }
+                break;
+
+            case sql_type::DATETIME2:
+                if (vv.is_null) {
+                    *(uint8_t*)ptr = 0;
+                    ptr++;
+                } else {
+                    datetime dt;
+
+                    try {
+                        dt = (datetime)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    uint32_t n = ymd_to_num(dt.d) + jan1900;
+                    auto ticks = dt.t.count();
+
+                    for (int j = 0; j < 7 - col.scale; j++) {
+                        ticks /= 10;
+                    }
+
+                    if (col.scale <= 2) {
+                        *(uint8_t*)ptr = 6;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 3);
+                        ptr += 3;
+                    } else if (col.scale <= 4) {
+                        *(uint8_t*)ptr = 7;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 4);
+                        ptr += 4;
+                    } else {
+                        *(uint8_t*)ptr = 8;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 5);
+                        ptr += 5;
+                    }
+
+                    memcpy(ptr, &n, 3);
+                    ptr += 3;
+                }
+                break;
+
+            case sql_type::DATETIMEOFFSET:
+                if (vv.is_null) {
+                    *(uint8_t*)ptr = 0;
+                    ptr++;
+                } else {
+                    datetimeoffset dto;
+
+                    try {
+                        dto = (datetimeoffset)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    uint32_t n = ymd_to_num(dto.d) + jan1900;
+                    auto ticks = dto.t.count();
+
+                    for (int j = 0; j < 7 - col.scale; j++) {
+                        ticks /= 10;
+                    }
+
+                    if (col.scale <= 2) {
+                        *(uint8_t*)ptr = 8;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 3);
+                        ptr += 3;
+                    } else if (col.scale <= 4) {
+                        *(uint8_t*)ptr = 9;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 4);
+                        ptr += 4;
+                    } else {
+                        *(uint8_t*)ptr = 10;
+                        ptr++;
+
+                        memcpy(ptr, &ticks, 5);
+                        ptr += 5;
+                    }
+
+                    memcpy(ptr, &n, 3);
+                    ptr += 3;
+
+                    *(int16_t*)ptr = dto.offset;
+                    ptr += sizeof(int16_t);
+                }
+                break;
+
+            case sql_type::DATETIME: {
+                datetime dt;
+
+                try {
+                    dt = (datetime)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
+
+                auto ticks = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t);
+
+                *(int32_t*)ptr = ymd_to_num(dt.d);
+                ptr += sizeof(int32_t);
+
+                *(uint32_t*)ptr = (uint32_t)ticks.count();
+                ptr += sizeof(uint32_t);
+
+                break;
+            }
+
+            case sql_type::DATETIMN:
+                if (vv.is_null) {
+                    *(uint8_t*)ptr = 0;
+                    ptr++;
+                } else {
+                    datetime dt;
+
+                    try {
+                        dt = (datetime)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    switch (col.max_length) {
+                        case 4: {
+                            if (dt.d < num_to_ymd(0))
+                                throw formatted_error("Datetime \"{}\" too early for SMALLDATETIME column {}.", dt, utf16_to_utf8(col_name));
+                            else if (dt.d > num_to_ymd(numeric_limits<uint16_t>::max()))
+                                throw formatted_error("Datetime \"{}\" too late for SMALLDATETIME column {}.", dt, utf16_to_utf8(col_name));
+
+                            *(uint8_t*)ptr = (uint8_t)col.max_length;
+                            ptr++;
+
+                            *(uint16_t*)ptr = (uint16_t)ymd_to_num(dt.d);
+                            ptr += sizeof(uint16_t);
+
+                            *(uint16_t*)ptr = (uint16_t)chrono::duration_cast<chrono::minutes>(dt.t).count();
+                            ptr += sizeof(uint16_t);
+
+                            break;
+                        }
+
+                        case 8: {
+                            auto dur = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t);
+
+                            *(uint8_t*)ptr = (uint8_t)col.max_length;
+                            ptr++;
+
+                            *(int32_t*)ptr = ymd_to_num(dt.d);
+                            ptr += sizeof(int32_t);
+
+                            *(uint32_t*)ptr = (uint32_t)dur.count();
+                            ptr += sizeof(uint32_t);
+
+                            break;
+                        }
+
+                        default:
+                            throw formatted_error("DATETIMN has invalid length {}.", col.max_length);
+                    }
+                }
+                break;
+
+            case sql_type::FLTN:
+                if (vv.is_null) {
+                    *(uint8_t*)ptr = 0;
+                    ptr++;
+                } else {
+                    double d;
+
+                    try {
+                        d = (double)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    *(uint8_t*)ptr = (uint8_t)col.max_length;
+                    ptr++;
+
+                    switch (col.max_length) {
+                        case sizeof(float): {
+                            auto f = (float)d;
+                            memcpy(ptr, &f, sizeof(float));
+                            ptr += sizeof(float);
+                            break;
+                        }
+
+                        case sizeof(double):
+                            memcpy(ptr, &d, sizeof(double));
+                            ptr += sizeof(double);
                             break;
 
-                            case sql_type::NVARCHAR:
-                            case sql_type::NCHAR:
-                                if (col.max_length == -1) {
-                                    if (vv.is_null) {
-                                        *(uint64_t*)ptr = 0xffffffffffffffff;
-                                        ptr += sizeof(uint64_t);
-                                    } else if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
-                                        *(uint64_t*)ptr = 0xfffffffffffffffe;
-                                        ptr += sizeof(uint64_t);
+                        default:
+                            throw formatted_error("FLTN has invalid length {}.", col.max_length);
+                    }
+                }
+                break;
 
-                                        if (!vv.val.empty()) {
-                                            *(uint32_t*)ptr = (uint32_t)vv.val.length();
-                                            ptr += sizeof(uint32_t);
+            case sql_type::BITN:
+                if (vv.is_null) {
+                    *(uint8_t*)ptr = 0;
+                    ptr++;
+                } else if (vv.type == sql_type::BIT || vv.type == sql_type::BITN) {
+                    *(uint8_t*)ptr = sizeof(uint8_t);
+                    ptr++;
+                    *(uint8_t*)ptr = (uint8_t)vv.val[0];
+                    ptr += sizeof(uint8_t);
+                } else {
+                    int64_t n;
 
-                                            memcpy(ptr, vv.val.data(), vv.val.length());
-                                            ptr += vv.val.length();
-                                        }
+                    try {
+                        n = (int64_t)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
 
-                                        *(uint32_t*)ptr = 0;
-                                        ptr += sizeof(uint32_t);
-                                    } else {
-                                        auto s = (u16string)vv;
+                    *(uint8_t*)ptr = sizeof(uint8_t);
+                    ptr++;
+                    *(uint8_t*)ptr = n != 0 ? 1 : 0;
+                    ptr++;
+                }
+                break;
 
-                                        *(uint64_t*)ptr = 0xfffffffffffffffe;
-                                        ptr += sizeof(uint64_t);
+            case sql_type::TINYINT: {
+                int64_t n;
 
-                                        if (!s.empty()) {
-                                            *(uint32_t*)ptr = (uint32_t)(s.length() * sizeof(char16_t));
-                                            ptr += sizeof(uint32_t);
+                try {
+                    n = (int64_t)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
 
-                                            memcpy(ptr, s.data(), s.length() * sizeof(char16_t));
-                                            ptr += s.length() * sizeof(char16_t);
-                                        }
+                if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
+                    throw formatted_error("Value {} is out of bounds for TINYINT column {}.", n, utf16_to_utf8(col_name));
 
-                                        *(uint32_t*)ptr = 0;
-                                        ptr += sizeof(uint32_t);
-                                    }
-                                } else {
-                                    if (vv.is_null) {
-                                        *(uint16_t*)ptr = 0xffff;
-                                        ptr += sizeof(uint16_t);
-                                    } else if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
-                                        if (vv.val.length() > (uint16_t)col.max_length) {
-                                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
-                                                                  utf16_to_utf8(u16string_view((char16_t*)vv.val.data(), vv.val.length() / sizeof(char16_t))),
-                                                                  utf16_to_utf8(col_name), col.max_length / sizeof(char16_t));
-                                        }
+                *(uint8_t*)ptr = (uint8_t)n;
+                ptr += sizeof(uint8_t);
 
-                                        *(uint16_t*)ptr = (uint16_t)vv.val.length();
-                                        ptr += sizeof(uint16_t);
+                break;
+            }
 
-                                        memcpy(ptr, vv.val.data(), vv.val.length());
-                                        ptr += vv.val.length();
-                                    } else {
-                                        auto s = (u16string)vv;
+            case sql_type::SMALLINT: {
+                int64_t n;
 
-                                        if (s.length() > (uint16_t)col.max_length) {
-                                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
-                                                                  utf16_to_utf8(u16string_view((char16_t*)s.data(), s.length() / sizeof(char16_t))),
-                                                                  utf16_to_utf8(col_name), col.max_length / sizeof(char16_t));
-                                        }
+                try {
+                    n = (int64_t)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
 
-                                        *(uint16_t*)ptr = (uint16_t)(s.length() * sizeof(char16_t));
-                                        ptr += sizeof(uint16_t);
+                if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
+                    throw formatted_error("Value {} is out of bounds for SMALLINT column {}.", n, utf16_to_utf8(col_name));
 
-                                        memcpy(ptr, s.data(), s.length() * sizeof(char16_t));
-                                        ptr += s.length() * sizeof(char16_t);
-                                    }
-                                }
+                *(int32_t*)ptr = (int16_t)n;
+                ptr += sizeof(int16_t);
+
+                break;
+            }
+
+            case sql_type::INT: {
+                int64_t n;
+
+                try {
+                    n = (int64_t)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
+
+                if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
+                    throw formatted_error("Value {} is out of bounds for INT column {}.", n, utf16_to_utf8(col_name));
+
+                *(int32_t*)ptr = (int32_t)n;
+                ptr += sizeof(int32_t);
+
+                break;
+            }
+
+            case sql_type::BIGINT: {
+                int64_t n;
+
+                try {
+                    n = (int64_t)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
+
+                *(int64_t*)ptr = n;
+                ptr += sizeof(int64_t);
+
+                break;
+            }
+
+            case sql_type::FLOAT: {
+                double n;
+
+                try {
+                    n = (double)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
+
+                *(double*)ptr = n;
+                ptr += sizeof(double);
+
+                break;
+            }
+
+            case sql_type::REAL: {
+                double n;
+
+                try {
+                    n = (double)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
+
+                *(float*)ptr = (float)n;
+                ptr += sizeof(float);
+
+                break;
+            }
+
+            case sql_type::BIT: {
+                if (vv.type == sql_type::BIT || vv.type == sql_type::BITN) {
+                    *(uint8_t*)ptr = (uint8_t)(vv.val[0]);
+                    ptr += sizeof(uint8_t);
+                } else {
+                    int64_t n;
+
+                    try {
+                        n = (int64_t)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    *(uint8_t*)ptr = n != 0 ? 1 : 0;
+                    ptr += sizeof(uint8_t);
+                }
+
+                break;
+            }
+
+            case sql_type::NUMERIC:
+            case sql_type::DECIMAL:
+                if (vv.is_null) {
+                    *ptr = 0;
+                    ptr++;
+                } else {
+                    auto type = vv.type;
+                    auto precision = vv.precision;
+                    auto scale = vv.scale;
+                    string_view data = vv.val;
+
+                    if (type == sql_type::SQL_VARIANT) {
+                        type = (sql_type)data[0];
+
+                        data = data.substr(1);
+
+                        auto propbytes = (uint8_t)data[0];
+
+                        data = data.substr(1);
+
+                        switch (type) {
+                            case sql_type::NUMERIC:
+                            case sql_type::DECIMAL:
+                                precision = data[0];
+                                scale = data[1];
                                 break;
 
-                                case sql_type::VARBINARY:
-                                case sql_type::BINARY:
-                                    if (col.max_length == -1) {
-                                        if (vv.is_null) {
-                                            *(uint64_t*)ptr = 0xffffffffffffffff;
-                                            ptr += sizeof(uint64_t);
-                                        } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
-                                            *(uint64_t*)ptr = 0xfffffffffffffffe;
-                                            ptr += sizeof(uint64_t);
+                            default:
+                                break;
+                        }
 
-                                            if (!vv.val.empty()) {
-                                                *(uint32_t*)ptr = (uint32_t)vv.val.length();
-                                                ptr += sizeof(uint32_t);
+                        data = data.substr(propbytes);
+                    }
 
-                                                memcpy(ptr, vv.val.data(), vv.val.length());
-                                                ptr += vv.val.length();
-                                            }
+                    switch (type) {
+                        case sql_type::NUMERIC:
+                        case sql_type::DECIMAL: {
+                            const auto& lim = numeric_limit_vals[col.precision - 1];
+                            numeric<0> n;
 
-                                            *(uint32_t*)ptr = 0;
-                                            ptr += sizeof(uint32_t);
-                                        } else
-                                            throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
-                                    } else {
-                                        if (vv.is_null) {
-                                            *(uint16_t*)ptr = 0xffff;
-                                            ptr += sizeof(uint16_t);
-                                        } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
-                                            if (vv.val.length() > (uint16_t)col.max_length)
-                                                throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(col_name), vv.val.length(), col.max_length);
+                            if (data.length() >= 9)
+                                n.low_part = *(uint64_t*)&data[1];
+                            else
+                                n.low_part = *(uint32_t*)&data[1];
 
-                                            *(uint16_t*)ptr = (uint16_t)vv.val.length();
-                                            ptr += sizeof(uint16_t);
+                            if (data.length() >= 17)
+                                n.high_part = *(uint64_t*)&data[1 + sizeof(uint64_t)];
+                            else if (data.length() >= 13)
+                                n.high_part = *(uint32_t*)&data[1 + sizeof(uint64_t)];
+                            else
+                                n.high_part = 0;
 
-                                            memcpy(ptr, vv.val.data(), vv.val.length());
-                                            ptr += vv.val.length();
-                                        } else
-                                            throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
-                                    }
-                                    break;
-
-                                case sql_type::DATE:
-                                    if (vv.is_null) {
-                                        *(uint8_t*)ptr = 0;
-                                        ptr++;
-                                    } else {
-                                        chrono::year_month_day d;
-
-                                        try {
-                                            d = (chrono::year_month_day)vv;
-                                        } catch (const exception& e) {
-                                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                        }
-
-                                        uint32_t n = ymd_to_num(d) + jan1900;
-
-                                        *(uint8_t*)ptr = 3;
-                                        ptr++;
-
-                                        memcpy(ptr, &n, 3);
-                                        ptr += 3;
-                                    }
-                                    break;
-
-                                case sql_type::TIME:
-                                    if (vv.is_null) {
-                                        *(uint8_t*)ptr = 0;
-                                        ptr++;
-                                    } else {
-                                        uint64_t ticks;
-
-                                        try {
-                                            ticks = time_t(vv).count();
-                                        } catch (const exception& e) {
-                                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                        }
-
-                                        for (int j = 0; j < 7 - col.scale; j++) {
-                                            ticks /= 10;
-                                        }
-
-                                        if (col.scale <= 2) {
-                                            *(uint8_t*)ptr = 3;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 3);
-                                            ptr += 3;
-                                        } else if (col.scale <= 4) {
-                                            *(uint8_t*)ptr = 4;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 4);
-                                            ptr += 4;
-                                        } else {
-                                            *(uint8_t*)ptr = 5;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 5);
-                                            ptr += 5;
-                                        }
-                                    }
-                                    break;
-
-                                case sql_type::DATETIME2:
-                                    if (vv.is_null) {
-                                        *(uint8_t*)ptr = 0;
-                                        ptr++;
-                                    } else {
-                                        datetime dt;
-
-                                        try {
-                                            dt = (datetime)vv;
-                                        } catch (const exception& e) {
-                                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                        }
-
-                                        uint32_t n = ymd_to_num(dt.d) + jan1900;
-                                        auto ticks = dt.t.count();
-
-                                        for (int j = 0; j < 7 - col.scale; j++) {
-                                            ticks /= 10;
-                                        }
-
-                                        if (col.scale <= 2) {
-                                            *(uint8_t*)ptr = 6;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 3);
-                                            ptr += 3;
-                                        } else if (col.scale <= 4) {
-                                            *(uint8_t*)ptr = 7;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 4);
-                                            ptr += 4;
-                                        } else {
-                                            *(uint8_t*)ptr = 8;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 5);
-                                            ptr += 5;
-                                        }
-
-                                        memcpy(ptr, &n, 3);
-                                        ptr += 3;
-                                    }
-                                    break;
-
-                                case sql_type::DATETIMEOFFSET:
-                                    if (vv.is_null) {
-                                        *(uint8_t*)ptr = 0;
-                                        ptr++;
-                                    } else {
-                                        datetimeoffset dto;
-
-                                        try {
-                                            dto = (datetimeoffset)vv;
-                                        } catch (const exception& e) {
-                                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                        }
-
-                                        uint32_t n = ymd_to_num(dto.d) + jan1900;
-                                        auto ticks = dto.t.count();
-
-                                        for (int j = 0; j < 7 - col.scale; j++) {
-                                            ticks /= 10;
-                                        }
-
-                                        if (col.scale <= 2) {
-                                            *(uint8_t*)ptr = 8;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 3);
-                                            ptr += 3;
-                                        } else if (col.scale <= 4) {
-                                            *(uint8_t*)ptr = 9;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 4);
-                                            ptr += 4;
-                                        } else {
-                                            *(uint8_t*)ptr = 10;
-                                            ptr++;
-
-                                            memcpy(ptr, &ticks, 5);
-                                            ptr += 5;
-                                        }
-
-                                        memcpy(ptr, &n, 3);
-                                        ptr += 3;
-
-                                        *(int16_t*)ptr = dto.offset;
-                                        ptr += sizeof(int16_t);
-                                    }
-                                    break;
-
-                                case sql_type::DATETIME: {
-                                    datetime dt;
-
-                                    try {
-                                        dt = (datetime)vv;
-                                    } catch (const exception& e) {
-                                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                    }
-
-                                    auto ticks = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t);
-
-                                    *(int32_t*)ptr = ymd_to_num(dt.d);
-                                    ptr += sizeof(int32_t);
-
-                                    *(uint32_t*)ptr = (uint32_t)ticks.count();
-                                    ptr += sizeof(uint32_t);
-
-                                    break;
+                            if (n.high_part > lim.second || (n.high_part == lim.second && n.low_part >= lim.first)) {
+                                if (n.neg) {
+                                    throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                            col.scale, utf16_to_utf8(col_name));
+                                } else {
+                                    throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                            col.scale, utf16_to_utf8(col_name));
                                 }
+                            }
+
+                            if (precision == col.precision && scale == col.scale) {
+                                *ptr = (uint8_t)data.length();
+                                ptr++;
+                                memcpy(ptr, data.data(), data.length());
+                                ptr += data.length();
+                                break;
+                            }
+
+                            n.neg = data[0] == 0;
+
+                            for (auto i = scale; i < col.scale; i++) {
+                                n.ten_mult();
+                            }
+
+                            for (auto i = col.scale; i < scale; i++) {
+                                n.ten_div();
+                            }
+
+                            if (col.precision < 10) { // 4 bytes
+                                *ptr = 5;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint32_t*)ptr = (uint32_t)n.low_part;
+                                ptr += sizeof(uint32_t);
+                            } else if (col.precision < 20) { // 8 bytes
+                                *ptr = 9;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint64_t*)ptr = n.low_part;
+                                ptr += sizeof(uint64_t);
+                            } else if (col.precision < 29) { // 12 bytes
+                                *ptr = 13;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint64_t*)ptr = n.low_part;
+                                ptr += sizeof(uint64_t);
+
+                                *(uint32_t*)ptr = (uint32_t)n.high_part;
+                                ptr += sizeof(uint32_t);
+                            } else { // 16 bytes
+                                *ptr = 17;
+                                ptr++;
+
+                                *ptr = n.neg ? 0 : 1;
+                                ptr++;
+
+                                *(uint64_t*)ptr = n.low_part;
+                                ptr += sizeof(uint64_t);
+
+                                *(uint64_t*)ptr = n.high_part;
+                                ptr += sizeof(uint64_t);
+                            }
+
+                            break;
+                        }
+
+                        default: {
+                            bool neg = false;
+                            double d;
+
+                            try {
+                                d = (double)vv;
+                            } catch (const exception& e) {
+                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                            }
+
+                            if (d < 0) {
+                                neg = true;
+                                d = -d;
+                            }
+
+                            for (unsigned int j = 0; j < col.scale; j++) {
+                                d *= 10;
+                            }
+
+                            // FIXME - avoid doing pow every time?
+
+                            if (d > pow(10, col.precision)) {
+                                if (neg) {
+                                    throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                            col.scale, utf16_to_utf8(col_name));
+                                } else {
+                                    throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
+                                                            col.scale, utf16_to_utf8(col_name));
+                                }
+                            }
+
+                            if (col.precision < 10) { // 4 bytes
+                                *ptr = 5;
+                                ptr++;
 
-                                case sql_type::DATETIMN:
-                                    if (vv.is_null) {
-                                        *(uint8_t*)ptr = 0;
-                                        ptr++;
-                                    } else {
-                                        datetime dt;
-
-                                        try {
-                                            dt = (datetime)vv;
-                                        } catch (const exception& e) {
-                                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                        }
-
-                                        switch (col.max_length) {
-                                            case 4: {
-                                                if (dt.d < num_to_ymd(0))
-                                                    throw formatted_error("Datetime \"{}\" too early for SMALLDATETIME column {}.", dt, utf16_to_utf8(col_name));
-                                                else if (dt.d > num_to_ymd(numeric_limits<uint16_t>::max()))
-                                                    throw formatted_error("Datetime \"{}\" too late for SMALLDATETIME column {}.", dt, utf16_to_utf8(col_name));
-
-                                                *(uint8_t*)ptr = (uint8_t)col.max_length;
-                                                ptr++;
-
-                                                *(uint16_t*)ptr = (uint16_t)ymd_to_num(dt.d);
-                                                ptr += sizeof(uint16_t);
-
-                                                *(uint16_t*)ptr = (uint16_t)chrono::duration_cast<chrono::minutes>(dt.t).count();
-                                                ptr += sizeof(uint16_t);
-
-                                                break;
-                                            }
-
-                                            case 8: {
-                                                auto dur = chrono::duration_cast<chrono::duration<int64_t, ratio<1, 300>>>(dt.t);
-
-                                                *(uint8_t*)ptr = (uint8_t)col.max_length;
-                                                ptr++;
-
-                                                *(int32_t*)ptr = ymd_to_num(dt.d);
-                                                ptr += sizeof(int32_t);
-
-                                                *(uint32_t*)ptr = (uint32_t)dur.count();
-                                                ptr += sizeof(uint32_t);
-
-                                                break;
-                                            }
-
-                                            default:
-                                                throw formatted_error("DATETIMN has invalid length {}.", col.max_length);
-                                        }
-                                    }
-                                    break;
-
-                                            case sql_type::FLTN:
-                                                if (vv.is_null) {
-                                                    *(uint8_t*)ptr = 0;
-                                                    ptr++;
-                                                } else {
-                                                    double d;
-
-                                                    try {
-                                                        d = (double)vv;
-                                                    } catch (const exception& e) {
-                                                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                    }
-
-                                                    *(uint8_t*)ptr = (uint8_t)col.max_length;
-                                                    ptr++;
-
-                                                    switch (col.max_length) {
-                                                        case sizeof(float): {
-                                                            auto f = (float)d;
-                                                            memcpy(ptr, &f, sizeof(float));
-                                                            ptr += sizeof(float);
-                                                            break;
-                                                        }
-
-                                                        case sizeof(double):
-                                                            memcpy(ptr, &d, sizeof(double));
-                                                            ptr += sizeof(double);
-                                                            break;
-
-                                                        default:
-                                                            throw formatted_error("FLTN has invalid length {}.", col.max_length);
-                                                    }
-                                                }
-                                                break;
-
-                                                        case sql_type::BITN:
-                                                            if (vv.is_null) {
-                                                                *(uint8_t*)ptr = 0;
-                                                                ptr++;
-                                                            } else if (vv.type == sql_type::BIT || vv.type == sql_type::BITN) {
-                                                                *(uint8_t*)ptr = sizeof(uint8_t);
-                                                                ptr++;
-                                                                *(uint8_t*)ptr = (uint8_t)vv.val[0];
-                                                                ptr += sizeof(uint8_t);
-                                                            } else {
-                                                                int64_t n;
-
-                                                                try {
-                                                                    n = (int64_t)vv;
-                                                                } catch (const exception& e) {
-                                                                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                                }
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
 
-                                                                *(uint8_t*)ptr = sizeof(uint8_t);
-                                                                ptr++;
-                                                                *(uint8_t*)ptr = n != 0 ? 1 : 0;
-                                                                ptr++;
-                                                            }
-                                                            break;
+                                *(uint32_t*)ptr = (uint32_t)d;
+                                ptr += sizeof(uint32_t);
+                            } else if (col.precision < 20) { // 8 bytes
+                                *ptr = 9;
+                                ptr++;
 
-                                                        case sql_type::TINYINT: {
-                                                            int64_t n;
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
 
-                                                            try {
-                                                                n = (int64_t)vv;
-                                                            } catch (const exception& e) {
-                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                            }
+                                *(uint64_t*)ptr = (uint64_t)d;
+                                ptr += sizeof(uint64_t);
+                            } else if (col.precision < 29) { // 12 bytes
+                                *ptr = 13;
+                                ptr++;
 
-                                                            if (n < numeric_limits<uint8_t>::min() || n > numeric_limits<uint8_t>::max())
-                                                                throw formatted_error("Value {} is out of bounds for TINYINT column {}.", n, utf16_to_utf8(col_name));
-
-                                                            *(uint8_t*)ptr = (uint8_t)n;
-                                                            ptr += sizeof(uint8_t);
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
 
-                                                            break;
-                                                        }
+                                double_to_int<12>(d, ptr);
+                                ptr += 12;
+                            } else { // 16 bytes
+                                *ptr = 17;
+                                ptr++;
 
-                                                        case sql_type::SMALLINT: {
-                                                            int64_t n;
+                                *ptr = neg ? 0 : 1;
+                                ptr++;
 
-                                                            try {
-                                                                n = (int64_t)vv;
-                                                            } catch (const exception& e) {
-                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                            }
-
-                                                            if (n < numeric_limits<int16_t>::min() || n > numeric_limits<int16_t>::max())
-                                                                throw formatted_error("Value {} is out of bounds for SMALLINT column {}.", n, utf16_to_utf8(col_name));
-
-                                                            *(int32_t*)ptr = (int16_t)n;
-                                                            ptr += sizeof(int16_t);
-
-                                                            break;
-                                                        }
-
-                                                        case sql_type::INT: {
-                                                            int64_t n;
+                                double_to_int<16>(d, ptr);
+                                ptr += 16;
+                            }
+                        }
+                    }
+                }
+                break;
 
-                                                            try {
-                                                                n = (int64_t)vv;
-                                                            } catch (const exception& e) {
-                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                            }
-
-                                                            if (n < numeric_limits<int32_t>::min() || n > numeric_limits<int32_t>::max())
-                                                                throw formatted_error("Value {} is out of bounds for INT column {}.", n, utf16_to_utf8(col_name));
-
-                                                            *(int32_t*)ptr = (int32_t)n;
-                                                            ptr += sizeof(int32_t);
+            case sql_type::MONEYN: {
+                if (vv.is_null) {
+                    *ptr = 0;
+                    ptr++;
+                } else {
+                    *ptr = (uint8_t)col.max_length;
+                    ptr++;
 
-                                                            break;
-                                                        }
+                    double val;
 
-                                                        case sql_type::BIGINT: {
-                                                            int64_t n;
-
-                                                            try {
-                                                                n = (int64_t)vv;
-                                                            } catch (const exception& e) {
-                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                            }
-
-                                                            *(int64_t*)ptr = n;
-                                                            ptr += sizeof(int64_t);
-
-                                                            break;
-                                                        }
-
-                                                        case sql_type::FLOAT: {
-                                                            double n;
-
-                                                            try {
-                                                                n = (double)vv;
-                                                            } catch (const exception& e) {
-                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                            }
-
-                                                            *(double*)ptr = n;
-                                                            ptr += sizeof(double);
-
-                                                            break;
-                                                        }
-
-                                                        case sql_type::REAL: {
-                                                            double n;
-
-                                                            try {
-                                                                n = (double)vv;
-                                                            } catch (const exception& e) {
-                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                            }
-
-                                                            *(float*)ptr = (float)n;
-                                                            ptr += sizeof(float);
-
-                                                            break;
-                                                        }
-
-                                                        case sql_type::BIT: {
-                                                            if (vv.type == sql_type::BIT || vv.type == sql_type::BITN) {
-                                                                *(uint8_t*)ptr = (uint8_t)(vv.val[0]);
-                                                                ptr += sizeof(uint8_t);
-                                                            } else {
-                                                                int64_t n;
-
-                                                                try {
-                                                                    n = (int64_t)vv;
-                                                                } catch (const exception& e) {
-                                                                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                                }
-
-                                                                *(uint8_t*)ptr = n != 0 ? 1 : 0;
-                                                                ptr += sizeof(uint8_t);
-                                                            }
-
-                                                            break;
-                                                        }
-
-                                                        case sql_type::NUMERIC:
-                                                        case sql_type::DECIMAL:
-                                                            if (vv.is_null) {
-                                                                *ptr = 0;
-                                                                ptr++;
-                                                            } else {
-                                                                auto type = vv.type;
-                                                                auto precision = vv.precision;
-                                                                auto scale = vv.scale;
-                                                                string_view data = vv.val;
-
-                                                                if (type == sql_type::SQL_VARIANT) {
-                                                                    type = (sql_type)data[0];
-
-                                                                    data = data.substr(1);
-
-                                                                    auto propbytes = (uint8_t)data[0];
-
-                                                                    data = data.substr(1);
-
-                                                                    switch (type) {
-                                                                        case sql_type::NUMERIC:
-                                                                        case sql_type::DECIMAL:
-                                                                            precision = data[0];
-                                                                            scale = data[1];
-                                                                            break;
-
-                                                                        default:
-                                                                            break;
-                                                                    }
-
-                                                                    data = data.substr(propbytes);
-                                                                }
-
-                                                                switch (type) {
-                                                                    case sql_type::NUMERIC:
-                                                                    case sql_type::DECIMAL: {
-                                                                        const auto& lim = numeric_limit_vals[col.precision - 1];
-                                                                        numeric<0> n;
-
-                                                                        if (data.length() >= 9)
-                                                                            n.low_part = *(uint64_t*)&data[1];
-                                                                        else
-                                                                            n.low_part = *(uint32_t*)&data[1];
-
-                                                                        if (data.length() >= 17)
-                                                                            n.high_part = *(uint64_t*)&data[1 + sizeof(uint64_t)];
-                                                                        else if (data.length() >= 13)
-                                                                            n.high_part = *(uint32_t*)&data[1 + sizeof(uint64_t)];
-                                                                        else
-                                                                            n.high_part = 0;
-
-                                                                        if (n.high_part > lim.second || (n.high_part == lim.second && n.low_part >= lim.first)) {
-                                                                            if (n.neg) {
-                                                                                throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
-                                                                                                      col.scale, utf16_to_utf8(col_name));
-                                                                            } else {
-                                                                                throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
-                                                                                                      col.scale, utf16_to_utf8(col_name));
-                                                                            }
-                                                                        }
-
-                                                                        if (precision == col.precision && scale == col.scale) {
-                                                                            *ptr = (uint8_t)data.length();
-                                                                            ptr++;
-                                                                            memcpy(ptr, data.data(), data.length());
-                                                                            ptr += data.length();
-                                                                            break;
-                                                                        }
-
-                                                                        n.neg = data[0] == 0;
-
-                                                                        for (auto i = scale; i < col.scale; i++) {
-                                                                            n.ten_mult();
-                                                                        }
-
-                                                                        for (auto i = col.scale; i < scale; i++) {
-                                                                            n.ten_div();
-                                                                        }
-
-                                                                        if (col.precision < 10) { // 4 bytes
-                                                                            *ptr = 5;
-                                                                            ptr++;
-
-                                                                            *ptr = n.neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            *(uint32_t*)ptr = (uint32_t)n.low_part;
-                                                                            ptr += sizeof(uint32_t);
-                                                                        } else if (col.precision < 20) { // 8 bytes
-                                                                            *ptr = 9;
-                                                                            ptr++;
-
-                                                                            *ptr = n.neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            *(uint64_t*)ptr = n.low_part;
-                                                                            ptr += sizeof(uint64_t);
-                                                                        } else if (col.precision < 29) { // 12 bytes
-                                                                            *ptr = 13;
-                                                                            ptr++;
-
-                                                                            *ptr = n.neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            *(uint64_t*)ptr = n.low_part;
-                                                                            ptr += sizeof(uint64_t);
-
-                                                                            *(uint32_t*)ptr = (uint32_t)n.high_part;
-                                                                            ptr += sizeof(uint32_t);
-                                                                        } else { // 16 bytes
-                                                                            *ptr = 17;
-                                                                            ptr++;
-
-                                                                            *ptr = n.neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            *(uint64_t*)ptr = n.low_part;
-                                                                            ptr += sizeof(uint64_t);
-
-                                                                            *(uint64_t*)ptr = n.high_part;
-                                                                            ptr += sizeof(uint64_t);
-                                                                        }
-
-                                                                        break;
-                                                                    }
-
-                                                                    default: {
-                                                                        bool neg = false;
-                                                                        double d;
-
-                                                                        try {
-                                                                            d = (double)vv;
-                                                                        } catch (const exception& e) {
-                                                                            throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                                        }
-
-                                                                        if (d < 0) {
-                                                                            neg = true;
-                                                                            d = -d;
-                                                                        }
-
-                                                                        for (unsigned int j = 0; j < col.scale; j++) {
-                                                                            d *= 10;
-                                                                        }
-
-                                                                        // FIXME - avoid doing pow every time?
-
-                                                                        if (d > pow(10, col.precision)) {
-                                                                            if (neg) {
-                                                                                throw formatted_error("Value {} is too small for NUMERIC({},{}) column {}.", vv, col.precision,
-                                                                                                      col.scale, utf16_to_utf8(col_name));
-                                                                            } else {
-                                                                                throw formatted_error("Value {} is too large for NUMERIC({},{}) column {}.", vv, col.precision,
-                                                                                                      col.scale, utf16_to_utf8(col_name));
-                                                                            }
-                                                                        }
-
-                                                                        if (col.precision < 10) { // 4 bytes
-                                                                            *ptr = 5;
-                                                                            ptr++;
-
-                                                                            *ptr = neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            *(uint32_t*)ptr = (uint32_t)d;
-                                                                            ptr += sizeof(uint32_t);
-                                                                        } else if (col.precision < 20) { // 8 bytes
-                                                                            *ptr = 9;
-                                                                            ptr++;
-
-                                                                            *ptr = neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            *(uint64_t*)ptr = (uint64_t)d;
-                                                                            ptr += sizeof(uint64_t);
-                                                                        } else if (col.precision < 29) { // 12 bytes
-                                                                            *ptr = 13;
-                                                                            ptr++;
-
-                                                                            *ptr = neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            double_to_int<12>(d, ptr);
-                                                                            ptr += 12;
-                                                                        } else { // 16 bytes
-                                                                            *ptr = 17;
-                                                                            ptr++;
-
-                                                                            *ptr = neg ? 0 : 1;
-                                                                            ptr++;
-
-                                                                            double_to_int<16>(d, ptr);
-                                                                            ptr += 16;
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                            break;
-
-                                                            case sql_type::MONEYN: {
-                                                                if (vv.is_null) {
-                                                                    *ptr = 0;
-                                                                    ptr++;
-                                                                } else {
-                                                                    *ptr = (uint8_t)col.max_length;
-                                                                    ptr++;
-
-                                                                    double val;
-
-                                                                    try {
-                                                                        val = (double)vv;
-                                                                    } catch (const exception& e) {
-                                                                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                                    }
-
-                                                                    val *= 10000.0;
-
-                                                                    switch (col.max_length) {
-                                                                        case sizeof(int64_t): {
-                                                                            auto v = (int64_t)val;
-
-                                                                            *(int32_t*)ptr = (int32_t)(v >> 32);
-                                                                            *(int32_t*)(ptr + sizeof(int32_t)) = (int32_t)(v & 0xffffffff);
-                                                                            break;
-                                                                        }
-
-                                                                        case sizeof(int32_t):
-                                                                            *(int32_t*)ptr = (int32_t)val;
-                                                                            break;
-
-                                                                        default:
-                                                                            throw formatted_error("MONEYN column {} had invalid size {}.", utf16_to_utf8(col_name), col.max_length);
-
-                                                                    }
-
-                                                                    ptr += col.max_length;
-                                                                }
-
-                                                                break;
-                                                            }
-
-                                                                        case sql_type::MONEY: {
-                                                                            double val;
-
-                                                                            try {
-                                                                                val = (double)vv;
-                                                                            } catch (const exception& e) {
-                                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                                            }
-
-                                                                            val *= 10000.0;
-
-                                                                            auto v = (int64_t)val;
-
-                                                                            *(int32_t*)ptr = (int32_t)(v >> 32);
-                                                                            *(int32_t*)(ptr + sizeof(int32_t)) = (int32_t)(v & 0xffffffff);
-
-                                                                            ptr += sizeof(int64_t);
-
-                                                                            break;
-                                                                        }
-
-                                                                        case sql_type::SMALLMONEY: {
-                                                                            double val;
-
-                                                                            try {
-                                                                                val = (double)vv;
-                                                                            } catch (const exception& e) {
-                                                                                throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
-                                                                            }
-
-                                                                            val *= 10000.0;
-
-                                                                            *(int32_t*)ptr = (int32_t)val;
-                                                                            ptr += sizeof(int32_t);
-
-                                                                            break;
-                                                                        }
-
-                                                                        default:
-                                                                            throw formatted_error("Unable to send {} in BCP row.", col.type);
+                    try {
+                        val = (double)vv;
+                    } catch (const exception& e) {
+                        throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                    }
+
+                    val *= 10000.0;
+
+                    switch (col.max_length) {
+                        case sizeof(int64_t): {
+                            auto v = (int64_t)val;
+
+                            *(int32_t*)ptr = (int32_t)(v >> 32);
+                            *(int32_t*)(ptr + sizeof(int32_t)) = (int32_t)(v & 0xffffffff);
+                            break;
+                        }
+
+                        case sizeof(int32_t):
+                            *(int32_t*)ptr = (int32_t)val;
+                            break;
+
+                        default:
+                            throw formatted_error("MONEYN column {} had invalid size {}.", utf16_to_utf8(col_name), col.max_length);
+
+                    }
+
+                    ptr += col.max_length;
+                }
+
+                break;
+            }
+
+            case sql_type::MONEY: {
+                double val;
+
+                try {
+                    val = (double)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
+
+                val *= 10000.0;
+
+                auto v = (int64_t)val;
+
+                *(int32_t*)ptr = (int32_t)(v >> 32);
+                *(int32_t*)(ptr + sizeof(int32_t)) = (int32_t)(v & 0xffffffff);
+
+                ptr += sizeof(int64_t);
+
+                break;
+            }
+
+            case sql_type::SMALLMONEY: {
+                double val;
+
+                try {
+                    val = (double)vv;
+                } catch (const exception& e) {
+                    throw formatted_error("{} (column {})", e.what(), utf16_to_utf8(col_name));
+                }
+
+                val *= 10000.0;
+
+                *(int32_t*)ptr = (int32_t)val;
+                ptr += sizeof(int32_t);
+
+                break;
+            }
+
+            default:
+                throw formatted_error("Unable to send {} in BCP row.", col.type);
         }
     }
 
