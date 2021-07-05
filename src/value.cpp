@@ -516,6 +516,9 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
                 return true;
             }
 
+            if (ptr == s.data()) // hide gcc maybe-unitialized warning
+                return false;
+
             if (s.length() < 2 || (ptr != s.data() + 1 && ptr != s.data() + 2))
                 return false;
 
