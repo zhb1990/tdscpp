@@ -162,12 +162,14 @@ static constexpr bool parse_time(string_view t, tds::time_t& dur, int16_t& offse
 
     uint16_t offset_hours, offset_mins;
 
-    auto fcr = from_chars_constexpr(t.data(), t.data() + t.length(), offset_hours);
+    {
+        auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), offset_hours);
 
-    if (fcr.ec != errc())
-        return false;
+        if (ptr == t.data())
+            return false;
 
-    t = t.substr(fcr.ptr - t.data());
+        t = t.substr(ptr - t.data());
+    }
 
     if (t.empty() || t[0] != ':') {
         for (auto c : t) {
@@ -197,10 +199,12 @@ static constexpr bool parse_time(string_view t, tds::time_t& dur, int16_t& offse
 
     t = t.substr(1);
 
-    fcr = from_chars_constexpr(t.data(), t.data() + t.length(), offset_mins);
+    {
+        auto [ptr, ec] = from_chars_constexpr(t.data(), t.data() + t.length(), offset_mins);
 
-    if (fcr.ec != errc())
-        return false;
+        if (ptr == t.data())
+            return false;
+    }
 
     if (offset_mins >= 60)
         return false;
