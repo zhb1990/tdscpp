@@ -1647,7 +1647,7 @@ namespace tds {
             case sql_type::NUMERIC:
             case sql_type::DECIMAL: {
                 uint8_t scratch[38];
-                char s[80], *p, *dot;
+                char s[80], *p;
                 unsigned int pos;
                 auto numlen = (unsigned int)(d.length() - 1);
 
@@ -1687,7 +1687,6 @@ namespace tds {
 
                     if (pos == 77 - (numlen * 2) - scale2 - 1) {
                         *p = '.';
-                        dot = p;
                         p++;
                     }
 
@@ -1697,11 +1696,12 @@ namespace tds {
 
                     if (pos == 77 - (numlen * 2) - scale2 - 1) {
                         *p = '.';
-                        dot = p;
                         p++;
                     }
                 }
                 *p = 0;
+
+                auto dot = &s[77 - (numlen * 2) - scale2 - 1];
 
                 // remove leading zeroes
 
