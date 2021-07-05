@@ -535,35 +535,40 @@ static constexpr bool parse_date(string_view& s2, uint16_t& y, uint8_t& m, uint8
 
         auto [ptr, ec] = from_chars_constexpr(s.data(), s.data() + min(s.length(), (size_t)4), num2);
 
-        if (s.length() >= 4 && ptr == s.data() + 4) { // mon dd, yyyy
-            y = num2;
-            d = (uint8_t)num;
-            s = s.substr(4);
-            s2 = s;
-            return true;
-        } else if (s.length() >= 2 && ptr == s.data() + 2) { // mon dd, yy
-            y = num2;
-            d = (uint8_t)num;
+        switch (ptr - s.data()) {
+            case 4:  // mon dd, yyyy
+                y = num2;
+                d = (uint8_t)num;
+                s = s.substr(4);
+                s2 = s;
+                break;
 
-            if (y >= 50)
-                y += 1900;
-            else
-                y += 2000;
+            case 2: // mon dd, yy
+                y = num2;
+                d = (uint8_t)num;
 
-            s = s.substr(2);
-            s2 = s;
-            return true;
-        } else { // mon yy
-            y = num;
-            d = 1;
+                if (y >= 50)
+                    y += 1900;
+                else
+                    y += 2000;
 
-            if (y >= 50)
-                y += 1900;
-            else
-                y += 2000;
+                s = s.substr(2);
+                s2 = s;
+                break;
 
-            return true;
+            default: // mon yy
+                y = num;
+                d = 1;
+
+                if (y >= 50)
+                    y += 1900;
+                else
+                    y += 2000;
+
+                break;
         }
+
+        return true;
     } else
         return false;
 }
