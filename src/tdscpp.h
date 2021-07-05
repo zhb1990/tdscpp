@@ -1444,7 +1444,7 @@ struct fmt::formatter<tds::numeric<N>> {
     template<typename format_context>
     auto format(const tds::numeric<N>& n, format_context& ctx) const {
         uint8_t scratch[38];
-        char s[80], *p, *dot;
+        char s[80], *p;
         unsigned int pos;
 
         // double dabble
@@ -1495,7 +1495,6 @@ struct fmt::formatter<tds::numeric<N>> {
 
             if (pos == 77 - (16 * 2) - N - 1) {
                 *p = '.';
-                dot = p;
                 p++;
             }
 
@@ -1505,11 +1504,12 @@ struct fmt::formatter<tds::numeric<N>> {
 
             if (pos == 77 - (16 * 2) - N - 1) {
                 *p = '.';
-                dot = p;
                 p++;
             }
         }
         *p = 0;
+
+        auto dot = &s[77 - (16 * 2) - N - 1];
 
         // remove leading zeroes
 
