@@ -384,6 +384,22 @@ enum class tds_feature : uint8_t {
 
 #pragma pack(pop)
 
+#ifdef _WIN32
+class handle_closer {
+public:
+    typedef HANDLE pointer;
+
+    void operator()(HANDLE h) {
+        if (h == INVALID_HANDLE_VALUE)
+            return;
+
+        CloseHandle(h);
+    }
+};
+
+typedef std::unique_ptr<HANDLE, handle_closer> unique_handle;
+#endif
+
 namespace tds {
     class tds_impl {
     public:
@@ -420,6 +436,7 @@ namespace tds {
 
 #ifdef _WIN32
         SOCKET sock = INVALID_SOCKET;
+        unique_handle pipe{INVALID_HANDLE_VALUE};
 #else
         int sock = 0;
 #endif

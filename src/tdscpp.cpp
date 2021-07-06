@@ -2468,13 +2468,20 @@ namespace tds {
                        const string_view& app_name, const msg_handler& message_handler,
                        const func_count_handler& count_handler, uint16_t port) : message_handler(message_handler), count_handler(count_handler) {
 #ifdef _WIN32
-        WSADATA wsa_data;
+        if (server.starts_with("\\\\")) { // named pipe
+            auto name = utf8_to_utf16(server);
 
-        if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
-            throw runtime_error("WSAStartup failed.");
+            pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
+        } else {
+            WSADATA wsa_data;
+
+            if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
+                throw runtime_error("WSAStartup failed.");
 #endif
-
-        connect(server, port, user.empty());
+            connect(server, port, user.empty());
+#ifdef _WIN32
+        }
+#endif
 
         send_prelogin_msg();
 
@@ -3253,21 +3260,38 @@ namespace tds {
             auto left = (int)payload.length();
 
             do {
-                auto ret = send(sock, (char*)ptr, left, 0);
+#ifdef _WIN32
+                if (pipe.get() != INVALID_HANDLE_VALUE) {
+                    DWORD written;
+
+                    if (!WriteFile(pipe.get(), ptr, left, &written, nullptr))
+                        throw formatted_error("WriteFile failed (error {})", GetLastError());
+
+                    if (written == (DWORD)left)
+                        break;
+
+                    ptr += written;
+                    left -= (int)written;
+                } else {
+#endif
+                    auto ret = send(sock, (char*)ptr, left, 0);
 
 #ifdef _WIN32
-                if (ret < 0)
-                    throw formatted_error("send failed (error {})", WSAGetLastError());
+                    if (ret < 0)
+                        throw formatted_error("send failed (error {})", WSAGetLastError());
 #else
-                if (ret < 0)
-                    throw formatted_error("send failed (error {})", errno);
+                    if (ret < 0)
+                        throw formatted_error("send failed (error {})", errno);
 #endif
 
-                if (ret == left)
-                    break;
+                    if (ret == left)
+                        break;
 
-                ptr += left;
-                ret -= left;
+                    ptr += ret;
+                    left -= (int)ret;
+#ifdef _WIN32
+                }
+#endif
             } while (true);
 
             if (sv2.length() == sv.length())
@@ -3283,24 +3307,41 @@ namespace tds {
         int left = sizeof(tds_header);
 
         do {
-            auto ret = recv(sock, (char*)ptr, left, 0);
+#ifdef _WIN32
+            if (pipe.get() != INVALID_HANDLE_VALUE) {
+                DWORD read;
+
+                if (!ReadFile(pipe.get(), ptr, left, &read, nullptr))
+                    throw formatted_error("ReadFile failed (error {})", GetLastError());
+
+                if (read == (DWORD)left)
+                    break;
+
+                ptr += read;
+                left -= read;
+            } else {
+#endif
+                auto ret = recv(sock, (char*)ptr, left, 0);
 
 #ifdef _WIN32
-            if (ret < 0)
-                throw formatted_error("recv failed (error {})", WSAGetLastError());
+                if (ret < 0)
+                    throw formatted_error("recv failed (error {})", WSAGetLastError());
 #else
-            if (ret < 0)
-                throw formatted_error("recv failed (error {})", errno);
+                if (ret < 0)
+                    throw formatted_error("recv failed (error {})", errno);
 #endif
 
-            if (ret == 0)
-                throw formatted_error("Disconnected.");
+                if (ret == 0)
+                    throw formatted_error("Disconnected.");
 
-            if (ret == left)
-                break;
+                if (ret == left)
+                    break;
 
-            ptr += ret;
-            left -= (int)ret;
+                ptr += ret;
+                left -= (int)ret;
+#ifdef _WIN32
+            }
+#endif
         } while (true);
 
         if (htons(h.length) < sizeof(tds_header)) {
@@ -3318,19 +3359,41 @@ namespace tds {
             ptr = (uint8_t*)&payload[0];
 
             do {
-                auto ret = recv(sock, (char*)ptr, (int)left, 0);
+#ifdef _WIN32
+                if (pipe.get() != INVALID_HANDLE_VALUE) {
+                    DWORD read;
 
-                if (ret < 0)
-                    throw formatted_error("recv failed (error {})", errno);
+                    if (!ReadFile(pipe.get(), ptr, left, &read, nullptr))
+                        throw formatted_error("ReadFile failed (error {})", GetLastError());
 
-                if (ret == 0)
-                    throw formatted_error("Disconnected.");
+                    if (read == (DWORD)left)
+                        break;
 
-                if (ret == left)
-                    break;
+                    ptr += read;
+                    left -= read;
+                } else {
+#endif
+                    auto ret = recv(sock, (char*)ptr, (int)left, 0);
 
-                ptr += ret;
-                left -= (int)ret;
+#ifdef _WIN32
+                    if (ret < 0)
+                        throw formatted_error("recv failed (error {})", WSAGetLastError());
+#else
+                    if (ret < 0)
+                        throw formatted_error("recv failed (error {})", errno);
+#endif
+
+                    if (ret == 0)
+                        throw formatted_error("Disconnected.");
+
+                    if (ret == left)
+                        break;
+
+                    ptr += ret;
+                    left -= (int)ret;
+#ifdef _WIN32
+                }
+#endif
             } while (true);
         } else
             payload.clear();
