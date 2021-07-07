@@ -2476,10 +2476,18 @@ namespace tds {
         if (server.starts_with("\\\\")) { // named pipe
             auto name = utf8_to_utf16(server);
 
-            pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
+            do {
+                pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
 
-            if (pipe.get() == INVALID_HANDLE_VALUE)
-                throw last_error("CreateFile(" + server + ")", GetLastError());
+                if (pipe.get() != INVALID_HANDLE_VALUE)
+                    break;
+
+                if (GetLastError() != ERROR_PIPE_BUSY)
+                    throw last_error("CreateFile(" + server + ")", GetLastError());
+
+                if (!WaitNamedPipeW((WCHAR*)name.c_str(), NMPWAIT_WAIT_FOREVER))
+                    throw last_error("WaitNamedPipe", GetLastError());
+            } while (true);
         } else
 #endif
             connect(server, port, user.empty());
