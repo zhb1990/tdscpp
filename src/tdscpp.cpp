@@ -2477,6 +2477,9 @@ namespace tds {
             auto name = utf8_to_utf16(server);
 
             pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
+
+            if (pipe.get() == INVALID_HANDLE_VALUE)
+                throw formatted_error("CreateFile failed for {} (error {})", server, GetLastError());
         } else
 #endif
             connect(server, port, user.empty());
