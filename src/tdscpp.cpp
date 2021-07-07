@@ -2468,20 +2468,18 @@ namespace tds {
                        const string_view& app_name, const msg_handler& message_handler,
                        const func_count_handler& count_handler, uint16_t port) : message_handler(message_handler), count_handler(count_handler) {
 #ifdef _WIN32
+        WSADATA wsa_data;
+
+        if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
+            throw runtime_error("WSAStartup failed.");
+
         if (server.starts_with("\\\\")) { // named pipe
             auto name = utf8_to_utf16(server);
 
             pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
-        } else {
-            WSADATA wsa_data;
-
-            if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
-                throw runtime_error("WSAStartup failed.");
+        } else
 #endif
             connect(server, port, user.empty());
-#ifdef _WIN32
-        }
-#endif
 
         send_prelogin_msg();
 
