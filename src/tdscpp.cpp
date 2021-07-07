@@ -2479,7 +2479,7 @@ namespace tds {
             pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
 
             if (pipe.get() == INVALID_HANDLE_VALUE)
-                throw formatted_error("CreateFile failed for {} (error {})", server, GetLastError());
+                throw last_error("CreateFile(" + server + ")", GetLastError());
         } else
 #endif
             connect(server, port, user.empty());
@@ -3269,7 +3269,7 @@ namespace tds {
                     DWORD written;
 
                     if (!WriteFile(pipe.get(), ptr, left, &written, nullptr))
-                        throw formatted_error("WriteFile failed (error {})", GetLastError());
+                        throw last_error("WriteFile", GetLastError());
 
                     if (written == (DWORD)left)
                         break;
@@ -3316,7 +3316,7 @@ namespace tds {
                 DWORD read;
 
                 if (!ReadFile(pipe.get(), ptr, left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
-                    throw formatted_error("ReadFile failed (error {})", GetLastError());
+                    throw last_error("ReadFile", GetLastError());
 
                 if (read == (DWORD)left)
                     break;
@@ -3368,7 +3368,7 @@ namespace tds {
                     DWORD read;
 
                     if (!ReadFile(pipe.get(), ptr, left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
-                        throw formatted_error("ReadFile failed (error {})", GetLastError());
+                        throw last_error("ReadFile", GetLastError());
 
                     if (read == (DWORD)left)
                         break;
