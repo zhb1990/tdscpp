@@ -2714,7 +2714,11 @@ namespace tds {
         auto user_u16 = utf8_to_utf16(user);
         auto password_u16 = utf8_to_utf16(password);
 
+#ifdef _WIN32
+        if (user.empty() && pipe.get() == INVALID_HANDLE_VALUE) {
+#else
         if (user.empty()) {
+#endif
             if (fqdn.empty())
                 throw runtime_error("Could not do SSPI authentication as could not find server FQDN.");
 
