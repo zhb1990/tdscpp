@@ -2819,7 +2819,6 @@ namespace tds {
         // FIXME - client PID
         // FIXME - option flags (1, 2, 3)
         // FIXME - collation
-        // FIXME - app name
         // FIXME - locale name?
 
         send_login_msg2(0x74000004, packet_size, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
