@@ -3311,7 +3311,7 @@ namespace tds {
             if (pipe.get() != INVALID_HANDLE_VALUE) {
                 DWORD read;
 
-                if (!ReadFile(pipe.get(), ptr, left, &read, nullptr))
+                if (!ReadFile(pipe.get(), ptr, left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
                     throw formatted_error("ReadFile failed (error {})", GetLastError());
 
                 if (read == (DWORD)left)
@@ -3363,7 +3363,7 @@ namespace tds {
                 if (pipe.get() != INVALID_HANDLE_VALUE) {
                     DWORD read;
 
-                    if (!ReadFile(pipe.get(), ptr, left, &read, nullptr))
+                    if (!ReadFile(pipe.get(), ptr, left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
                         throw formatted_error("ReadFile failed (error {})", GetLastError());
 
                     if (read == (DWORD)left)
