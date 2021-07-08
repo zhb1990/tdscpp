@@ -148,7 +148,60 @@ namespace tds {
         unsigned int codepage;
     };
 
-    std::u16string TDSCPP utf8_to_utf16(const std::string_view& sv);
+#if __cpp_lib_constexpr_string >= 201907L
+#define CONSTEXPR_STRING constexpr
+#else
+#define CONSTEXPR_STRING
+#endif
+
+    static CONSTEXPR_STRING __inline std::u16string utf8_to_utf16(std::string_view sv) {
+        std::u16string ret;
+
+        ret.reserve(sv.length());
+
+        while (!sv.empty()) {
+            if ((uint8_t)sv[0] < 0x80) {
+                ret.push_back((uint8_t)sv[0]);
+                sv = sv.substr(1);
+            } else if (((uint8_t)sv[0] & 0xe0) == 0xc0 && (uint8_t)sv.length() >= 2 && ((uint8_t)sv[1] & 0xc0) == 0x80) {
+                char16_t cp = (char16_t)(((uint8_t)sv[0] & 0x1f) << 6) | (char16_t)((uint8_t)sv[1] & 0x3f);
+
+                ret.push_back(cp);
+                sv = sv.substr(2);
+            } else if (((uint8_t)sv[0] & 0xf0) == 0xe0 && (uint8_t)sv.length() >= 3 && ((uint8_t)sv[1] & 0xc0) == 0x80 && ((uint8_t)sv[2] & 0xc0) == 0x80) {
+                char16_t cp = (char16_t)(((uint8_t)sv[0] & 0xf) << 12) | (char16_t)(((uint8_t)sv[1] & 0x3f) << 6) | (char16_t)((uint8_t)sv[2] & 0x3f);
+
+                if (cp >= 0xd800 && cp <= 0xdfff) {
+                    ret.push_back(0xfffd);
+                    sv = sv.substr(3);
+                    continue;
+                }
+
+                ret.push_back(cp);
+                sv = sv.substr(3);
+            } else if (((uint8_t)sv[0] & 0xf8) == 0xf0 && (uint8_t)sv.length() >= 4 && ((uint8_t)sv[1] & 0xc0) == 0x80 && ((uint8_t)sv[2] & 0xc0) == 0x80 && ((uint8_t)sv[3] & 0xc0) == 0x80) {
+                char32_t cp = (char32_t)(((uint8_t)sv[0] & 0x7) << 18) | (char32_t)(((uint8_t)sv[1] & 0x3f) << 12) | (char32_t)(((uint8_t)sv[2] & 0x3f) << 6) | (char32_t)((uint8_t)sv[3] & 0x3f);
+
+                if (cp > 0x10ffff) {
+                    ret.push_back(0xfffd);
+                    sv = sv.substr(4);
+                    continue;
+                }
+
+                cp -= 0x10000;
+
+                ret.push_back((char16_t)(0xd800 | (cp >> 10)));
+                ret.push_back((char16_t)(0xdc00 | (cp & 0x3ff)));
+                sv = sv.substr(4);
+            } else {
+                ret.push_back(0xfffd);
+                sv = sv.substr(1);
+            }
+        }
+
+        return ret;
+    }
+
     std::string TDSCPP utf16_to_utf8(const std::u16string_view& sv);
     size_t TDSCPP bcp_colmetadata_size(const col_info& col);
     void TDSCPP bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, const std::u16string_view& name);
