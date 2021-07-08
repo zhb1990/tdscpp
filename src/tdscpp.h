@@ -244,48 +244,76 @@ namespace tds {
         return ret;
     }
 
+    static constexpr size_t utf16_to_utf8_len(std::u16string_view sv) noexcept {
+        size_t ret = 0;
+
+        while (!sv.empty()) {
+            if (sv[0] < 0x80)
+                ret++;
+            else if (sv[0] < 0x800)
+                ret += 2;
+            else if (sv[0] < 0xd800)
+                ret += 3;
+            else if (sv[0] < 0xdc00) {
+                if (sv.length() < 2 || (sv[1] & 0xdc00) != 0xdc00) {
+                    ret += 3;
+                    sv = sv.substr(1);
+                    continue;
+                }
+
+                ret += 4;
+                sv = sv.substr(1);
+            } else
+                ret += 3;
+
+            sv = sv.substr(1);
+        }
+
+        return ret;
+    }
+
     static CONSTEXPR_STRING __inline std::string utf16_to_utf8(std::u16string_view sv) {
-        std::string ret;
+        std::string ret(utf16_to_utf8_len(sv), 0);
 
         if (sv.empty())
             return "";
 
-        ret.reserve(sv.length());
+        auto ptr = &ret[0];
 
         while (!sv.empty()) {
-            if (sv[0] < 0x80)
-                ret.push_back((uint8_t)sv[0]);
-            else if (sv[0] < 0x800) {
-                ret.push_back((uint8_t)(0xc0 | (sv[0] >> 6)));
-                ret.push_back((uint8_t)(0x80 | (sv[0] & 0x3f)));
+            if (sv[0] < 0x80) {
+                *ptr = (uint8_t)sv[0]; ptr++;
+            } else if (sv[0] < 0x800) {
+                *ptr = (uint8_t)(0xc0 | (sv[0] >> 6)); ptr++;
+                *ptr = (uint8_t)(0x80 | (sv[0] & 0x3f)); ptr++;
             } else if (sv[0] < 0xd800) {
-                ret.push_back((uint8_t)(0xe0 | (sv[0] >> 12)));
-                ret.push_back((uint8_t)(0x80 | ((sv[0] >> 6) & 0x3f)));
-                ret.push_back((uint8_t)(0x80 | (sv[0] & 0x3f)));
+                *ptr = (uint8_t)(0xe0 | (sv[0] >> 12)); ptr++;
+                *ptr = (uint8_t)(0x80 | ((sv[0] >> 6) & 0x3f)); ptr++;
+                *ptr = (uint8_t)(0x80 | (sv[0] & 0x3f)); ptr++;
             } else if (sv[0] < 0xdc00) {
                 if (sv.length() < 2 || (sv[1] & 0xdc00) != 0xdc00) {
-                    ret.push_back((uint8_t)0xef);
-                    ret.push_back((uint8_t)0xbf);
-                    ret.push_back((uint8_t)0xbd);
+                    *ptr = (uint8_t)0xef; ptr++;
+                    *ptr = (uint8_t)0xbf; ptr++;
+                    *ptr = (uint8_t)0xbd; ptr++;
                     sv = sv.substr(1);
                     continue;
                 }
 
                 char32_t cp = 0x10000 | ((sv[0] & ~0xd800) << 10) | (sv[1] & ~0xdc00);
 
-                ret.push_back((uint8_t)(0xf0 | (cp >> 18)));
-                ret.push_back((uint8_t)(0x80 | ((cp >> 12) & 0x3f)));
-                ret.push_back((uint8_t)(0x80 | ((cp >> 6) & 0x3f)));
-                ret.push_back((uint8_t)(0x80 | (cp & 0x3f)));
+                *ptr = (uint8_t)(0xf0 | (cp >> 18)); ptr++;
+                *ptr = (uint8_t)(0x80 | ((cp >> 12) & 0x3f)); ptr++;
+                *ptr = (uint8_t)(0x80 | ((cp >> 6) & 0x3f)); ptr++;
+                *ptr = (uint8_t)(0x80 | (cp & 0x3f)); ptr++;
                 sv = sv.substr(1);
             } else if (sv[0] < 0xe000) {
-                ret.push_back((uint8_t)0xef);
-                ret.push_back((uint8_t)0xbf);
-                ret.push_back((uint8_t)0xbd);
+                *ptr = (uint8_t)0xef; ptr++;
+                *ptr = (uint8_t)0xbf; ptr++;
+                *ptr = (uint8_t)0xbd; ptr++;
             } else {
-                ret.push_back((uint8_t)(0xe0 | (sv[0] >> 12)));
-                ret.push_back((uint8_t)(0x80 | ((sv[0] >> 6) & 0x3f)));
-                ret.push_back((uint8_t)(0x80 | (sv[0] & 0x3f)));
+                *ptr = (uint8_t)(0xe0 | (sv[0] >> 12)); ptr++;
+                *ptr = (uint8_t)(0x80 | ((sv[0] >> 6) & 0x3f)); ptr++;
+                *ptr = (uint8_t)(0x80 | (sv[0] & 0x3f)); ptr++;
             }
 
             sv = sv.substr(1);
