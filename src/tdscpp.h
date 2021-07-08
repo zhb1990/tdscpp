@@ -189,6 +189,10 @@ namespace tds {
 
     static CONSTEXPR_STRING __inline std::u16string utf8_to_utf16(std::string_view sv) {
         std::u16string ret(utf8_to_utf16_len(sv), 0);
+
+        if (sv.empty())
+            return u"";
+
         auto ptr = &ret[0];
 
         while (!sv.empty()) {
