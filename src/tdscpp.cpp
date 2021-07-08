@@ -1274,51 +1274,6 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
     }
 }
 
-namespace tds {
-#if __cpp_lib_constexpr_string >= 201907L
-    static_assert(utf8_to_utf16("hello") == u"hello"); // single bytes
-    static_assert(utf8_to_utf16("h\xc3\xa9llo") == u"h\xe9llo"); // 2-byte literal
-    static_assert(utf8_to_utf16("h\xe2\x82\xacllo") == u"h\u20acllo"); // 3-byte literal
-    static_assert(utf8_to_utf16("h\xf0\x9f\x95\xb4llo") == u"h\U0001f574llo"); // 4-byte literal
-    static_assert(utf8_to_utf16("h\xc3llo") == u"h\ufffdllo"); // first byte of 2-byte literal
-    static_assert(utf8_to_utf16("h\xe2llo") == u"h\ufffdllo"); // first byte of 3-byte literal
-    static_assert(utf8_to_utf16("h\xe2\x82llo") == u"h\ufffd\ufffdllo"); // first two bytes of 3-byte literal
-    static_assert(utf8_to_utf16("h\xf0llo") == u"h\ufffdllo"); // first byte of 4-byte literal
-    static_assert(utf8_to_utf16("h\xf0\x9fllo") == u"h\ufffd\ufffdllo"); // first two bytes of 4-byte literal
-    static_assert(utf8_to_utf16("h\xf0\x9f\x95llo") == u"h\ufffd\ufffd\ufffdllo"); // first three bytes of 4-byte literal
-    static_assert(utf8_to_utf16("h\xed\xa0\xbdllo") == u"h\ufffdllo"); // encoded surrogate
-#endif
-
-    string utf16_to_utf8(const u16string_view& sv) {
-#ifdef _WIN32
-        string ret;
-
-        if (sv.empty())
-            return "";
-
-        auto len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), nullptr, 0,
-                                    nullptr, nullptr);
-
-        if (len == 0)
-            throw runtime_error("WideCharToMultiByte 1 failed.");
-
-        ret.resize(len);
-
-        len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)sv.data(), (int)sv.length(), ret.data(), len,
-                                nullptr, nullptr);
-
-        if (len == 0)
-            throw runtime_error("WideCharToMultiByte 2 failed.");
-
-        return ret;
-#else
-        wstring_convert<codecvt_utf8_utf16<char16_t>, char16_t> convert;
-
-        return convert.to_bytes(sv.data(), sv.data() + sv.length());
-#endif
-    }
-}
-
 #ifdef _WIN32
 template<>
 struct fmt::formatter<enum sec_error> {
@@ -2441,6 +2396,28 @@ private:
 #endif
 
 namespace tds {
+#if __cpp_lib_constexpr_string >= 201907L
+    static_assert(utf8_to_utf16("hello") == u"hello"); // single bytes
+    static_assert(utf8_to_utf16("h\xc3\xa9llo") == u"h\xe9llo"); // 2-byte literal
+    static_assert(utf8_to_utf16("h\xe2\x82\xacllo") == u"h\u20acllo"); // 3-byte literal
+    static_assert(utf8_to_utf16("h\xf0\x9f\x95\xb4llo") == u"h\U0001f574llo"); // 4-byte literal
+    static_assert(utf8_to_utf16("h\xc3llo") == u"h\ufffdllo"); // first byte of 2-byte literal
+    static_assert(utf8_to_utf16("h\xe2llo") == u"h\ufffdllo"); // first byte of 3-byte literal
+    static_assert(utf8_to_utf16("h\xe2\x82llo") == u"h\ufffd\ufffdllo"); // first two bytes of 3-byte literal
+    static_assert(utf8_to_utf16("h\xf0llo") == u"h\ufffdllo"); // first byte of 4-byte literal
+    static_assert(utf8_to_utf16("h\xf0\x9fllo") == u"h\ufffd\ufffdllo"); // first two bytes of 4-byte literal
+    static_assert(utf8_to_utf16("h\xf0\x9f\x95llo") == u"h\ufffd\ufffd\ufffdllo"); // first three bytes of 4-byte literal
+    static_assert(utf8_to_utf16("h\xed\xa0\xbdllo") == u"h\ufffdllo"); // encoded surrogate
+
+    static_assert(utf16_to_utf8(u"hello") == "hello"); // single bytes
+    // Compiler bug on MSVC 16.10? These work as asserts but not static_asserts
+//     static_assert(utf16_to_utf8(u"h\xe9llo") == "h\xc3\xa9llo"); // 2-byte literal
+//     static_assert(utf16_to_utf8(u"h\u20acllo") == "h\xe2\x82\xacllo"); // 3-byte literal
+//     static_assert(utf16_to_utf8(u"h\ufb00llo") == "h\xef\xac\x80llo"); // 3-byte literal
+//     static_assert(utf16_to_utf8(u"h\U0001f574llo") == "h\xf0\x9f\x95\xb4llo"); // 4-byte literal
+//     static_assert(utf16_to_utf8(u"h\xdc00llo") == "h\xef\xbf\xbdllo"); // unpaired surrogate
+#endif
+
     tds::tds(const string& server, const string_view& user, const string_view& password,
              const string_view& app_name, const msg_handler& message_handler,
              const func_count_handler& count_handler, uint16_t port) {
