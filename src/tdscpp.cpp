@@ -7,11 +7,6 @@
 #include "config.h"
 #include <iostream>
 #include <string>
-
-#ifndef _WIN32
-#include <codecvt>
-#endif
-
 #include <list>
 #include <map>
 #include <charconv>
