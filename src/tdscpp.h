@@ -874,7 +874,8 @@ namespace tds {
             }
         }
 
-        void add_param(const std::span<std::byte>& bin) {
+        template<typename T> requires byte_list<T>
+        void add_param(const T& bin) {
             params.emplace_back(bin);
         }
 
