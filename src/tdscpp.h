@@ -322,6 +322,12 @@ namespace tds {
         return ret;
     }
 
+    template<typename T>
+    requires std::ranges::input_range<T>
+    static constexpr std::span<std::byte> to_bytes(const T& t) {
+        return std::span<std::byte>{(std::byte*)std::ranges::cdata(t), std::ranges::size(t) * sizeof(std::ranges::range_value_t<T>)};
+    }
+
     size_t TDSCPP bcp_colmetadata_size(const col_info& col);
     void TDSCPP bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, const std::u16string_view& name);
 
