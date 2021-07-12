@@ -316,7 +316,8 @@ namespace tds {
     }
 
     template<typename T>
-    requires std::ranges::output_range<T, char> && std::is_same_v<std::ranges::range_value_t<T>, char>
+    requires (std::ranges::output_range<T, char> && std::is_same_v<std::ranges::range_value_t<T>, char>) ||
+             (std::ranges::output_range<T, char8_t> && std::is_same_v<std::ranges::range_value_t<T>, char8_t>)
     static constexpr void utf16_to_utf8_range(std::u16string_view sv, T& t) noexcept {
         auto ptr = t.begin();
 
