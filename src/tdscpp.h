@@ -276,6 +276,12 @@ namespace tds {
         }
     }
 
+    template<typename T>
+    requires std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>
+    static constexpr void utf8_to_utf16_range(std::u8string_view sv, T& t) noexcept {
+        utf8_to_utf16_range(std::string_view((char*)sv.data(), sv.length()), t);
+    }
+
     static CONSTEXPR_STRING __inline std::u16string utf8_to_utf16(const std::string_view& sv) {
         if (sv.empty())
             return u"";
