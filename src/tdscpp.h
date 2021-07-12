@@ -187,6 +187,10 @@ namespace tds {
         return ret;
     }
 
+    static constexpr size_t utf8_to_utf16_len(std::u8string_view sv) noexcept {
+        return utf8_to_utf16_len(std::string_view(std::bit_cast<char*>(sv.data()), sv.length()));
+    }
+
     template<typename T>
     requires std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>
     static constexpr void utf8_to_utf16_range(std::string_view sv, T& t) noexcept {
