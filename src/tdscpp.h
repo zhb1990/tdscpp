@@ -323,7 +323,7 @@ namespace tds {
     }
 
     template<typename T>
-    requires std::ranges::input_range<T>
+    requires std::ranges::input_range<T> && std::ranges::contiguous_range<T>
     static constexpr std::span<std::byte> to_bytes(const T& t) {
         return std::span<std::byte>{(std::byte*)std::ranges::cdata(t), std::ranges::size(t) * sizeof(std::ranges::range_value_t<T>)};
     }
