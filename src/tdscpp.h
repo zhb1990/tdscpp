@@ -192,7 +192,8 @@ namespace tds {
     }
 
     template<typename T>
-    requires std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>
+    requires (std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>) ||
+        (sizeof(wchar_t) == 2 && std::ranges::output_range<T, wchar_t> && std::is_same_v<std::ranges::range_value_t<T>, wchar_t>)
     static constexpr void utf8_to_utf16_range(std::string_view sv, T& t) noexcept {
         auto ptr = t.begin();
 
@@ -281,7 +282,8 @@ namespace tds {
     }
 
     template<typename T>
-    requires std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>
+    requires (std::ranges::output_range<T, char16_t> && std::is_same_v<std::ranges::range_value_t<T>, char16_t>) ||
+        (sizeof(wchar_t) == 2 && std::ranges::output_range<T, wchar_t> && std::is_same_v<std::ranges::range_value_t<T>, wchar_t>)
     static constexpr void utf8_to_utf16_range(std::u8string_view sv, T& t) noexcept {
         utf8_to_utf16_range(std::string_view((char*)sv.data(), sv.length()), t);
     }
