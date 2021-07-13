@@ -151,7 +151,7 @@ namespace tds {
 #if __cpp_lib_constexpr_string >= 201907L
 #define CONSTEXPR_STRING constexpr
 #else
-#define CONSTEXPR_STRING
+#define CONSTEXPR_STRING __inline
 #endif
 
     static constexpr size_t utf8_to_utf16_len(std::string_view sv) noexcept {
@@ -288,7 +288,7 @@ namespace tds {
         utf8_to_utf16_range(std::string_view((char*)sv.data(), sv.length()), t);
     }
 
-    static CONSTEXPR_STRING __inline std::u16string utf8_to_utf16(const std::string_view& sv) {
+    static CONSTEXPR_STRING std::u16string utf8_to_utf16(const std::string_view& sv) {
         if (sv.empty())
             return u"";
 
@@ -299,7 +299,9 @@ namespace tds {
         return ret;
     }
 
-    static constexpr size_t utf16_to_utf8_len(std::u16string_view sv) noexcept {
+    template<typename T>
+    requires (std::is_same_v<T, char16_t> || (sizeof(wchar_t) == 2 && std::is_same_v<T, wchar_t>))
+    static constexpr size_t utf16_to_utf8_len(std::basic_string_view<T> sv) noexcept {
         size_t ret = 0;
 
         while (!sv.empty()) {
@@ -327,10 +329,17 @@ namespace tds {
         return ret;
     }
 
-    template<typename T>
-    requires (std::ranges::output_range<T, char> && std::is_same_v<std::ranges::range_value_t<T>, char>) ||
-             (std::ranges::output_range<T, char8_t> && std::is_same_v<std::ranges::range_value_t<T>, char8_t>)
-    static constexpr void utf16_to_utf8_range(std::u16string_view sv, T& t) noexcept {
+    template<typename T, size_t N>
+    requires (std::is_same_v<T, char16_t> || (sizeof(wchar_t) == 2 && std::is_same_v<T, wchar_t>))
+    static constexpr size_t utf16_to_utf8_len(const T (&str)[N]) noexcept {
+        return utf16_to_utf8_len(std::basic_string_view<T>{str, N - 1});
+    }
+
+    template<typename T, typename U>
+    requires (std::is_same_v<T, char16_t> || (sizeof(wchar_t) == 2 && std::is_same_v<T, wchar_t>)) &&
+             ((std::ranges::output_range<U, char> && std::is_same_v<std::ranges::range_value_t<U>, char>) ||
+             (std::ranges::output_range<U, char8_t> && std::is_same_v<std::ranges::range_value_t<U>, char8_t>))
+    static constexpr void utf16_to_utf8_range(std::basic_string_view<T> sv, U& t) noexcept {
         auto ptr = t.begin();
 
         if (ptr == t.end())
@@ -466,7 +475,7 @@ namespace tds {
         }
     }
 
-    static CONSTEXPR_STRING __inline std::string utf16_to_utf8(const std::u16string_view& sv) {
+    static CONSTEXPR_STRING std::string utf16_to_utf8(const std::u16string_view& sv) {
         if (sv.empty())
             return "";
 
@@ -476,6 +485,19 @@ namespace tds {
 
         return ret;
     }
+
+#if defined(_WIN32) || __WCHAR_WIDTH__ == 16
+    static CONSTEXPR_STRING std::string utf16_to_utf8(const std::wstring_view& sv) {
+        if (sv.empty())
+            return "";
+
+        std::string ret(utf16_to_utf8_len(sv), 0);
+
+        utf16_to_utf8_range(sv, ret);
+
+        return ret;
+    }
+#endif
 
     template<typename T>
     requires std::ranges::input_range<T> && std::ranges::contiguous_range<T>
