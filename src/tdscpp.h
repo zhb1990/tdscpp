@@ -595,6 +595,7 @@ namespace tds {
         }
 
         uint16_t spid() const;
+        std::u16string db_name() const;
 
         tds_impl* impl;
 

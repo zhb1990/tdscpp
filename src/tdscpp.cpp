@@ -5278,6 +5278,24 @@ namespace tds {
         auto ec = (tds_envchange*)(sv.data() - offsetof(tds_envchange, type));
 
         switch (ec->type) {
+            case tds_envchange_type::database: {
+                if (sv.length() < sizeof(tds_envchange_database) - offsetof(tds_envchange_database, header.type)) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sv.length(),
+                                          sizeof(tds_envchange_database) - offsetof(tds_envchange_database, header.type));
+                }
+
+                auto tedb = (tds_envchange_database*)ec;
+
+                if (tedb->header.length < sizeof(tds_envchange_database) + (tedb->name_len * sizeof(char16_t))) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).",
+                                          tedb->header.length, sizeof(tds_envchange_database) + (tedb->name_len * sizeof(char16_t)));
+                }
+
+                db_name = u16string_view{(char16_t*)&tedb[1], tedb->name_len};
+
+                break;
+            }
+
             case tds_envchange_type::begin_trans: {
                 if (sv.length() < sizeof(tds_envchange_begin_trans) - offsetof(tds_envchange_begin_trans, header.type))
                     throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sv.length());
@@ -5324,8 +5342,10 @@ namespace tds {
             }
 
             case tds_envchange_type::packet_size: {
-                if (sv.length() < sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type))
-                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least 2).", sv.length());
+                if (sv.length() < sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type)) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sv.length(),
+                                          sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type));
+                }
 
                 auto teps = (tds_envchange_packet_size*)ec;
 
@@ -5353,6 +5373,10 @@ namespace tds {
             default:
             break;
         }
+    }
+
+    u16string tds::db_name() const {
+        return impl->db_name;
     }
 
     trans::trans(tds& conn) : conn(conn) {

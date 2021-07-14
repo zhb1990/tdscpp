@@ -362,6 +362,13 @@ struct tds_envchange_packet_size {
 
 static_assert(sizeof(tds_envchange_packet_size) == 5, "tds_envchange_packet_size has wrong size");
 
+struct tds_envchange_database {
+    struct tds_envchange header;
+    uint8_t name_len;
+};
+
+static_assert(sizeof(tds_envchange_database) == 5, "tds_envchange_database has wrong size");
+
 struct tds_info_msg {
     int32_t msgno;
     uint8_t state;
@@ -486,6 +493,7 @@ namespace tds {
         uint32_t packet_size = 4096;
         uint16_t spid = 0;
         bool has_utf8 = false;
+        std::u16string db_name;
     };
 
     class batch_impl {
