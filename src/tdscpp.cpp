@@ -2432,8 +2432,13 @@ namespace tds {
         if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
             throw runtime_error("WSAStartup failed.");
 
-        if (server.starts_with("\\\\")) { // named pipe
+        if (server.starts_with("\\\\") || server.starts_with("np:") || server.starts_with("lpc:")) { // named pipe
             auto name = utf8_to_utf16(server);
+
+            if (name.starts_with(u"np:"))
+                name = u"\\\\" + name.substr(3) + u"\\pipe\\sql\\query";
+            else if (name.starts_with(u"lpc:"))
+                name = u"\\\\" + name.substr(4) + u"\\pipe\\SQLLocal\\MSSQLSERVER";
 
             do {
                 pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
@@ -2442,7 +2447,7 @@ namespace tds {
                     break;
 
                 if (GetLastError() != ERROR_PIPE_BUSY)
-                    throw last_error("CreateFile(" + server + ")", GetLastError());
+                    throw last_error("CreateFile(" + utf16_to_utf8(name) + ")", GetLastError());
 
                 if (!WaitNamedPipeW((WCHAR*)name.c_str(), NMPWAIT_WAIT_FOREVER))
                     throw last_error("WaitNamedPipe", GetLastError());
