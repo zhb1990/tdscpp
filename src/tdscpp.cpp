@@ -2414,9 +2414,10 @@ namespace tds {
 #endif
 
     tds::tds(const string& server, const string_view& user, const string_view& password,
-             const string_view& app_name, const msg_handler& message_handler,
+             const string_view& app_name, const string_view& db,
+             const msg_handler& message_handler,
              const func_count_handler& count_handler, uint16_t port) {
-        impl = new tds_impl(server, user, password, app_name, message_handler, count_handler, port);
+        impl = new tds_impl(server, user, password, app_name, db, message_handler, count_handler, port);
     }
 
     tds::~tds() {
@@ -2424,7 +2425,7 @@ namespace tds {
     }
 
     tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
-                       const string_view& app_name, const msg_handler& message_handler,
+                       const string_view& app_name, const string_view& db, const msg_handler& message_handler,
                        const func_count_handler& count_handler, uint16_t port) : message_handler(message_handler), count_handler(count_handler) {
 #ifdef _WIN32
         WSADATA wsa_data;
@@ -2458,7 +2459,7 @@ namespace tds {
 
         send_prelogin_msg();
 
-        send_login_msg(user, password, server, app_name);
+        send_login_msg(user, password, server, app_name, db);
     }
 
     tds_impl::~tds_impl() {
@@ -2681,7 +2682,7 @@ namespace tds {
 #endif
 
     void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server,
-                                  const string_view& app_name) {
+                                  const string_view& app_name, const string_view& db) {
         enum tds_msg type;
         string payload, sspi;
 #ifdef _WIN32
@@ -2805,7 +2806,7 @@ namespace tds {
 
         send_login_msg2(0x74000004, packet_size, 0xf8f28306, 0x5ab7, 0, 0xe0, 0x03, 0, 0x08, 0x436,
                         client_name, user_u16, password_u16, utf8_to_utf16(app_name), utf8_to_utf16(server), u"", u"us_english",
-                        u"", sspi, u"", u"");
+                        utf8_to_utf16(db), sspi, u"", u"");
 
         // FIXME - timeout
 

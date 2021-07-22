@@ -454,7 +454,8 @@ namespace tds {
     class tds_impl {
     public:
         tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
-                 const std::string_view& app_name, const msg_handler& message_handler,
+                 const std::string_view& app_name, const std::string_view& db,
+                 const msg_handler& message_handler,
                  const func_count_handler& count_handler, uint16_t port);
         ~tds_impl();
         void send_msg(enum tds_msg type, const std::string_view& msg);
@@ -471,7 +472,7 @@ namespace tds {
         void connect(const std::string& server, uint16_t port, bool get_fqdn);
         void send_prelogin_msg();
         void send_login_msg(const std::string_view& user, const std::string_view& password, const std::string_view& server,
-                            const std::string_view& app_name);
+                            const std::string_view& app_name, const std::string_view& db);
         void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
                             uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
                             uint8_t option_flags3, uint32_t collation, const std::u16string_view& client_name,
