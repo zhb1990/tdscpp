@@ -2559,7 +2559,7 @@ namespace tds {
         size_t size, off;
 
         // FIXME - allow the user to specify this
-        static const char instance[] = "MSSQLServer";
+        static const string_view instance = "MSSQLServer";
 
         // version
 
@@ -2578,8 +2578,7 @@ namespace tds {
 
         // instopt
 
-        // needs trailing zero
-        opts.emplace_back(tds_login_opt_type::instopt, string_view{instance, sizeof(instance)});
+        opts.emplace_back(tds_login_opt_type::instopt, instance);
 
         // MARS
 
@@ -2590,6 +2589,9 @@ namespace tds {
 
         for (const auto& opt : opts) {
             size += opt.payload.size();
+
+            if (opt.type == tds_login_opt_type::instopt)
+                size++;
         }
 
         msg.resize(size);
@@ -2599,10 +2601,20 @@ namespace tds {
         for (const auto& opt : opts) {
             tlo->type = opt.type;
             tlo->offset = htons((uint16_t)off);
-            tlo->length = htons((uint16_t)opt.payload.size());
+
+            if (opt.type == tds_login_opt_type::instopt)
+                tlo->length = htons((uint16_t)opt.payload.size() + 1);
+            else
+                tlo->length = htons((uint16_t)opt.payload.size());
 
             memcpy(msg.data() + off, opt.payload.data(), opt.payload.size());
             off += opt.payload.size();
+
+            // instopt is null-terminated
+            if (opt.type == tds_login_opt_type::instopt) {
+                msg[off] = 0;
+                off++;
+            }
 
             tlo++;
         }
