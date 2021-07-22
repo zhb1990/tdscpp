@@ -68,6 +68,10 @@ enum class tds_login_opt_type : uint8_t {
 struct login_opt {
     login_opt(enum tds_login_opt_type type, const std::string_view& payload) : type(type), payload(payload) { }
 
+    template<typename T>
+    requires std::is_integral_v<T> || std::is_enum_v<T>
+    login_opt(enum tds_login_opt_type type, T payload) : type(type), payload(std::string_view{(char*)&payload, sizeof(payload)}) { }
+
     enum tds_login_opt_type type;
     std::string payload;
 };

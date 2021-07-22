@@ -2557,8 +2557,6 @@ namespace tds {
         vector<login_opt> opts;
         login_opt_version lov;
         size_t size, off;
-        enum tds_encryption_type enc;
-        uint8_t mars;
 
         // FIXME - allow the user to specify this
         static const char instance[] = "MSSQLServer";
@@ -2576,9 +2574,7 @@ namespace tds {
         // FIXME - actually support encryption
         // FIXME - handle error message if server insists on encryption
 
-        enc = tds_encryption_type::ENCRYPT_NOT_SUP;
-
-        opts.emplace_back(tds_login_opt_type::encryption, string_view{(char*)&enc, sizeof(enc)});
+        opts.emplace_back(tds_login_opt_type::encryption, tds_encryption_type::ENCRYPT_NOT_SUP);
 
         // instopt
 
@@ -2587,8 +2583,7 @@ namespace tds {
 
         // MARS
 
-        mars = 0;
-        opts.emplace_back(tds_login_opt_type::mars, string_view{(char*)&mars, sizeof(mars)});
+        opts.emplace_back(tds_login_opt_type::mars, (uint8_t)0);
 
         size = (sizeof(tds_login_opt) * opts.size()) + sizeof(enum tds_login_opt_type);
         off = size;
