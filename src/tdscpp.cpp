@@ -2573,7 +2573,6 @@ namespace tds {
 
         // encryption
         // FIXME - actually support encryption
-        // FIXME - handle error message if server insists on encryption
 
         opts.emplace_back(tds_login_opt_type::encryption, tds_encryption_type::ENCRYPT_NOT_SUP);
 
@@ -2624,17 +2623,40 @@ namespace tds {
 
         send_msg(tds_msg::prelogin, msg);
 
-        {
-            enum tds_msg type;
-            string payload;
+        enum tds_msg type;
+        string payload;
 
-            wait_for_msg(type, payload);
-            // FIXME - timeout
+        wait_for_msg(type, payload);
+        // FIXME - timeout
 
-            if (type != tds_msg::tabular_result)
-                throw formatted_error("Received message type {}, expected tabular_result", (int)type);
+        if (type != tds_msg::tabular_result)
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-            // FIXME - parse payload for anything we care about (in particular, what server says about encryption)
+        string_view sv = payload;
+
+        while (sv.length() > sizeof(tds_login_opt)) {
+            tlo = (tds_login_opt*)sv.data();
+
+            if (tlo->type == tds_login_opt_type::terminator)
+                break;
+
+            if (tlo->type == tds_login_opt_type::encryption) {
+                auto off = htons(tlo->offset);
+                auto len = htons(tlo->length);
+
+                if (payload.length() < off + len)
+                    throw runtime_error("Malformed PRELOGIN response.");
+
+                if (len < sizeof(enum tds_encryption_type))
+                    throw formatted_error("Returned encryption type was {} bytes, expected {}.", len, sizeof(enum tds_encryption_type));
+
+                auto enc = *(enum tds_encryption_type*)(payload.data() + off);
+
+                if (enc == tds_encryption_type::ENCRYPT_REQ)
+                    throw runtime_error("Cannot connect as server requires encryption.");
+            }
+
+            sv.remove_prefix(sizeof(tds_login_opt));
         }
     }
 
