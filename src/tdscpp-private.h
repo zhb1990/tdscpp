@@ -11,6 +11,12 @@
 #include <sspi.h>
 #endif
 
+#include <openssl/ssl.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/conf.h>
+#include <openssl/x509v3.h>
+
 class _formatted_error : public std::exception {
 public:
     template<typename T, typename... Args>
@@ -450,7 +456,18 @@ private:
 
 #endif
 
+class bio_deleter {
+public:
+    typedef BIO* pointer;
+
+    void operator()(BIO* bio) {
+        BIO_free_all(bio);
+    }
+};
+
 namespace tds {
+    class tds_ssl;
+
     class tds_impl {
     public:
         tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
@@ -458,7 +475,8 @@ namespace tds {
                  const msg_handler& message_handler,
                  const func_count_handler& count_handler, uint16_t port);
         ~tds_impl();
-        void send_msg(enum tds_msg type, const std::string_view& msg);
+        void send_raw(const std::string_view& msg);
+        void send_msg(enum tds_msg type, const std::string_view& msg, bool do_ssl = true);
         void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);
         void handle_info_msg(std::string_view sv, bool error);
         void handle_envchange_msg(const std::string_view& sv);
@@ -499,6 +517,23 @@ namespace tds {
         uint16_t spid = 0;
         bool has_utf8 = false;
         std::u16string db_name;
+        std::unique_ptr<tds_ssl> ssl;
+        tds_encryption_type server_enc = tds_encryption_type::ENCRYPT_NOT_SUP;
+    };
+
+    class tds_ssl {
+    public:
+        tds_ssl(tds_impl& tds);
+        int ssl_read_cb(char* data, int len);
+        int ssl_write_cb(const std::string_view& sv);
+        long ssl_ctrl_cb(int cmd, long num, void* ptr);
+        void send(std::string_view sv);
+
+        tds_impl& tds;
+        std::string ssl_recv_buf;
+        SSL* ssl;
+        std::unique_ptr<BIO*, bio_deleter> bio;
+        bool established = false;
     };
 
     class batch_impl {

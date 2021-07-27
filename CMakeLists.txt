@@ -25,6 +25,7 @@ find_package(ICU COMPONENTS uc REQUIRED)
 endif()
 
 find_package(fmt REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,7 +40,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(SRC_FILES src/tdscpp.cpp
     src/bcp.cpp
-    src/value.cpp)
+    src/value.cpp
+    src/ssl.cpp)
 
 add_library(tdscpp SHARED ${SRC_FILES})
 
@@ -48,6 +50,7 @@ if(WIN32)
 endif()
 
 target_link_libraries(tdscpp fmt::fmt-header-only)
+target_link_libraries(tdscpp OpenSSL::Crypto OpenSSL::SSL)
 
 if(NOT WIN32)
 target_link_libraries(tdscpp ICU::uc)

@@ -2459,7 +2459,14 @@ namespace tds {
 
         send_prelogin_msg();
 
+        if (server_enc != tds_encryption_type::ENCRYPT_NOT_SUP)
+            ssl.reset(new tds_ssl(*this));
+
         send_login_msg(user, password, server, app_name, db);
+
+        // FIXME - handle non-login encryption as well
+
+        ssl.reset();
     }
 
     tds_impl::~tds_impl() {
@@ -2572,9 +2579,8 @@ namespace tds {
         opts.emplace_back(tds_login_opt_type::version, string_view{(char*)&lov, sizeof(lov)});
 
         // encryption
-        // FIXME - actually support encryption
 
-        opts.emplace_back(tds_login_opt_type::encryption, tds_encryption_type::ENCRYPT_NOT_SUP);
+        opts.emplace_back(tds_login_opt_type::encryption, tds_encryption_type::ENCRYPT_OFF);
 
         // instopt
 
@@ -2650,10 +2656,7 @@ namespace tds {
                 if (len < sizeof(enum tds_encryption_type))
                     throw formatted_error("Returned encryption type was {} bytes, expected {}.", len, sizeof(enum tds_encryption_type));
 
-                auto enc = *(enum tds_encryption_type*)(payload.data() + off);
-
-                if (enc == tds_encryption_type::ENCRYPT_REQ)
-                    throw runtime_error("Cannot connect as server requires encryption.");
+                server_enc = *(enum tds_encryption_type*)(payload.data() + off);
             }
 
             sv.remove_prefix(sizeof(tds_login_opt));
@@ -3235,7 +3238,47 @@ namespace tds {
         send_msg(tds_msg::tds7_login, payload);
     }
 
-    void tds_impl::send_msg(enum tds_msg type, const string_view& msg) {
+    void tds_impl::send_raw(const string_view& msg) {
+        auto ptr = (uint8_t*)msg.data();
+        auto left = (int)msg.length();
+
+        do {
+#ifdef _WIN32
+            if (pipe.get() != INVALID_HANDLE_VALUE) {
+                DWORD written;
+
+                if (!WriteFile(pipe.get(), ptr, left, &written, nullptr))
+                    throw last_error("WriteFile", GetLastError());
+
+                if (written == (DWORD)left)
+                    break;
+
+                ptr += written;
+                left -= (int)written;
+            } else {
+#endif
+                auto ret = send(sock, (char*)ptr, left, 0);
+
+#ifdef _WIN32
+                if (ret < 0)
+                    throw formatted_error("send failed (error {})", WSAGetLastError());
+#else
+                if (ret < 0)
+                    throw formatted_error("send failed (error {})", errno);
+#endif
+
+                if (ret == left)
+                    break;
+
+                ptr += ret;
+                left -= (int)ret;
+#ifdef _WIN32
+            }
+#endif
+        } while (true);
+    }
+
+    void tds_impl::send_msg(enum tds_msg type, const string_view& msg, bool do_ssl) {
         string payload;
         const size_t size = packet_size - sizeof(tds_header);
         string_view sv = msg;
@@ -3262,43 +3305,10 @@ namespace tds {
             if (!sv2.empty())
                 memcpy(payload.data() + sizeof(tds_header), sv2.data(), sv2.size());
 
-            auto ptr = (uint8_t*)payload.data();
-            auto left = (int)payload.length();
-
-            do {
-#ifdef _WIN32
-                if (pipe.get() != INVALID_HANDLE_VALUE) {
-                    DWORD written;
-
-                    if (!WriteFile(pipe.get(), ptr, left, &written, nullptr))
-                        throw last_error("WriteFile", GetLastError());
-
-                    if (written == (DWORD)left)
-                        break;
-
-                    ptr += written;
-                    left -= (int)written;
-                } else {
-#endif
-                    auto ret = send(sock, (char*)ptr, left, 0);
-
-#ifdef _WIN32
-                    if (ret < 0)
-                        throw formatted_error("send failed (error {})", WSAGetLastError());
-#else
-                    if (ret < 0)
-                        throw formatted_error("send failed (error {})", errno);
-#endif
-
-                    if (ret == left)
-                        break;
-
-                    ptr += ret;
-                    left -= (int)ret;
-#ifdef _WIN32
-                }
-#endif
-            } while (true);
+            if (do_ssl && ssl)
+                ssl->send(payload);
+            else
+                send_raw(payload);
 
             if (sv2.length() == sv.length())
                 return;
