@@ -56,22 +56,37 @@ private:
     SSL_CTX* ctx;
 };
 
-static int ssl_bio_read(BIO* bio, char* data, int len) {
+static int ssl_bio_read(BIO* bio, char* data, int len) noexcept {
     auto& t = *(tds::tds_ssl*)BIO_get_data(bio);
 
-    return t.ssl_read_cb(data, len);
+    try {
+        return t.ssl_read_cb(data, len);
+    } catch (...) {
+        t.exception = current_exception();
+        return -1;
+    }
 }
 
-static int ssl_bio_write(BIO* bio, const char* data, int len) {
+static int ssl_bio_write(BIO* bio, const char* data, int len) noexcept {
     auto& t = *(tds::tds_ssl*)BIO_get_data(bio);
 
-    return t.ssl_write_cb(string_view{data, (size_t)len});
+    try {
+        return t.ssl_write_cb(string_view{data, (size_t)len});
+    } catch (...) {
+        t.exception = current_exception();
+        return -1;
+    }
 }
 
-static long ssl_bio_ctrl(BIO* bio, int cmd, long num, void* ptr) {
+static long ssl_bio_ctrl(BIO* bio, int cmd, long num, void* ptr) noexcept {
     auto& t = *(tds::tds_ssl*)BIO_get_data(bio);
 
-    return t.ssl_ctrl_cb(cmd, num, ptr);
+    try {
+        return t.ssl_ctrl_cb(cmd, num, ptr);
+    } catch (...) {
+        t.exception = current_exception();
+        return -1;
+    }
 }
 
 namespace tds {
@@ -95,8 +110,6 @@ namespace tds {
             data += to_copy;
         }
 
-        // FIXME - don't throw exceptions
-
         enum tds_msg type;
         string payload;
 
@@ -117,8 +130,6 @@ namespace tds {
     }
 
     int tds_ssl::ssl_write_cb(const string_view& sv) {
-        // FIXME - don't throw exceptions
-
         if (established)
             tds.send_raw(sv);
         else
@@ -185,13 +196,24 @@ namespace tds {
         // FIXME - SSL_set_tlsext_host_name?
 
         SSL_set_connect_state(ssl.get());
+
         SSL_connect(ssl.get());
+        if (exception)
+            rethrow_exception(exception);
 
-        if (BIO_do_connect(bio) != 1)
+        if (BIO_do_connect(bio) != 1) {
+            if (exception)
+                rethrow_exception(exception);
+
             throw ssl_error("BIO_do_connect", ERR_get_error());
+        }
 
-        if (BIO_do_handshake(bio) != 1)
+        if (BIO_do_handshake(bio) != 1) {
+            if (exception)
+                rethrow_exception(exception);
+
             throw ssl_error("BIO_do_handshake", ERR_get_error());
+        }
 
         established = true;
     }
@@ -200,8 +222,12 @@ namespace tds {
         while (!sv.empty()) {
             auto ret = SSL_write(ssl.get(), sv.data(), (int)sv.length());
 
-            if (ret <= 0)
+            if (ret <= 0) {
+                if (exception)
+                    rethrow_exception(exception);
+
                 throw formatted_error("SSL_write failed (error {})", SSL_get_error(ssl.get(), ret));
+            }
 
             sv = sv.substr(ret);
         }

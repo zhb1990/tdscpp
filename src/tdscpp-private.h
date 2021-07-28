@@ -538,6 +538,8 @@ namespace tds {
         long ssl_ctrl_cb(int cmd, long num, void* ptr);
         void send(std::string_view sv);
 
+        std::exception_ptr exception;
+
     private:
         tds_impl& tds;
         std::string ssl_recv_buf;
