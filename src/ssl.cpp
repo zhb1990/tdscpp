@@ -154,18 +154,18 @@ namespace tds {
 
         ctx.set_options(SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
 
-        auto meth = BIO_meth_new(BIO_TYPE_MEM, "tdscpp"); // FIXME - free with BIO_meth_free?
+        meth.reset(BIO_meth_new(BIO_TYPE_MEM, "tdscpp"));
         if (!meth)
             throw ssl_error("BIO_meth_new", ERR_get_error());
 
-        BIO_meth_set_read(meth, ssl_bio_read);
-        BIO_meth_set_write(meth, ssl_bio_write);
-        BIO_meth_set_ctrl(meth, ssl_bio_ctrl);
-        BIO_meth_set_destroy(meth, [](BIO*) {
+        BIO_meth_set_read(meth.get(), ssl_bio_read);
+        BIO_meth_set_write(meth.get(), ssl_bio_write);
+        BIO_meth_set_ctrl(meth.get(), ssl_bio_ctrl);
+        BIO_meth_set_destroy(meth.get(), [](BIO*) {
             return 1;
         });
 
-        bio.reset(BIO_new(meth));
+        bio.reset(BIO_new(meth.get()));
         if (!bio)
             throw ssl_error("BIO_new", ERR_get_error());
 

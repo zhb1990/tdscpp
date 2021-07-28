@@ -465,6 +465,15 @@ public:
     }
 };
 
+class bio_meth_deleter {
+public:
+    typedef BIO_METHOD* pointer;
+
+    void operator()(BIO_METHOD* meth) {
+        BIO_meth_free(meth);
+    }
+};
+
 namespace tds {
     class tds_ssl;
 
@@ -529,10 +538,12 @@ namespace tds {
         long ssl_ctrl_cb(int cmd, long num, void* ptr);
         void send(std::string_view sv);
 
+    private:
         tds_impl& tds;
         std::string ssl_recv_buf;
         SSL* ssl;
         std::unique_ptr<BIO*, bio_deleter> bio;
+        std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
         bool established = false;
     };
 
