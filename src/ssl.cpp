@@ -78,23 +78,30 @@ namespace tds {
             data += to_copy;
         }
 
-        enum tds_msg type;
-        string payload;
+        if (established) {
+            tds.recv_raw((uint8_t*)data, len);
+            copied += len;
 
-        tds.wait_for_msg(type, payload);
+            return copied;
+        } else {
+            enum tds_msg type;
+            string payload;
 
-        if (type != tds_msg::prelogin)
-            throw formatted_error("Received message type {}, expected prelogin", (int)type);
+            tds.wait_for_msg(type, payload);
 
-        auto to_copy = min(len, (int)payload.length());
+            if (type != tds_msg::prelogin)
+                throw formatted_error("Received message type {}, expected prelogin", (int)type);
 
-        memcpy(data, payload.data(), to_copy);
-        copied += to_copy;
+            auto to_copy = min(len, (int)payload.length());
 
-        if (payload.length() > (size_t)to_copy)
-            ssl_recv_buf.append(payload.substr(to_copy));
+            memcpy(data, payload.data(), to_copy);
+            copied += to_copy;
 
-        return copied;
+            if (payload.length() > (size_t)to_copy)
+                ssl_recv_buf.append(payload.substr(to_copy));
+
+            return copied;
+        }
     }
 
     int tds_ssl::ssl_write_cb(const string_view& sv) {
@@ -200,6 +207,22 @@ namespace tds {
             }
 
             sv = sv.substr(ret);
+        }
+    }
+
+    void tds_ssl::recv(uint8_t* ptr, size_t left) {
+        while (left > 0) {
+            auto ret = SSL_read(ssl.get(), ptr, (int)left);
+
+            if (ret <= 0) {
+                if (exception)
+                    rethrow_exception(exception);
+
+                throw formatted_error("SSL_read failed (error {})", SSL_get_error(ssl.get(), ret));
+            }
+
+            ptr += ret;
+            left -= ret;
         }
     }
 };

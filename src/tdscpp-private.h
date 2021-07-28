@@ -494,6 +494,7 @@ namespace tds {
                  const func_count_handler& count_handler, uint16_t port);
         ~tds_impl();
         void send_raw(const std::string_view& msg);
+        void recv_raw(uint8_t* ptr, size_t left);
         void send_msg(enum tds_msg type, const std::string_view& msg, bool do_ssl = true);
         void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);
         void handle_info_msg(std::string_view sv, bool error);
@@ -546,6 +547,7 @@ namespace tds {
         int ssl_write_cb(const std::string_view& sv);
         long ssl_ctrl_cb(int cmd, long num, void* ptr);
         void send(std::string_view sv);
+        void recv(uint8_t* ptr, size_t left);
 
         std::exception_ptr exception;
 

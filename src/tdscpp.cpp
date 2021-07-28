@@ -2466,7 +2466,8 @@ namespace tds {
 
         // FIXME - handle non-login encryption as well
 
-        ssl.reset();
+        if (server_enc != tds_encryption_type::ENCRYPT_ON && server_enc != tds_encryption_type::ENCRYPT_REQ)
+            ssl.reset();
     }
 
     tds_impl::~tds_impl() {
@@ -3317,11 +3318,7 @@ namespace tds {
         }
     }
 
-    void tds_impl::wait_for_msg(enum tds_msg& type, string& payload, bool* last_packet) {
-        tds_header h;
-        auto ptr = (uint8_t*)&h;
-        int left = sizeof(tds_header);
-
+    void tds_impl::recv_raw(uint8_t* ptr, size_t left) {
         do {
 #ifdef _WIN32
             if (pipe.get() != INVALID_HANDLE_VALUE) {
@@ -3350,15 +3347,25 @@ namespace tds {
                 if (ret == 0)
                     throw formatted_error("Disconnected.");
 
-                if (ret == left)
+                if ((size_t)ret == left)
                     break;
 
-                ptr += ret;
+                ptr += (size_t)ret;
                 left -= (int)ret;
 #ifdef _WIN32
             }
 #endif
         } while (true);
+    }
+
+    void tds_impl::wait_for_msg(enum tds_msg& type, string& payload, bool* last_packet) {
+        tds_header h;
+        bool do_ssl = ssl && (server_enc == tds_encryption_type::ENCRYPT_ON || server_enc == tds_encryption_type::ENCRYPT_REQ);
+
+        if (do_ssl)
+            ssl->recv((uint8_t*)&h, sizeof(tds_header));
+        else
+            recv_raw((uint8_t*)&h, sizeof(tds_header));
 
         if (htons(h.length) < sizeof(tds_header)) {
             throw formatted_error("message length was {}, expected at least {}",
@@ -3368,49 +3375,14 @@ namespace tds {
         type = h.type;
 
         if (htons(h.length) > sizeof(tds_header)) {
-            left = (int)(htons(h.length) - sizeof(tds_header));
+            auto left = (int)(htons(h.length) - sizeof(tds_header));
 
             payload.resize(left);
 
-            ptr = (uint8_t*)&payload[0];
-
-            do {
-#ifdef _WIN32
-                if (pipe.get() != INVALID_HANDLE_VALUE) {
-                    DWORD read;
-
-                    if (!ReadFile(pipe.get(), ptr, left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
-                        throw last_error("ReadFile", GetLastError());
-
-                    if (read == (DWORD)left)
-                        break;
-
-                    ptr += read;
-                    left -= read;
-                } else {
-#endif
-                    auto ret = recv(sock, (char*)ptr, (int)left, 0);
-
-#ifdef _WIN32
-                    if (ret < 0)
-                        throw formatted_error("recv failed (error {})", WSAGetLastError());
-#else
-                    if (ret < 0)
-                        throw formatted_error("recv failed (error {})", errno);
-#endif
-
-                    if (ret == 0)
-                        throw formatted_error("Disconnected.");
-
-                    if (ret == left)
-                        break;
-
-                    ptr += ret;
-                    left -= (int)ret;
-#ifdef _WIN32
-                }
-#endif
-            } while (true);
+            if (do_ssl)
+                ssl->recv((uint8_t*)&payload[0], left);
+            else
+                recv_raw((uint8_t*)&payload[0], left);
         } else
             payload.clear();
 
