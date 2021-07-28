@@ -8,6 +8,7 @@
 
 #ifdef _WIN32
 #define SECURITY_WIN32
+#include <windows.h>
 #include <sspi.h>
 #endif
 

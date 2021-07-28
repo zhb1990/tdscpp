@@ -25,6 +25,7 @@
 #include <unistd.h>
 #else
 #define SECURITY_WIN32
+#include <windows.h>
 #include <sspi.h>
 #endif
 
