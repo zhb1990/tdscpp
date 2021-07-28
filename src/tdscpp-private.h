@@ -474,6 +474,15 @@ public:
     }
 };
 
+class ssl_ctx_deleter {
+public:
+    typedef SSL_CTX* pointer;
+
+    void operator()(SSL_CTX* ctx) {
+        SSL_CTX_free(ctx);
+    }
+};
+
 namespace tds {
     class tds_ssl;
 
@@ -547,6 +556,7 @@ namespace tds {
         BIO* bio;
         std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
         bool established = false;
+        std::unique_ptr<SSL_CTX*, ssl_ctx_deleter> ctx;
     };
 
     class batch_impl {

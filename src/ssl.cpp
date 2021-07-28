@@ -24,38 +24,6 @@ private:
     string msg;
 };
 
-class ssl_ctx {
-public:
-    ssl_ctx(const SSL_METHOD* method) {
-        ctx = SSL_CTX_new(method);
-        if (!ctx)
-            throw ssl_error("SSL_CTX_new", ERR_get_error());
-    }
-
-    ~ssl_ctx() {
-        SSL_CTX_free(ctx);
-    }
-
-    void set_verify(int mode, SSL_verify_cb verify_callback) noexcept {
-        SSL_CTX_set_verify(ctx, mode, verify_callback);
-    }
-
-    void set_verify_depth(int depth) noexcept {
-        SSL_CTX_set_verify_depth(ctx, depth);
-    }
-
-    long set_options(long options) noexcept {
-        return SSL_CTX_set_options(ctx, options);
-    }
-
-    operator SSL_CTX*() noexcept {
-        return ctx;
-    }
-
-private:
-    SSL_CTX* ctx;
-};
-
 static int ssl_bio_read(BIO* bio, char* data, int len) noexcept {
     auto& t = *(tds::tds_ssl*)BIO_get_data(bio);
 
@@ -157,13 +125,15 @@ namespace tds {
     }
 
     tds_ssl::tds_ssl(tds_impl& tds) : tds(tds) {
-        ssl_ctx ctx(SSLv23_method());
+        ctx.reset(SSL_CTX_new(SSLv23_method()));
+        if (!ctx)
+            throw ssl_error("SSL_CTX_new", ERR_get_error());
 
         // FIXME - verify certificate?
 //         ctx.set_verify(SSL_VERIFY_PEER, verify_callback);
 //         ctx.set_verify_depth(5);
 
-        ctx.set_options(SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
+        SSL_CTX_set_options(ctx.get(), SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
 
         meth.reset(BIO_meth_new(BIO_TYPE_MEM, "tdscpp"));
         if (!meth)
@@ -182,7 +152,7 @@ namespace tds {
 
         BIO_set_data(bio, this);
 
-        ssl.reset(SSL_new(ctx));
+        ssl.reset(SSL_new(ctx.get()));
         if (!ssl) {
             BIO_free_all(bio);
             throw ssl_error("SSL_new", ERR_get_error());
