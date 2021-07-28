@@ -3325,7 +3325,7 @@ namespace tds {
             if (pipe.get() != INVALID_HANDLE_VALUE) {
                 DWORD read;
 
-                if (!ReadFile(pipe.get(), ptr, left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
+                if (!ReadFile(pipe.get(), ptr, (DWORD)left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
                     throw last_error("ReadFile", GetLastError());
 
                 if (read == (DWORD)left)
@@ -3335,7 +3335,7 @@ namespace tds {
                 left -= read;
             } else {
 #endif
-                auto ret = recv(sock, (char*)ptr, left, 0);
+                auto ret = recv(sock, (char*)ptr, (int)left, 0);
 
 #ifdef _WIN32
                 if (ret < 0)
