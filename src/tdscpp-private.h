@@ -456,21 +456,21 @@ private:
 
 #endif
 
-class bio_deleter {
-public:
-    typedef BIO* pointer;
-
-    void operator()(BIO* bio) {
-        BIO_free_all(bio);
-    }
-};
-
 class bio_meth_deleter {
 public:
     typedef BIO_METHOD* pointer;
 
     void operator()(BIO_METHOD* meth) {
         BIO_meth_free(meth);
+    }
+};
+
+class ssl_deleter {
+public:
+    typedef SSL* pointer;
+
+    void operator()(SSL* ssl) {
+        SSL_free(ssl);
     }
 };
 
@@ -541,8 +541,8 @@ namespace tds {
     private:
         tds_impl& tds;
         std::string ssl_recv_buf;
-        SSL* ssl;
-        std::unique_ptr<BIO*, bio_deleter> bio;
+        std::unique_ptr<SSL*, ssl_deleter> ssl;
+        BIO* bio;
         std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
         bool established = false;
     };

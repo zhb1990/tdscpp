@@ -133,10 +133,10 @@ namespace tds {
                 return 1;
 
             case BIO_C_DO_STATE_MACHINE: {
-                auto ret = SSL_do_handshake(ssl);
+                auto ret = SSL_do_handshake(ssl.get());
 
                 if (ret != 1)
-                    throw formatted_error("SSL_do_handshake failed (error {})", SSL_get_error(ssl, ret));
+                    throw formatted_error("SSL_do_handshake failed (error {})", SSL_get_error(ssl.get(), ret));
 
                 return 1;
             }
@@ -165,30 +165,32 @@ namespace tds {
             return 1;
         });
 
-        bio.reset(BIO_new(meth.get()));
+        bio = BIO_new(meth.get());
         if (!bio)
             throw ssl_error("BIO_new", ERR_get_error());
 
-        BIO_set_data(bio.get(), this);
+        BIO_set_data(bio, this);
 
-        ssl = SSL_new(ctx); // FIXME - free
-        if (!ssl)
+        ssl.reset(SSL_new(ctx));
+        if (!ssl) {
+            BIO_free_all(bio);
             throw ssl_error("SSL_new", ERR_get_error());
+        }
 
-        SSL_set_bio(ssl, bio.get(), bio.get());
+        SSL_set_bio(ssl.get(), bio, bio);
 
-        if (SSL_set_cipher_list(ssl, PREFERRED_CIPHERS) != 1)
+        if (SSL_set_cipher_list(ssl.get(), PREFERRED_CIPHERS) != 1)
             throw ssl_error("SSL_set_cipher_list", ERR_get_error());
 
         // FIXME - SSL_set_tlsext_host_name?
 
-        SSL_set_connect_state(ssl);
-        SSL_connect(ssl);
+        SSL_set_connect_state(ssl.get());
+        SSL_connect(ssl.get());
 
-        if (BIO_do_connect(bio.get()) != 1)
+        if (BIO_do_connect(bio) != 1)
             throw ssl_error("BIO_do_connect", ERR_get_error());
 
-        if (BIO_do_handshake(bio.get()) != 1)
+        if (BIO_do_handshake(bio) != 1)
             throw ssl_error("BIO_do_handshake", ERR_get_error());
 
         established = true;
@@ -196,10 +198,10 @@ namespace tds {
 
     void tds_ssl::send(std::string_view sv) {
         while (!sv.empty()) {
-            auto ret = SSL_write(ssl, sv.data(), (int)sv.length());
+            auto ret = SSL_write(ssl.get(), sv.data(), (int)sv.length());
 
             if (ret <= 0)
-                throw formatted_error("SSL_write failed (error {})", SSL_get_error(ssl, ret));
+                throw formatted_error("SSL_write failed (error {})", SSL_get_error(ssl.get(), ret));
 
             sv = sv.substr(ret);
         }
