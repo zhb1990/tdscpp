@@ -555,11 +555,11 @@ namespace tds {
     private:
         tds_impl& tds;
         std::string ssl_recv_buf;
-        std::unique_ptr<SSL*, ssl_deleter> ssl;
         BIO* bio;
-        std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
         bool established = false;
         std::unique_ptr<SSL_CTX*, ssl_ctx_deleter> ctx;
+        std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
+        std::unique_ptr<SSL*, ssl_deleter> ssl;
     };
 
     class batch_impl {
