@@ -3021,8 +3021,10 @@ namespace tds {
         if (outbuf.pvBuffer)
             FreeContextBuffer(outbuf.pvBuffer);
 
-        if (!ret.empty())
-            send_msg(tds_msg::sspi, ret);
+        if (!ret.empty()) {
+            send_msg(tds_msg::sspi, ret,
+                     server_enc == tds_encryption_type::ENCRYPT_ON || server_enc == tds_encryption_type::ENCRYPT_REQ);
+        }
     }
 #endif
 
