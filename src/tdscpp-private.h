@@ -529,7 +529,7 @@ namespace tds {
 #else
         int sock = 0;
 #endif
-        std::string fqdn;
+        std::string fqdn, hostname;
         msg_handler message_handler;
         func_count_handler count_handler;
         uint64_t trans_id = 0;
@@ -547,6 +547,7 @@ namespace tds {
         int ssl_read_cb(char* data, int len);
         int ssl_write_cb(const std::string_view& sv);
         long ssl_ctrl_cb(int cmd, long num, void* ptr);
+        int ssl_verify_cb(int preverify, X509_STORE_CTX* x509_ctx);
         void send(std::string_view sv);
         void recv(uint8_t* ptr, size_t left);
 

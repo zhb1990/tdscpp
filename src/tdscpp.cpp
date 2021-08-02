@@ -2454,9 +2454,13 @@ namespace tds {
                 if (!WaitNamedPipeW((WCHAR*)name.c_str(), NMPWAIT_WAIT_FOREVER))
                     throw last_error("WaitNamedPipe", GetLastError());
             } while (true);
-        } else
+        } else {
 #endif
             connect(server, port, user.empty());
+            hostname = server;
+#ifdef _WIN32
+        }
+#endif
 
         send_prelogin_msg();
 
