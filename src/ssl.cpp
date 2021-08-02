@@ -3,8 +3,6 @@
 
 using namespace std;
 
-static const char PREFERRED_CIPHERS[] = "HIGH:!aNULL:!kRSA:!SRP:!PSK:!CAMELLIA:!RC4:!MD5:!DSS";
-
 class ssl_error : public exception {
 public:
     ssl_error(const char* func, unsigned long err) {
@@ -166,9 +164,6 @@ namespace tds {
         }
 
         SSL_set_bio(ssl.get(), bio, bio);
-
-        if (SSL_set_cipher_list(ssl.get(), PREFERRED_CIPHERS) != 1)
-            throw ssl_error("SSL_set_cipher_list", ERR_get_error());
 
         // FIXME - SSL_set_tlsext_host_name?
 
