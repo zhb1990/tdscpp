@@ -356,15 +356,13 @@ namespace tds {
     }
 
     int tds_ssl::ssl_verify_cb(int preverify, X509_STORE_CTX* x509_ctx) {
+        if (preverify)
+            return preverify;
+
         int err = X509_STORE_CTX_get_error(x509_ctx);
+        auto str = x509_err_to_string(err);
 
-        if (preverify == 0) {
-            auto str = x509_err_to_string(err);
-
-            throw formatted_error("Error verifying SSL certificate: {}", str);
-        }
-
-        return preverify;
+        throw formatted_error("Error verifying SSL certificate: {}", str);
     }
 
     tds_ssl::tds_ssl(tds_impl& tds) : tds(tds) {
