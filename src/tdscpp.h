@@ -538,12 +538,35 @@ namespace tds {
     template<typename T>
     concept is_optional = std::is_convertible_v<std::nullopt_t, T>;
 
+    struct options {
+        options(const std::string_view& server, const std::string_view& user = "", const std::string_view& password = "",
+                const std::string_view& app_name = "tdscpp", const std::string_view& db = "",
+                const msg_handler& message_handler = nullptr, const func_count_handler& count_handler = nullptr,
+                uint16_t port = 1433) :
+                server(server), user(user), password(password), app_name(app_name), db(db),
+                message_handler(message_handler), count_handler(count_handler), port(port) {
+        }
+
+        std::string server;
+        std::string_view user;
+        std::string_view password;
+        std::string_view app_name;
+        std::string_view db;
+        msg_handler message_handler;
+        func_count_handler count_handler;
+        uint16_t port;
+    };
+
     class TDSCPP tds {
     public:
-        tds(const std::string& server, const std::string_view& user, const std::string_view& password,
-            const std::string_view& app_name = "tdscpp", const std::string_view& db = "",
-            const msg_handler& message_handler = nullptr,
-            const func_count_handler& count_handler = nullptr, uint16_t port = 1433);
+        tds(const options& opts);
+
+        template<typename... Args>
+        requires std::is_constructible_v<options, Args...>
+        tds(Args&&... args) {
+            new (this) tds((const options&)options(args...));
+        }
+
         ~tds();
 
         void run(const std::string_view& s);

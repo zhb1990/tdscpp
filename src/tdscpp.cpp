@@ -2414,11 +2414,9 @@ namespace tds {
 //     static_assert(utf16_to_utf8(u"h\xdc00llo") == "h\xef\xbf\xbdllo"); // unpaired surrogate
 #endif
 
-    tds::tds(const string& server, const string_view& user, const string_view& password,
-             const string_view& app_name, const string_view& db,
-             const msg_handler& message_handler,
-             const func_count_handler& count_handler, uint16_t port) {
-        impl = new tds_impl(server, user, password, app_name, db, message_handler, count_handler, port);
+    tds::tds(const options& opts) {
+        impl = new tds_impl(opts.server, opts.user, opts.password, opts.app_name, opts.db,
+                            opts.message_handler, opts.count_handler, opts.port);
     }
 
     tds::~tds() {
