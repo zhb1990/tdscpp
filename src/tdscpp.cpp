@@ -2426,7 +2426,7 @@ namespace tds {
 
     tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
                        const string_view& app_name, const string_view& db, const msg_handler& message_handler,
-                       const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc,
+                       const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                        bool check_certificate) :
                        message_handler(message_handler), count_handler(count_handler), check_certificate(check_certificate) {
 #ifdef _WIN32
@@ -2465,14 +2465,12 @@ namespace tds {
 
         send_prelogin_msg(enc);
 
-        if (server_enc != tds_encryption_type::ENCRYPT_NOT_SUP)
+        if (server_enc != encryption_type::ENCRYPT_NOT_SUP)
             ssl.reset(new tds_ssl(*this));
 
         send_login_msg(user, password, server, app_name, db);
 
-        // FIXME - handle non-login encryption as well
-
-        if (server_enc != tds_encryption_type::ENCRYPT_ON && server_enc != tds_encryption_type::ENCRYPT_REQ)
+        if (server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ)
             ssl.reset();
     }
 
@@ -2567,7 +2565,7 @@ namespace tds {
 #endif
     }
 
-    void tds_impl::send_prelogin_msg(enum tds_encryption_type encrypt) {
+    void tds_impl::send_prelogin_msg(enum encryption_type encrypt) {
         string msg;
         vector<login_opt> opts;
         login_opt_version lov;
@@ -2660,10 +2658,10 @@ namespace tds {
                 if (payload.length() < off + len)
                     throw runtime_error("Malformed PRELOGIN response.");
 
-                if (len < sizeof(enum tds_encryption_type))
-                    throw formatted_error("Returned encryption type was {} bytes, expected {}.", len, sizeof(enum tds_encryption_type));
+                if (len < sizeof(enum encryption_type))
+                    throw formatted_error("Returned encryption type was {} bytes, expected {}.", len, sizeof(enum encryption_type));
 
-                server_enc = *(enum tds_encryption_type*)(payload.data() + off);
+                server_enc = *(enum encryption_type*)(payload.data() + off);
             }
 
             sv.remove_prefix(sizeof(tds_login_opt));
@@ -3028,7 +3026,7 @@ namespace tds {
 
         if (!ret.empty()) {
             send_msg(tds_msg::sspi, ret,
-                     server_enc == tds_encryption_type::ENCRYPT_ON || server_enc == tds_encryption_type::ENCRYPT_REQ);
+                     server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
         }
     }
 #endif
@@ -3368,7 +3366,7 @@ namespace tds {
 
     void tds_impl::wait_for_msg(enum tds_msg& type, string& payload, bool* last_packet) {
         tds_header h;
-        bool do_ssl = ssl && (server_enc == tds_encryption_type::ENCRYPT_ON || server_enc == tds_encryption_type::ENCRYPT_REQ);
+        bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
 
         if (do_ssl)
             ssl->recv((uint8_t*)&h, sizeof(tds_header));

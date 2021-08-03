@@ -538,7 +538,7 @@ namespace tds {
     template<typename T>
     concept is_optional = std::is_convertible_v<std::nullopt_t, T>;
 
-    enum class tds_encryption_type : uint8_t {
+    enum class encryption_type : uint8_t {
         ENCRYPT_OFF,
         ENCRYPT_ON,
         ENCRYPT_NOT_SUP,
@@ -549,7 +549,7 @@ namespace tds {
         options(const std::string_view& server, const std::string_view& user = "", const std::string_view& password = "",
                 const std::string_view& app_name = "tdscpp", const std::string_view& db = "",
                 const msg_handler& message_handler = nullptr, const func_count_handler& count_handler = nullptr,
-                uint16_t port = 1433, tds_encryption_type encrypt = tds_encryption_type::ENCRYPT_OFF,
+                uint16_t port = 1433, encryption_type encrypt = encryption_type::ENCRYPT_OFF,
                 bool check_certificate = false) :
                 server(server), user(user), password(password), app_name(app_name), db(db),
                 message_handler(message_handler), count_handler(count_handler), port(port),
@@ -564,7 +564,7 @@ namespace tds {
         msg_handler message_handler;
         func_count_handler count_handler;
         uint16_t port;
-        tds_encryption_type encrypt;
+        encryption_type encrypt;
         bool check_certificate;
     };
 

@@ -485,7 +485,7 @@ namespace tds {
         tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
                  const std::string_view& app_name, const std::string_view& db,
                  const msg_handler& message_handler,
-                 const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc,
+                 const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                  bool check_certificate);
         ~tds_impl();
         void send_raw(const std::string_view& msg);
@@ -502,7 +502,7 @@ namespace tds {
                  const std::u16string_view& db);
 
         void connect(const std::string& server, uint16_t port, bool get_fqdn);
-        void send_prelogin_msg(enum tds_encryption_type encrypt);
+        void send_prelogin_msg(enum encryption_type encrypt);
         void send_login_msg(const std::string_view& user, const std::string_view& password, const std::string_view& server,
                             const std::string_view& app_name, const std::string_view& db);
         void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
@@ -532,7 +532,7 @@ namespace tds {
         bool has_utf8 = false;
         std::u16string db_name;
         std::unique_ptr<tds_ssl> ssl;
-        tds_encryption_type server_enc = tds_encryption_type::ENCRYPT_NOT_SUP;
+        encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
     };
 
