@@ -77,7 +77,7 @@ if(NOT MSVC)
 endif()
 
 if(WIN32)
-	target_link_libraries(tdscpp ws2_32 secur32)
+	target_link_libraries(tdscpp ws2_32 secur32 crypt32)
 elseif(ENABLE_KRB5)
 	target_link_libraries(tdscpp gssapi_krb5)
 endif()
