@@ -104,13 +104,6 @@ struct tds_login_opt {
 
 static_assert(sizeof(tds_login_opt) == 5, "tds_login_opt has wrong size");
 
-enum class tds_encryption_type : uint8_t {
-    ENCRYPT_OFF,
-    ENCRYPT_ON,
-    ENCRYPT_NOT_SUP,
-    ENCRYPT_REQ
-};
-
 #pragma pack(push,1)
 
 struct tds_login_msg {
@@ -492,7 +485,7 @@ namespace tds {
         tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
                  const std::string_view& app_name, const std::string_view& db,
                  const msg_handler& message_handler,
-                 const func_count_handler& count_handler, uint16_t port);
+                 const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc);
         ~tds_impl();
         void send_raw(const std::string_view& msg);
         void recv_raw(uint8_t* ptr, size_t left);
@@ -508,7 +501,7 @@ namespace tds {
                  const std::u16string_view& db);
 
         void connect(const std::string& server, uint16_t port, bool get_fqdn);
-        void send_prelogin_msg();
+        void send_prelogin_msg(enum tds_encryption_type encrypt);
         void send_login_msg(const std::string_view& user, const std::string_view& password, const std::string_view& server,
                             const std::string_view& app_name, const std::string_view& db);
         void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,

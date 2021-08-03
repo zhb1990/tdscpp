@@ -2416,7 +2416,8 @@ namespace tds {
 
     tds::tds(const options& opts) {
         impl = new tds_impl(opts.server, opts.user, opts.password, opts.app_name, opts.db,
-                            opts.message_handler, opts.count_handler, opts.port);
+                            opts.message_handler, opts.count_handler, opts.port,
+                            opts.encrypt);
     }
 
     tds::~tds() {
@@ -2425,7 +2426,8 @@ namespace tds {
 
     tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
                        const string_view& app_name, const string_view& db, const msg_handler& message_handler,
-                       const func_count_handler& count_handler, uint16_t port) : message_handler(message_handler), count_handler(count_handler) {
+                       const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc) :
+                       message_handler(message_handler), count_handler(count_handler) {
 #ifdef _WIN32
         WSADATA wsa_data;
 
@@ -2460,7 +2462,7 @@ namespace tds {
         }
 #endif
 
-        send_prelogin_msg();
+        send_prelogin_msg(enc);
 
         if (server_enc != tds_encryption_type::ENCRYPT_NOT_SUP)
             ssl.reset(new tds_ssl(*this));
@@ -2564,7 +2566,7 @@ namespace tds {
 #endif
     }
 
-    void tds_impl::send_prelogin_msg() {
+    void tds_impl::send_prelogin_msg(enum tds_encryption_type encrypt) {
         string msg;
         vector<login_opt> opts;
         login_opt_version lov;
@@ -2584,7 +2586,7 @@ namespace tds {
 
         // encryption
 
-        opts.emplace_back(tds_login_opt_type::encryption, tds_encryption_type::ENCRYPT_OFF);
+        opts.emplace_back(tds_login_opt_type::encryption, encrypt);
 
         // instopt
 
