@@ -2417,7 +2417,7 @@ namespace tds {
     tds::tds(const options& opts) {
         impl = new tds_impl(opts.server, opts.user, opts.password, opts.app_name, opts.db,
                             opts.message_handler, opts.count_handler, opts.port,
-                            opts.encrypt);
+                            opts.encrypt, opts.check_certificate);
     }
 
     tds::~tds() {
@@ -2426,8 +2426,9 @@ namespace tds {
 
     tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
                        const string_view& app_name, const string_view& db, const msg_handler& message_handler,
-                       const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc) :
-                       message_handler(message_handler), count_handler(count_handler) {
+                       const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc,
+                       bool check_certificate) :
+                       message_handler(message_handler), count_handler(count_handler), check_certificate(check_certificate) {
 #ifdef _WIN32
         WSADATA wsa_data;
 

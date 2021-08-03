@@ -549,10 +549,11 @@ namespace tds {
         options(const std::string_view& server, const std::string_view& user = "", const std::string_view& password = "",
                 const std::string_view& app_name = "tdscpp", const std::string_view& db = "",
                 const msg_handler& message_handler = nullptr, const func_count_handler& count_handler = nullptr,
-                uint16_t port = 1433, tds_encryption_type encrypt = tds_encryption_type::ENCRYPT_OFF) :
+                uint16_t port = 1433, tds_encryption_type encrypt = tds_encryption_type::ENCRYPT_OFF,
+                bool check_certificate = false) :
                 server(server), user(user), password(password), app_name(app_name), db(db),
                 message_handler(message_handler), count_handler(count_handler), port(port),
-                encrypt(encrypt) {
+                encrypt(encrypt), check_certificate(check_certificate) {
         }
 
         std::string server;
@@ -564,6 +565,7 @@ namespace tds {
         func_count_handler count_handler;
         uint16_t port;
         tds_encryption_type encrypt;
+        bool check_certificate;
     };
 
     class TDSCPP tds {

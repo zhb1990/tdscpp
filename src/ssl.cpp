@@ -370,14 +370,16 @@ namespace tds {
         if (!ctx)
             throw ssl_error("SSL_CTX_new", ERR_get_error());
 
-        if (!SSL_CTX_set_default_verify_paths(ctx.get()))
-            throw ssl_error("SSL_CTX_set_default_verify_paths", ERR_get_error());
+        if (tds.check_certificate) {
+            if (!SSL_CTX_set_default_verify_paths(ctx.get()))
+                throw ssl_error("SSL_CTX_set_default_verify_paths", ERR_get_error());
 
 #ifdef _WIN32
-        add_certs_to_store(SSL_CTX_get_cert_store(ctx.get()));
+            add_certs_to_store(SSL_CTX_get_cert_store(ctx.get()));
 #endif
 
-        SSL_CTX_set_verify(ctx.get(), SSL_VERIFY_PEER, verify_callback);
+            SSL_CTX_set_verify(ctx.get(), SSL_VERIFY_PEER, verify_callback);
+        }
 
         SSL_CTX_set_options(ctx.get(), SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
 

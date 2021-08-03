@@ -485,7 +485,8 @@ namespace tds {
         tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
                  const std::string_view& app_name, const std::string_view& db,
                  const msg_handler& message_handler,
-                 const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc);
+                 const func_count_handler& count_handler, uint16_t port, tds_encryption_type enc,
+                 bool check_certificate);
         ~tds_impl();
         void send_raw(const std::string_view& msg);
         void recv_raw(uint8_t* ptr, size_t left);
@@ -532,6 +533,7 @@ namespace tds {
         std::u16string db_name;
         std::unique_ptr<tds_ssl> ssl;
         tds_encryption_type server_enc = tds_encryption_type::ENCRYPT_NOT_SUP;
+        bool check_certificate;
     };
 
     class tds_ssl {
