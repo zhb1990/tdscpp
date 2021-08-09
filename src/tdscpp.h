@@ -557,10 +557,10 @@ namespace tds {
         }
 
         std::string server;
-        std::string_view user;
-        std::string_view password;
-        std::string_view app_name;
-        std::string_view db;
+        std::string user;
+        std::string password;
+        std::string app_name;
+        std::string db;
         msg_handler message_handler;
         func_count_handler count_handler;
         uint16_t port;
