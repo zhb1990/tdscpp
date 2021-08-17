@@ -499,6 +499,8 @@ namespace tds {
     }
 #endif
 
+    std::string utf16_to_cp(const std::u16string_view& s, unsigned int codepage);
+
     template<typename T>
     requires std::ranges::input_range<T> && std::ranges::contiguous_range<T>
     static constexpr std::span<std::byte> to_bytes(const T& t) {
