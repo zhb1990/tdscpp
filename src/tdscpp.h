@@ -1065,6 +1065,8 @@ namespace tds {
             do_query(conn, q);
         }
 
+        query(const query&) = delete;
+
         ~query();
 
         uint16_t num_columns() const;
