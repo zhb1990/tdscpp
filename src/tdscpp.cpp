@@ -2463,15 +2463,23 @@ namespace tds {
         }
 #endif
 
+#ifndef WITH_OPENSSL
+        enc = encryption_type::ENCRYPT_NOT_SUP;
+#endif
+
         send_prelogin_msg(enc);
 
+#ifdef WITH_OPENSSL
         if (server_enc != encryption_type::ENCRYPT_NOT_SUP)
             ssl.reset(new tds_ssl(*this));
+#endif
 
         send_login_msg(user, password, server, app_name, db);
 
+#ifdef WITH_OPENSSL
         if (server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ)
             ssl.reset();
+#endif
     }
 
     tds_impl::~tds_impl() {
@@ -2666,6 +2674,11 @@ namespace tds {
 
             sv.remove_prefix(sizeof(tds_login_opt));
         }
+
+#ifndef WITH_OPENSSL
+        if (server_enc == encryption_type::ENCRYPT_REQ)
+            throw runtime_error("Server required encryption, but tdscpp has been compiled without TLS support.");
+#endif
     }
 
 #ifdef _WIN32
@@ -3025,8 +3038,12 @@ namespace tds {
             FreeContextBuffer(outbuf.pvBuffer);
 
         if (!ret.empty()) {
+#ifdef WITH_OPENSSL
             send_msg(tds_msg::sspi, ret,
                      server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+#else
+            send_msg(tds_msg::sspi, ret);
+#endif
         }
     }
 #endif
@@ -3285,7 +3302,12 @@ namespace tds {
         } while (true);
     }
 
-    void tds_impl::send_msg(enum tds_msg type, const string_view& msg, bool do_ssl) {
+#ifdef WITH_OPENSSL
+    void tds_impl::send_msg(enum tds_msg type, const string_view& msg, bool do_ssl)
+#else
+    void tds_impl::send_msg(enum tds_msg type, const string_view& msg)
+#endif
+    {
         string payload;
         const size_t size = packet_size - sizeof(tds_header);
         string_view sv = msg;
@@ -3312,9 +3334,11 @@ namespace tds {
             if (!sv2.empty())
                 memcpy(payload.data() + sizeof(tds_header), sv2.data(), sv2.size());
 
+#ifdef WITH_OPENSSL
             if (do_ssl && ssl)
                 ssl->send(payload);
             else
+#endif
                 send_raw(payload);
 
             if (sv2.length() == sv.length())
@@ -3366,11 +3390,15 @@ namespace tds {
 
     void tds_impl::wait_for_msg(enum tds_msg& type, string& payload, bool* last_packet) {
         tds_header h;
+#ifdef WITH_OPENSSL
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+#endif
 
+#ifdef WITH_OPENSSL
         if (do_ssl)
             ssl->recv((uint8_t*)&h, sizeof(tds_header));
         else
+#endif
             recv_raw((uint8_t*)&h, sizeof(tds_header));
 
         if (htons(h.length) < sizeof(tds_header)) {
@@ -3385,9 +3413,11 @@ namespace tds {
 
             payload.resize(left);
 
+#ifdef WITH_OPENSSL
             if (do_ssl)
                 ssl->recv((uint8_t*)&payload[0], left);
             else
+#endif
                 recv_raw((uint8_t*)&payload[0], left);
         } else
             payload.clear();

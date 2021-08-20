@@ -3,6 +3,7 @@
 
 using namespace std;
 
+#ifdef WITH_OPENSSL
 class ssl_error : public exception {
 public:
     ssl_error(const char* func, unsigned long err) {
@@ -475,3 +476,4 @@ namespace tds {
         }
     }
 };
+#endif

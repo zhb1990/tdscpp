@@ -12,11 +12,13 @@
 #include <sspi.h>
 #endif
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
+#endif
 
 class _formatted_error : public std::exception {
 public:
@@ -450,6 +452,7 @@ private:
 
 #endif
 
+#ifdef WITH_OPENSSL
 class bio_meth_deleter {
 public:
     typedef BIO_METHOD* pointer;
@@ -476,9 +479,12 @@ public:
         SSL_CTX_free(ctx);
     }
 };
+#endif
 
 namespace tds {
+#ifdef WITH_OPENSSL
     class tds_ssl;
+#endif
 
     class tds_impl {
     public:
@@ -490,7 +496,11 @@ namespace tds {
         ~tds_impl();
         void send_raw(const std::string_view& msg);
         void recv_raw(uint8_t* ptr, size_t left);
+#ifdef WITH_OPENSSL
         void send_msg(enum tds_msg type, const std::string_view& msg, bool do_ssl = true);
+#else
+        void send_msg(enum tds_msg type, const std::string_view& msg);
+#endif
         void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);
         void handle_info_msg(std::string_view sv, bool error);
         void handle_envchange_msg(const std::string_view& sv);
@@ -531,11 +541,14 @@ namespace tds {
         uint16_t spid = 0;
         bool has_utf8 = false;
         std::u16string db_name;
+#ifdef WITH_OPENSSL
         std::unique_ptr<tds_ssl> ssl;
+#endif
         encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
     };
 
+#ifdef WITH_OPENSSL
     class tds_ssl {
     public:
         tds_ssl(tds_impl& tds);
@@ -557,6 +570,7 @@ namespace tds {
         std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
         std::unique_ptr<SSL*, ssl_deleter> ssl;
     };
+#endif
 
     class batch_impl {
     public:

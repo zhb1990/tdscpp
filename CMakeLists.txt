@@ -7,25 +7,29 @@ project(tdscpp VERSION 1.0)
 
 option(WITH_JSON           "Include JSON support" ON)
 option(BUILD_SAMPLE        "Build sample program" ON)
+option(WITH_OPENSSL        "Use OpenSSL for encryption" ON)
 
 if(NOT WIN32)
-option(ENABLE_KRB5         "Enable Kerberos support" ON)
+    option(ENABLE_KRB5         "Enable Kerberos support" ON)
 endif()
 
 if(WITH_JSON)
-find_package(nlohmann_json REQUIRED)
+    find_package(nlohmann_json REQUIRED)
 endif()
 
 if(ENABLE_KRB5)
-set(HAVE_GSSAPI 1)
+    set(HAVE_GSSAPI 1)
 endif()
 
 if(NOT WIN32)
-find_package(ICU COMPONENTS uc REQUIRED)
+    find_package(ICU COMPONENTS uc REQUIRED)
 endif()
 
 find_package(fmt REQUIRED)
-find_package(OpenSSL REQUIRED)
+
+if(WITH_OPENSSL)
+    find_package(OpenSSL REQUIRED)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,10 +54,13 @@ if(WIN32)
 endif()
 
 target_link_libraries(tdscpp fmt::fmt-header-only)
-target_link_libraries(tdscpp OpenSSL::Crypto OpenSSL::SSL)
+
+if(WITH_OPENSSL)
+    target_link_libraries(tdscpp OpenSSL::Crypto OpenSSL::SSL)
+endif()
 
 if(NOT WIN32)
-target_link_libraries(tdscpp ICU::uc)
+    target_link_libraries(tdscpp ICU::uc)
 endif()
 
 target_compile_options(tdscpp PRIVATE
