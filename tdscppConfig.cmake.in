@@ -13,3 +13,9 @@ endif()
 if(NOT WIN32)
     find_package(ICU COMPONENTS uc REQUIRED)
 endif()
+
+set(WITH_JSON @WITH_JSON@)
+
+if(WITH_JSON)
+    find_package(nlohmann_json REQUIRED)
+endif()

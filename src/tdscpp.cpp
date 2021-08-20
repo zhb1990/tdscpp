@@ -5680,6 +5680,7 @@ namespace tds {
         committed = true;
     }
 
+#ifdef TDSCPP_JSON
     void TDSCPP to_json(nlohmann::json& j, const value& v) {
         auto type2 = v.type;
         string_view val = v.val;
@@ -5727,6 +5728,7 @@ namespace tds {
                 j = nlohmann::json((string)v);
         }
     }
+#endif
 
     uint16_t rpc::num_columns() const {
         return (uint16_t)cols.size();

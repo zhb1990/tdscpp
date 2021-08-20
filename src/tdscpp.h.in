@@ -11,7 +11,16 @@
 #include <ranges>
 #include <chrono>
 #include <time.h>
+
+#cmakedefine WITH_JSON 1
+#ifdef WITH_JSON
+#define TDSCPP_JSON
+#undef WITH_JSON
+#endif
+
+#ifdef TDSCPP_JSON
 #include <nlohmann/json.hpp>
+#endif
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -1186,11 +1195,13 @@ namespace tds {
         bool committed = false;
     };
 
+#ifdef TDSCPP_JSON
     void TDSCPP to_json(nlohmann::json& j, const value& v);
 
     static void __inline to_json(nlohmann::json& j, const column& c) {
         to_json(j, static_cast<const value&>(c));
     }
+#endif
 
     static std::string __inline escape(const std::string_view& sv) {
         std::string s{"["};

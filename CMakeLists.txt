@@ -40,6 +40,7 @@ add_definitions(-DTDSCPP_EXPORT)
 # ----------------------------------------
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/tdscpp.h.in ${CMAKE_CURRENT_BINARY_DIR}/tdscpp.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(SRC_FILES src/tdscpp.cpp
@@ -63,13 +64,17 @@ if(NOT WIN32)
     target_link_libraries(tdscpp ICU::uc)
 endif()
 
+if(WITH_JSON)
+    target_link_libraries(tdscpp nlohmann_json::nlohmann_json)
+endif()
+
 target_compile_options(tdscpp PRIVATE
      $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
           -Wall>
      $<$<CXX_COMPILER_ID:MSVC>:
           /W4>)
 
-set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER src/tdscpp.h)
+set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_BINARY_DIR}/tdscpp.h)
 
 if(WIN32)
     set_target_properties(tdscpp PROPERTIES PREFIX "")
