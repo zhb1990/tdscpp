@@ -1,5 +1,8 @@
 #include "tdscpp.h"
 #include "tdscpp-private.h"
+#if !defined(WITH_OPENSSL) && defined(_WIN32)
+#include <schannel.h>
+#endif
 
 using namespace std;
 
@@ -474,6 +477,112 @@ namespace tds {
             ptr += ret;
             left -= ret;
         }
+    }
+};
+#elif defined(_WIN32)
+namespace tds{
+    tds_ssl::tds_ssl(tds_impl& tds) : tds(tds) {
+        SECURITY_STATUS sec_status;
+        SecBuffer outbuf;
+        SecBufferDesc out;
+        uint32_t context_attr;
+        string outstr;
+
+        sec_status = AcquireCredentialsHandleW(nullptr, UNISP_NAME_W, SECPKG_CRED_OUTBOUND, nullptr, nullptr,
+                                               nullptr, nullptr, &cred_handle, nullptr);
+
+        if (FAILED(sec_status))
+            throw formatted_error("AcquireCredentialsHandle returned {}", (enum sec_error)sec_status);
+
+        // FIXME - trusting certificate
+
+        outbuf.cbBuffer = 0;
+        outbuf.BufferType = SECBUFFER_TOKEN;
+        outbuf.pvBuffer = nullptr;
+
+        out.ulVersion = SECBUFFER_VERSION;
+        out.cBuffers = 1;
+        out.pBuffers = &outbuf;
+
+        auto host = utf8_to_utf16(tds.hostname);
+
+        sec_status = InitializeSecurityContextW(&cred_handle, nullptr, (SEC_WCHAR*)host.c_str(),
+                                                ISC_REQ_ALLOCATE_MEMORY, 0, 0, nullptr, 0,
+                                                &ctx_handle, &out, (ULONG*)&context_attr, nullptr);
+        if (FAILED(sec_status)) {
+            FreeCredentialsHandle(&cred_handle);
+            throw formatted_error("InitializeSecurityContext returned {}", (enum sec_error)sec_status);
+        }
+
+        outstr = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+
+        if (outbuf.pvBuffer)
+            FreeContextBuffer(outbuf.pvBuffer);
+
+        ctx_handle_set = true;
+
+        while (sec_status == SEC_I_CONTINUE_NEEDED) {
+            enum tds_msg type;
+            string payload;
+            SecBuffer inbuf;
+            SecBufferDesc in;
+
+            tds.send_msg(tds_msg::prelogin, outstr, false);
+
+            tds.wait_for_msg(type, payload);
+
+            if (type != tds_msg::prelogin) {
+                FreeCredentialsHandle(&cred_handle);
+                throw formatted_error("Received message type {}, expected prelogin", (int)type);
+            }
+
+            outbuf.cbBuffer = 0;
+            outbuf.BufferType = SECBUFFER_TOKEN;
+            outbuf.pvBuffer = nullptr;
+
+            inbuf.cbBuffer = payload.length();
+            inbuf.BufferType = SECBUFFER_TOKEN;
+            inbuf.pvBuffer = payload.data();
+
+            in.ulVersion = SECBUFFER_VERSION;
+            in.cBuffers = 1;
+            in.pBuffers = &inbuf;
+
+            sec_status = InitializeSecurityContextW(&cred_handle, &ctx_handle, nullptr,
+                                                    ISC_REQ_ALLOCATE_MEMORY, 0, 0, &in, 0,
+                                                    nullptr, &out, (ULONG*)&context_attr, nullptr);
+            if (FAILED(sec_status)) {
+                FreeCredentialsHandle(&cred_handle);
+                throw formatted_error("InitializeSecurityContext returned {}", (enum sec_error)sec_status);
+            }
+
+            outstr = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+
+            if (outbuf.pvBuffer)
+                FreeContextBuffer(outbuf.pvBuffer);
+        }
+
+        if (sec_status != SEC_E_OK) {
+            FreeCredentialsHandle(&cred_handle);
+            throw formatted_error("InitializeSecurityContext returned unexpected status {}", (enum sec_error)sec_status);
+        }
+    }
+
+    tds_ssl::~tds_ssl() {
+        if (ctx_handle_set)
+            DeleteSecurityContext(&ctx_handle);
+
+        FreeCredentialsHandle(&cred_handle);
+    }
+
+    void tds_ssl::send(std::string_view sv) {
+        throw runtime_error("FIXME - Schannel send");
+        // FIXME
+    }
+
+    void tds_ssl::recv(uint8_t* ptr, size_t left) {
+        throw runtime_error("FIXME - Schannel recv");
+        // FIXME
     }
 };
 #endif

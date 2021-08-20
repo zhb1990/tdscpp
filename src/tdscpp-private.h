@@ -482,7 +482,7 @@ public:
 #endif
 
 namespace tds {
-#ifdef WITH_OPENSSL
+#if defined(WITH_OPENSSL) || defined(_WIN32)
     class tds_ssl;
 #endif
 
@@ -496,7 +496,7 @@ namespace tds {
         ~tds_impl();
         void send_raw(const std::string_view& msg);
         void recv_raw(uint8_t* ptr, size_t left);
-#ifdef WITH_OPENSSL
+#if defined(WITH_OPENSSL) || defined(_WIN32)
         void send_msg(enum tds_msg type, const std::string_view& msg, bool do_ssl = true);
 #else
         void send_msg(enum tds_msg type, const std::string_view& msg);
@@ -541,21 +541,25 @@ namespace tds {
         uint16_t spid = 0;
         bool has_utf8 = false;
         std::u16string db_name;
-#ifdef WITH_OPENSSL
+#if defined(WITH_OPENSSL) || defined(_WIN32)
         std::unique_ptr<tds_ssl> ssl;
 #endif
         encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
     };
 
-#ifdef WITH_OPENSSL
+#if defined(WITH_OPENSSL) || defined(_WIN32)
     class tds_ssl {
     public:
         tds_ssl(tds_impl& tds);
+#ifdef WITH_OPENSSL
         int ssl_read_cb(char* data, int len);
         int ssl_write_cb(const std::string_view& sv);
         long ssl_ctrl_cb(int cmd, long num, void* ptr);
         int ssl_verify_cb(int preverify, X509_STORE_CTX* x509_ctx);
+#else
+        ~tds_ssl();
+#endif
         void send(std::string_view sv);
         void recv(uint8_t* ptr, size_t left);
 
@@ -564,11 +568,17 @@ namespace tds {
     private:
         tds_impl& tds;
         std::string ssl_recv_buf;
-        BIO* bio;
         bool established = false;
+#ifdef WITH_OPENSSL
+        BIO* bio;
         std::unique_ptr<SSL_CTX*, ssl_ctx_deleter> ctx;
         std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
         std::unique_ptr<SSL*, ssl_deleter> ssl;
+#else
+        CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1};
+        CtxtHandle ctx_handle;
+        bool ctx_handle_set = false;
+#endif
     };
 #endif
 
@@ -686,7 +696,308 @@ enum class sec_error : uint32_t {
     _SEC_E_EXT_BUFFER_TOO_SMALL = 0x8009036A,
     _SEC_E_INSUFFICIENT_BUFFERS = 0x8009036B
 };
-#elif defined(HAVE_GSSAPI)
+
+template<>
+struct fmt::formatter<enum sec_error> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(enum sec_error t, format_context& ctx) const {
+        switch (t) {
+            case sec_error::_SEC_E_OK:
+                return fmt::format_to(ctx.out(), "SEC_E_OK");
+
+            case sec_error::_SEC_E_INSUFFICIENT_MEMORY:
+                return fmt::format_to(ctx.out(), "SEC_E_INSUFFICIENT_MEMORY");
+
+            case sec_error::_SEC_E_INVALID_HANDLE:
+                return fmt::format_to(ctx.out(), "SEC_E_INVALID_HANDLE");
+
+            case sec_error::_SEC_E_UNSUPPORTED_FUNCTION:
+                return fmt::format_to(ctx.out(), "SEC_E_UNSUPPORTED_FUNCTION");
+
+            case sec_error::_SEC_E_TARGET_UNKNOWN:
+                return fmt::format_to(ctx.out(), "SEC_E_TARGET_UNKNOWN");
+
+            case sec_error::_SEC_E_INTERNAL_ERROR:
+                return fmt::format_to(ctx.out(), "SEC_E_INTERNAL_ERROR");
+
+            case sec_error::_SEC_E_SECPKG_NOT_FOUND:
+                return fmt::format_to(ctx.out(), "SEC_E_SECPKG_NOT_FOUND");
+
+            case sec_error::_SEC_E_NOT_OWNER:
+                return fmt::format_to(ctx.out(), "SEC_E_NOT_OWNER");
+
+            case sec_error::_SEC_E_CANNOT_INSTALL:
+                return fmt::format_to(ctx.out(), "SEC_E_CANNOT_INSTALL");
+
+            case sec_error::_SEC_E_INVALID_TOKEN:
+                return fmt::format_to(ctx.out(), "SEC_E_INVALID_TOKEN");
+
+            case sec_error::_SEC_E_CANNOT_PACK:
+                return fmt::format_to(ctx.out(), "SEC_E_CANNOT_PACK");
+
+            case sec_error::_SEC_E_QOP_NOT_SUPPORTED:
+                return fmt::format_to(ctx.out(), "SEC_E_QOP_NOT_SUPPORTED");
+
+            case sec_error::_SEC_E_NO_IMPERSONATION:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_IMPERSONATION");
+
+            case sec_error::_SEC_E_LOGON_DENIED:
+                return fmt::format_to(ctx.out(), "SEC_E_LOGON_DENIED");
+
+            case sec_error::_SEC_E_UNKNOWN_CREDENTIALS:
+                return fmt::format_to(ctx.out(), "SEC_E_UNKNOWN_CREDENTIALS");
+
+            case sec_error::_SEC_E_NO_CREDENTIALS:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_CREDENTIALS");
+
+            case sec_error::_SEC_E_MESSAGE_ALTERED:
+                return fmt::format_to(ctx.out(), "SEC_E_MESSAGE_ALTERED");
+
+            case sec_error::_SEC_E_OUT_OF_SEQUENCE:
+                return fmt::format_to(ctx.out(), "SEC_E_OUT_OF_SEQUENCE");
+
+            case sec_error::_SEC_E_NO_AUTHENTICATING_AUTHORITY:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_AUTHENTICATING_AUTHORITY");
+
+            case sec_error::_SEC_I_CONTINUE_NEEDED:
+                return fmt::format_to(ctx.out(), "SEC_I_CONTINUE_NEEDED");
+
+            case sec_error::_SEC_I_COMPLETE_NEEDED:
+                return fmt::format_to(ctx.out(), "SEC_I_COMPLETE_NEEDED");
+
+            case sec_error::_SEC_I_COMPLETE_AND_CONTINUE:
+                return fmt::format_to(ctx.out(), "SEC_I_COMPLETE_AND_CONTINUE");
+
+            case sec_error::_SEC_I_LOCAL_LOGON:
+                return fmt::format_to(ctx.out(), "SEC_I_LOCAL_LOGON");
+
+            case sec_error::_SEC_I_GENERIC_EXTENSION_RECEIVED:
+                return fmt::format_to(ctx.out(), "SEC_I_GENERIC_EXTENSION_RECEIVED");
+
+            case sec_error::_SEC_E_BAD_PKGID:
+                return fmt::format_to(ctx.out(), "SEC_E_BAD_PKGID");
+
+            case sec_error::_SEC_E_CONTEXT_EXPIRED:
+                return fmt::format_to(ctx.out(), "SEC_E_CONTEXT_EXPIRED");
+
+            case sec_error::_SEC_I_CONTEXT_EXPIRED:
+                return fmt::format_to(ctx.out(), "SEC_I_CONTEXT_EXPIRED");
+
+            case sec_error::_SEC_E_INCOMPLETE_MESSAGE:
+                return fmt::format_to(ctx.out(), "SEC_E_INCOMPLETE_MESSAGE");
+
+            case sec_error::_SEC_E_INCOMPLETE_CREDENTIALS:
+                return fmt::format_to(ctx.out(), "SEC_E_INCOMPLETE_CREDENTIALS");
+
+            case sec_error::_SEC_E_BUFFER_TOO_SMALL:
+                return fmt::format_to(ctx.out(), "SEC_E_BUFFER_TOO_SMALL");
+
+            case sec_error::_SEC_I_INCOMPLETE_CREDENTIALS:
+                return fmt::format_to(ctx.out(), "SEC_I_INCOMPLETE_CREDENTIALS");
+
+            case sec_error::_SEC_I_RENEGOTIATE:
+                return fmt::format_to(ctx.out(), "SEC_I_RENEGOTIATE");
+
+            case sec_error::_SEC_E_WRONG_PRINCIPAL:
+                return fmt::format_to(ctx.out(), "SEC_E_WRONG_PRINCIPAL");
+
+            case sec_error::_SEC_I_NO_LSA_CONTEXT:
+                return fmt::format_to(ctx.out(), "SEC_I_NO_LSA_CONTEXT");
+
+            case sec_error::_SEC_E_TIME_SKEW:
+                return fmt::format_to(ctx.out(), "SEC_E_TIME_SKEW");
+
+            case sec_error::_SEC_E_UNTRUSTED_ROOT:
+                return fmt::format_to(ctx.out(), "SEC_E_UNTRUSTED_ROOT");
+
+            case sec_error::_SEC_E_ILLEGAL_MESSAGE:
+                return fmt::format_to(ctx.out(), "SEC_E_ILLEGAL_MESSAGE");
+
+            case sec_error::_SEC_E_CERT_UNKNOWN:
+                return fmt::format_to(ctx.out(), "SEC_E_CERT_UNKNOWN");
+
+            case sec_error::_SEC_E_CERT_EXPIRED:
+                return fmt::format_to(ctx.out(), "SEC_E_CERT_EXPIRED");
+
+            case sec_error::_SEC_E_ENCRYPT_FAILURE:
+                return fmt::format_to(ctx.out(), "SEC_E_ENCRYPT_FAILURE");
+
+            case sec_error::_SEC_E_DECRYPT_FAILURE:
+                return fmt::format_to(ctx.out(), "SEC_E_DECRYPT_FAILURE");
+
+            case sec_error::_SEC_E_ALGORITHM_MISMATCH:
+                return fmt::format_to(ctx.out(), "SEC_E_ALGORITHM_MISMATCH");
+
+            case sec_error::_SEC_E_SECURITY_QOS_FAILED:
+                return fmt::format_to(ctx.out(), "SEC_E_SECURITY_QOS_FAILED");
+
+            case sec_error::_SEC_E_UNFINISHED_CONTEXT_DELETED:
+                return fmt::format_to(ctx.out(), "SEC_E_UNFINISHED_CONTEXT_DELETED");
+
+            case sec_error::_SEC_E_NO_TGT_REPLY:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_TGT_REPLY");
+
+            case sec_error::_SEC_E_NO_IP_ADDRESSES:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_IP_ADDRESSES");
+
+            case sec_error::_SEC_E_WRONG_CREDENTIAL_HANDLE:
+                return fmt::format_to(ctx.out(), "SEC_E_WRONG_CREDENTIAL_HANDLE");
+
+            case sec_error::_SEC_E_CRYPTO_SYSTEM_INVALID:
+                return fmt::format_to(ctx.out(), "SEC_E_CRYPTO_SYSTEM_INVALID");
+
+            case sec_error::_SEC_E_MAX_REFERRALS_EXCEEDED:
+                return fmt::format_to(ctx.out(), "SEC_E_MAX_REFERRALS_EXCEEDED");
+
+            case sec_error::_SEC_E_MUST_BE_KDC:
+                return fmt::format_to(ctx.out(), "SEC_E_MUST_BE_KDC");
+
+            case sec_error::_SEC_E_STRONG_CRYPTO_NOT_SUPPORTED:
+                return fmt::format_to(ctx.out(), "SEC_E_STRONG_CRYPTO_NOT_SUPPORTED");
+
+            case sec_error::_SEC_E_TOO_MANY_PRINCIPALS:
+                return fmt::format_to(ctx.out(), "SEC_E_TOO_MANY_PRINCIPALS");
+
+            case sec_error::_SEC_E_NO_PA_DATA:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_PA_DATA");
+
+            case sec_error::_SEC_E_PKINIT_NAME_MISMATCH:
+                return fmt::format_to(ctx.out(), "SEC_E_PKINIT_NAME_MISMATCH");
+
+            case sec_error::_SEC_E_SMARTCARD_LOGON_REQUIRED:
+                return fmt::format_to(ctx.out(), "SEC_E_SMARTCARD_LOGON_REQUIRED");
+
+            case sec_error::_SEC_E_SHUTDOWN_IN_PROGRESS:
+                return fmt::format_to(ctx.out(), "SEC_E_SHUTDOWN_IN_PROGRESS");
+
+            case sec_error::_SEC_E_KDC_INVALID_REQUEST:
+                return fmt::format_to(ctx.out(), "SEC_E_KDC_INVALID_REQUEST");
+
+            case sec_error::_SEC_E_KDC_UNABLE_TO_REFER:
+                return fmt::format_to(ctx.out(), "SEC_E_KDC_UNABLE_TO_REFER");
+
+            case sec_error::_SEC_E_KDC_UNKNOWN_ETYPE:
+                return fmt::format_to(ctx.out(), "SEC_E_KDC_UNKNOWN_ETYPE");
+
+            case sec_error::_SEC_E_UNSUPPORTED_PREAUTH:
+                return fmt::format_to(ctx.out(), "SEC_E_UNSUPPORTED_PREAUTH");
+
+            case sec_error::_SEC_E_DELEGATION_REQUIRED:
+                return fmt::format_to(ctx.out(), "SEC_E_DELEGATION_REQUIRED");
+
+            case sec_error::_SEC_E_BAD_BINDINGS:
+                return fmt::format_to(ctx.out(), "SEC_E_BAD_BINDINGS");
+
+            case sec_error::_SEC_E_MULTIPLE_ACCOUNTS:
+                return fmt::format_to(ctx.out(), "SEC_E_MULTIPLE_ACCOUNTS");
+
+            case sec_error::_SEC_E_NO_KERB_KEY:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_KERB_KEY");
+
+            case sec_error::_SEC_E_CERT_WRONG_USAGE:
+                return fmt::format_to(ctx.out(), "SEC_E_CERT_WRONG_USAGE");
+
+            case sec_error::_SEC_E_DOWNGRADE_DETECTED:
+                return fmt::format_to(ctx.out(), "SEC_E_DOWNGRADE_DETECTED");
+
+            case sec_error::_SEC_E_SMARTCARD_CERT_REVOKED:
+                return fmt::format_to(ctx.out(), "SEC_E_SMARTCARD_CERT_REVOKED");
+
+            case sec_error::_SEC_E_ISSUING_CA_UNTRUSTED:
+                return fmt::format_to(ctx.out(), "SEC_E_ISSUING_CA_UNTRUSTED");
+
+            case sec_error::_SEC_E_REVOCATION_OFFLINE_C:
+                return fmt::format_to(ctx.out(), "SEC_E_REVOCATION_OFFLINE_C");
+
+            case sec_error::_SEC_E_PKINIT_CLIENT_FAILURE:
+                return fmt::format_to(ctx.out(), "SEC_E_PKINIT_CLIENT_FAILURE");
+
+            case sec_error::_SEC_E_SMARTCARD_CERT_EXPIRED:
+                return fmt::format_to(ctx.out(), "SEC_E_SMARTCARD_CERT_EXPIRED");
+
+            case sec_error::_SEC_E_NO_S4U_PROT_SUPPORT:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_S4U_PROT_SUPPORT");
+
+            case sec_error::_SEC_E_CROSSREALM_DELEGATION_FAILURE:
+                return fmt::format_to(ctx.out(), "SEC_E_CROSSREALM_DELEGATION_FAILURE");
+
+            case sec_error::_SEC_E_REVOCATION_OFFLINE_KDC:
+                return fmt::format_to(ctx.out(), "SEC_E_REVOCATION_OFFLINE_KDC");
+
+            case sec_error::_SEC_E_ISSUING_CA_UNTRUSTED_KDC:
+                return fmt::format_to(ctx.out(), "SEC_E_ISSUING_CA_UNTRUSTED_KDC");
+
+            case sec_error::_SEC_E_KDC_CERT_EXPIRED:
+                return fmt::format_to(ctx.out(), "SEC_E_KDC_CERT_EXPIRED");
+
+            case sec_error::_SEC_E_KDC_CERT_REVOKED:
+                return fmt::format_to(ctx.out(), "SEC_E_KDC_CERT_REVOKED");
+
+            case sec_error::_SEC_I_SIGNATURE_NEEDED:
+                return fmt::format_to(ctx.out(), "SEC_I_SIGNATURE_NEEDED");
+
+            case sec_error::_SEC_E_INVALID_PARAMETER:
+                return fmt::format_to(ctx.out(), "SEC_E_INVALID_PARAMETER");
+
+            case sec_error::_SEC_E_DELEGATION_POLICY:
+                return fmt::format_to(ctx.out(), "SEC_E_DELEGATION_POLICY");
+
+            case sec_error::_SEC_E_POLICY_NLTM_ONLY:
+                return fmt::format_to(ctx.out(), "SEC_E_POLICY_NLTM_ONLY");
+
+            case sec_error::_SEC_I_NO_RENEGOTIATION:
+                return fmt::format_to(ctx.out(), "SEC_I_NO_RENEGOTIATION");
+
+            case sec_error::_SEC_E_NO_CONTEXT:
+                return fmt::format_to(ctx.out(), "SEC_E_NO_CONTEXT");
+
+            case sec_error::_SEC_E_PKU2U_CERT_FAILURE:
+                return fmt::format_to(ctx.out(), "SEC_E_PKU2U_CERT_FAILURE");
+
+            case sec_error::_SEC_E_MUTUAL_AUTH_FAILED:
+                return fmt::format_to(ctx.out(), "SEC_E_MUTUAL_AUTH_FAILED");
+
+            case sec_error::_SEC_I_MESSAGE_FRAGMENT:
+                return fmt::format_to(ctx.out(), "SEC_I_MESSAGE_FRAGMENT");
+
+            case sec_error::_SEC_E_ONLY_HTTPS_ALLOWED:
+                return fmt::format_to(ctx.out(), "SEC_E_ONLY_HTTPS_ALLOWED");
+
+            case sec_error::_SEC_I_CONTINUE_NEEDED_MESSAGE_OK:
+                return fmt::format_to(ctx.out(), "SEC_I_CONTINUE_NEEDED_MESSAGE_OK");
+
+            case sec_error::_SEC_E_APPLICATION_PROTOCOL_MISMATCH:
+                return fmt::format_to(ctx.out(), "SEC_E_APPLICATION_PROTOCOL_MISMATCH");
+
+            case sec_error::_SEC_I_ASYNC_CALL_PENDING:
+                return fmt::format_to(ctx.out(), "SEC_I_ASYNC_CALL_PENDING");
+
+            case sec_error::_SEC_E_INVALID_UPN_NAME:
+                return fmt::format_to(ctx.out(), "SEC_E_INVALID_UPN_NAME");
+
+            case sec_error::_SEC_E_EXT_BUFFER_TOO_SMALL:
+                return fmt::format_to(ctx.out(), "SEC_E_EXT_BUFFER_TOO_SMALL");
+
+            case sec_error::_SEC_E_INSUFFICIENT_BUFFERS:
+                return fmt::format_to(ctx.out(), "SEC_E_INSUFFICIENT_BUFFERS");
+
+            default:
+                return fmt::format_to(ctx.out(), "{:08x}", (uint32_t)t);
+        }
+    }
+};
+#endif
+
+#ifdef HAVE_GSSAPI
 enum class krb5_minor {
     KRB5KDC_ERR_NONE = -1765328384L,
     KRB5KDC_ERR_NAME_EXP = -1765328383L,
