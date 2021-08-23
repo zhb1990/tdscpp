@@ -572,6 +572,12 @@ namespace tds {
             FreeCredentialsHandle(&cred_handle);
             throw formatted_error("InitializeSecurityContext returned unexpected status {}", (enum sec_error)sec_status);
         }
+
+        sec_status = QueryContextAttributes(&ctx_handle, SECPKG_ATTR_STREAM_SIZES, &stream_sizes);
+        if (FAILED(sec_status)) {
+            FreeCredentialsHandle(&cred_handle);
+            throw formatted_error("QueryContextAttributes(SECPKG_ATTR_STREAM_SIZES) returned {}", (enum sec_error)sec_status);
+        }
     }
 
     tds_ssl::~tds_ssl() {
@@ -582,8 +588,43 @@ namespace tds {
     }
 
     void tds_ssl::send(std::string_view sv) {
-        throw runtime_error("FIXME - Schannel send");
-        // FIXME
+        SECURITY_STATUS sec_status;
+        array<SecBuffer, 4> buf;
+        SecBufferDesc bufdesc;
+        string payload;
+
+        memset(buf.data(), 0, sizeof(SecBuffer) * buf.size());
+
+        payload.resize(stream_sizes.cbHeader + sv.length() + stream_sizes.cbTrailer);
+
+        buf[0].BufferType = SECBUFFER_STREAM_HEADER;
+        buf[0].pvBuffer = payload.data();
+        buf[0].cbBuffer = stream_sizes.cbHeader;
+
+        buf[1].cbBuffer = (long)sv.length();
+        buf[1].BufferType = SECBUFFER_DATA;
+        buf[1].pvBuffer = payload.data() + stream_sizes.cbHeader;
+
+        buf[2].BufferType = SECBUFFER_STREAM_TRAILER;
+        buf[2].pvBuffer = payload.data() + stream_sizes.cbHeader + sv.length();
+        buf[2].cbBuffer = stream_sizes.cbTrailer;
+
+        buf[3].BufferType = SECBUFFER_EMPTY;
+
+        memcpy(buf[1].pvBuffer, sv.data(), sv.length());
+
+        bufdesc.ulVersion = SECBUFFER_VERSION;
+        bufdesc.cBuffers = buf.size();
+        bufdesc.pBuffers = buf.data();
+
+        sec_status = EncryptMessage(&ctx_handle, 0, &bufdesc, 0);
+
+        if (FAILED(sec_status))
+            throw formatted_error("EncryptMessage returned {}", (enum sec_error)sec_status);
+
+        payload.resize(buf[0].cbBuffer + buf[1].cbBuffer + buf[2].cbBuffer);
+
+        tds.send_raw(payload);
     }
 
     void tds_ssl::recv(uint8_t* ptr, size_t left) {

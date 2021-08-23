@@ -568,8 +568,8 @@ namespace tds {
     private:
         tds_impl& tds;
         std::string ssl_recv_buf;
-        bool established = false;
 #ifdef WITH_OPENSSL
+        bool established = false;
         BIO* bio;
         std::unique_ptr<SSL_CTX*, ssl_ctx_deleter> ctx;
         std::unique_ptr<BIO_METHOD*, bio_meth_deleter> meth;
@@ -578,6 +578,7 @@ namespace tds {
         CredHandle cred_handle = {(ULONG_PTR)-1, (ULONG_PTR)-1};
         CtxtHandle ctx_handle;
         bool ctx_handle_set = false;
+        SecPkgContext_StreamSizes stream_sizes;
 #endif
     };
 #endif
