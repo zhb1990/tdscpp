@@ -628,8 +628,81 @@ namespace tds {
     }
 
     void tds_ssl::recv(uint8_t* ptr, size_t left) {
-        throw runtime_error("FIXME - Schannel recv");
-        // FIXME
+        SECURITY_STATUS sec_status;
+        array<SecBuffer, 4> buf;
+        SecBufferDesc bufdesc;
+        string recvbuf;
+
+        if (left == 0)
+            return;
+
+        if (!ssl_recv_buf.empty()) {
+            auto to_copy = min(left, ssl_recv_buf.length());
+
+            memcpy(ptr, ssl_recv_buf.data(), to_copy);
+            ssl_recv_buf = ssl_recv_buf.substr(to_copy);
+
+            if (left == to_copy)
+                return;
+
+            left -= to_copy;
+            ptr += to_copy;
+        }
+
+        recvbuf.resize(stream_sizes.cbHeader);
+        tds.recv_raw((uint8_t*)recvbuf.data(), recvbuf.length());
+
+        while (left > 0) {
+            bool found = false;
+
+            memset(buf.data(), 0, sizeof(SecBuffer) * buf.size());
+            buf[0].BufferType = SECBUFFER_DATA;
+            buf[0].pvBuffer = recvbuf.data();
+            buf[0].cbBuffer = (long)recvbuf.length();
+            buf[1].BufferType = SECBUFFER_EMPTY;
+            buf[2].BufferType = SECBUFFER_EMPTY;
+            buf[3].BufferType = SECBUFFER_EMPTY;
+
+            bufdesc.ulVersion = SECBUFFER_VERSION;
+            bufdesc.cBuffers = buf.size();
+            bufdesc.pBuffers = buf.data();
+
+            sec_status = DecryptMessage(&ctx_handle, &bufdesc, 0, nullptr);
+
+            if (sec_status == SEC_E_INCOMPLETE_MESSAGE && buf[0].BufferType == SECBUFFER_MISSING) {
+                recvbuf.resize(recvbuf.length() + buf[0].cbBuffer);
+                tds.recv_raw((uint8_t*)recvbuf.data() + recvbuf.length() - buf[0].cbBuffer, buf[0].cbBuffer);
+                continue;
+            }
+
+            if (FAILED(sec_status))
+                throw formatted_error("DecryptMessage returned {}", (enum sec_error)sec_status);
+
+            for (const auto& b : buf) {
+                if (b.BufferType == SECBUFFER_DATA) {
+                    auto to_copy = min(left, (size_t)b.cbBuffer);
+
+                    memcpy(ptr, b.pvBuffer, to_copy);
+
+                    ptr += to_copy;
+                    left -= to_copy;
+
+                    ssl_recv_buf += string_view((char*)b.pvBuffer + to_copy, b.cbBuffer - to_copy);
+
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                throw runtime_error("DecryptMessage did not return a SECBUFFER_DATA buffer.");
+
+            if (left == 0)
+                break;
+
+            recvbuf.resize(stream_sizes.cbHeader);
+            tds.recv_raw((uint8_t*)recvbuf.data(), recvbuf.length());
+        }
     }
 };
 #endif
