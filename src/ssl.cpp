@@ -546,7 +546,7 @@ namespace tds {
             outbuf.BufferType = SECBUFFER_TOKEN;
             outbuf.pvBuffer = nullptr;
 
-            inbuf.cbBuffer = payload.length();
+            inbuf.cbBuffer = (long)payload.length();
             inbuf.BufferType = SECBUFFER_TOKEN;
             inbuf.pvBuffer = payload.data();
 
