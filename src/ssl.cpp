@@ -493,14 +493,13 @@ namespace tds {
 
         cred.dwVersion = SCHANNEL_CRED_VERSION;
         cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
+        cred.dwFlags = tds.check_certificate ? SCH_CRED_AUTO_CRED_VALIDATION : SCH_CRED_MANUAL_CRED_VALIDATION;
 
         sec_status = AcquireCredentialsHandleW(nullptr, UNISP_NAME_W, SECPKG_CRED_OUTBOUND, nullptr, &cred,
                                                nullptr, nullptr, &cred_handle, nullptr);
 
         if (FAILED(sec_status))
             throw formatted_error("AcquireCredentialsHandle returned {}", (enum sec_error)sec_status);
-
-        // FIXME - trusting certificate
 
         outbuf.cbBuffer = 0;
         outbuf.BufferType = SECBUFFER_TOKEN;
