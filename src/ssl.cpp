@@ -480,15 +480,21 @@ namespace tds {
     }
 };
 #elif defined(_WIN32)
-namespace tds{
+namespace tds {
     tds_ssl::tds_ssl(tds_impl& tds) : tds(tds) {
         SECURITY_STATUS sec_status;
         SecBuffer outbuf;
         SecBufferDesc out;
         uint32_t context_attr;
         string outstr;
+        SCHANNEL_CRED cred;
 
-        sec_status = AcquireCredentialsHandleW(nullptr, UNISP_NAME_W, SECPKG_CRED_OUTBOUND, nullptr, nullptr,
+        memset(&cred, 0, sizeof(cred));
+
+        cred.dwVersion = SCHANNEL_CRED_VERSION;
+        cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
+
+        sec_status = AcquireCredentialsHandleW(nullptr, UNISP_NAME_W, SECPKG_CRED_OUTBOUND, nullptr, &cred,
                                                nullptr, nullptr, &cred_handle, nullptr);
 
         if (FAILED(sec_status))
