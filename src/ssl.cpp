@@ -495,7 +495,7 @@ namespace tds {
         cred.grbitEnabledProtocols = SP_PROT_TLS1_2_CLIENT;
         cred.dwFlags = tds.check_certificate ? SCH_CRED_AUTO_CRED_VALIDATION : SCH_CRED_MANUAL_CRED_VALIDATION;
 
-        sec_status = AcquireCredentialsHandleW(nullptr, UNISP_NAME_W, SECPKG_CRED_OUTBOUND, nullptr, &cred,
+        sec_status = AcquireCredentialsHandleW(nullptr, (LPWSTR)UNISP_NAME_W, SECPKG_CRED_OUTBOUND, nullptr, &cred,
                                                nullptr, nullptr, &cred_handle, nullptr);
 
         if (FAILED(sec_status))
