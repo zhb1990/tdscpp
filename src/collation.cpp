@@ -532,4 +532,59 @@ namespace tds {
 
         return ret;
     }
+
+    weak_ordering column::operator<=>(const column& c) const {
+        switch (type) {
+            case sql_type::INTN:
+            case sql_type::TINYINT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::BIGINT: {
+                auto v1 = (int64_t)*this;
+                auto v2 = (int64_t)c;
+
+                return v1 <=> v2;
+            }
+
+            case sql_type::DATE: {
+                auto v1 = (chrono::year_month_day)*this;
+                auto v2 = (chrono::year_month_day)c;
+
+                return v1 <=> v2;
+            }
+
+            // FIXME - VARCHAR
+            // FIXME - CHAR
+            // FIXME - NVARCHAR
+            // FIXME - NCHAR
+            // FIXME - TEXT
+            // FIXME - NTEXT
+            // FIXME - XML
+            // FIXME - IMAGE
+            // FIXME - UNIQUEIDENTIFIER
+            // FIXME - TIME
+            // FIXME - DATETIME2
+            // FIXME - DATETIMEOFFSET
+            // FIXME - BIT
+            // FIXME - DATETIM4
+            // FIXME - REAL
+            // FIXME - MONEY
+            // FIXME - DATETIME
+            // FIXME - FLOAT
+            // FIXME - SQL_VARIANT
+            // FIXME - BITN
+            // FIXME - DECIMAL
+            // FIXME - NUMERIC
+            // FIXME - FLTN
+            // FIXME - MONEYN
+            // FIXME - DATETIMN
+            // FIXME - SMALLMONEY
+            // FIXME - VARBINARY
+            // FIXME - BINARY
+            // FIXME - UDT
+
+            default:
+                throw formatted_error("Comparison for type {} unimplemented.", type);
+        }
+    }
 };

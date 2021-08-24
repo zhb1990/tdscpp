@@ -949,6 +949,7 @@ namespace tds {
         collation coll;
 
         std::string collation_name() const;
+        std::weak_ordering operator<=>(const column& c) const;
     };
 
     template<typename T>
