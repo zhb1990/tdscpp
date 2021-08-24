@@ -46,7 +46,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 set(SRC_FILES src/tdscpp.cpp
     src/bcp.cpp
     src/value.cpp
-    src/ssl.cpp)
+    src/ssl.cpp
+    src/collation.cpp)
 
 add_library(tdscpp SHARED ${SRC_FILES})
 
