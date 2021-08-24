@@ -928,8 +928,8 @@ namespace tds {
         uint32_t lcid : 20;
         uint32_t ignore_case : 1;
         uint32_t ignore_accent : 1;
-        uint32_t ignore_width : 1;
         uint32_t ignore_kana : 1;
+        uint32_t ignore_width : 1;
         uint32_t binary : 1;
         uint32_t binary2 : 1;
         uint32_t utf8 : 1;
