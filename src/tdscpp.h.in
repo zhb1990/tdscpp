@@ -947,6 +947,8 @@ namespace tds {
         std::u16string name;
         bool nullable;
         collation coll;
+
+        std::string collation_name() const;
     };
 
     template<typename T>
