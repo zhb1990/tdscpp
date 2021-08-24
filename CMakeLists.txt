@@ -120,4 +120,7 @@ if(BUILD_SAMPLE)
     add_executable(tdscpp-test ${TEST_SRC_FILES})
     target_link_libraries(tdscpp-test tdscpp)
     install(TARGETS tdscpp-test DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+    add_executable(colltest src/colltest.cpp)
+    target_link_libraries(colltest tdscpp fmt::fmt-header-only)
 endif()
