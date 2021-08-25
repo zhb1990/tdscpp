@@ -728,6 +728,26 @@ namespace tds {
     requires (N <= 38)
     class numeric;
 
+#pragma pack(push,1)
+
+    struct collation {
+        uint32_t lcid : 20;
+        uint32_t ignore_case : 1;
+        uint32_t ignore_accent : 1;
+        uint32_t ignore_kana : 1;
+        uint32_t ignore_width : 1;
+        uint32_t binary : 1;
+        uint32_t binary2 : 1;
+        uint32_t utf8 : 1;
+        uint32_t reserved : 1;
+        uint32_t version : 4;
+        uint8_t sort_id;
+    };
+
+    static_assert(sizeof(collation) == 5, "tds::collation has wrong size");
+
+#pragma pack(pop)
+
     class TDSCPP WARN_UNUSED value {
     public:
         // make sure pointers don't get interpreted as bools
@@ -912,6 +932,9 @@ namespace tds {
             }
         }
 
+        std::string collation_name() const;
+        std::weak_ordering operator<=>(const value& v) const;
+
         enum sql_type type;
         std::string val;
         bool is_null = false;
@@ -920,36 +943,13 @@ namespace tds {
         unsigned int max_length = 0;
         uint8_t precision;
         uint8_t scale;
+        collation coll;
     };
-
-#pragma pack(push,1)
-
-    struct collation {
-        uint32_t lcid : 20;
-        uint32_t ignore_case : 1;
-        uint32_t ignore_accent : 1;
-        uint32_t ignore_kana : 1;
-        uint32_t ignore_width : 1;
-        uint32_t binary : 1;
-        uint32_t binary2 : 1;
-        uint32_t utf8 : 1;
-        uint32_t reserved : 1;
-        uint32_t version : 4;
-        uint8_t sort_id;
-    };
-
-    static_assert(sizeof(collation) == 5, "tds::collation has wrong size");
-
-#pragma pack(pop)
 
     class TDSCPP column : public value {
     public:
         std::u16string name;
         bool nullable;
-        collation coll;
-
-        std::string collation_name() const;
-        std::weak_ordering operator<=>(const column& c) const;
     };
 
     template<typename T>

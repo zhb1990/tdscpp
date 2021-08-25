@@ -4,7 +4,7 @@
 using namespace std;
 
 namespace tds {
-    string column::collation_name() const {
+    string value::collation_name() const {
         string ret;
 
         if (coll.sort_id != 0) {
@@ -533,7 +533,7 @@ namespace tds {
         return ret;
     }
 
-    weak_ordering column::operator<=>(const column& c) const {
+    weak_ordering value::operator<=>(const value& v) const {
         switch (type) {
             case sql_type::INTN:
             case sql_type::TINYINT:
@@ -541,14 +541,14 @@ namespace tds {
             case sql_type::INT:
             case sql_type::BIGINT: {
                 auto v1 = (int64_t)*this;
-                auto v2 = (int64_t)c;
+                auto v2 = (int64_t)v;
 
                 return v1 <=> v2;
             }
 
             case sql_type::DATE: {
                 auto v1 = (chrono::year_month_day)*this;
-                auto v2 = (chrono::year_month_day)c;
+                auto v2 = (chrono::year_month_day)v;
 
                 return v1 <=> v2;
             }
