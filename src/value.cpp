@@ -1191,59 +1191,6 @@ namespace tds {
             is_null = true;
     }
 
-    value::value(const u16string_view& sv) {
-        type = sql_type::NVARCHAR;
-        val.resize(sv.length() * sizeof(char16_t));
-        memcpy(val.data(), sv.data(), val.length());
-    }
-
-    value::value(const optional<u16string_view>& sv) {
-        type = sql_type::NVARCHAR;
-
-        if (!sv.has_value())
-            is_null = true;
-        else {
-            val.resize(sv.value().length() * sizeof(char16_t));
-            memcpy(val.data(), sv.value().data(), sv.value().length());
-        }
-    }
-
-    value::value(const string_view& sv) {
-        type = sql_type::VARCHAR;
-        val.resize(sv.length());
-        memcpy(val.data(), sv.data(), val.length());
-    }
-
-    value::value(const optional<string_view>& sv) {
-        type = sql_type::VARCHAR;
-
-        if (!sv.has_value())
-            is_null = true;
-        else {
-            val.resize(sv.value().length());
-            memcpy(val.data(), sv.value().data(), sv.value().length());
-        }
-    }
-
-    value::value(const u8string_view& sv) {
-        type = sql_type::VARCHAR;
-        utf8 = true;
-        val.resize(sv.length());
-        memcpy(val.data(), sv.data(), sv.length());
-    }
-
-    value::value(const optional<u8string_view>& sv) {
-        type = sql_type::VARCHAR;
-        utf8 = true;
-
-        if (!sv.has_value())
-            is_null = true;
-        else {
-            val.resize(sv.value().length());
-            memcpy(val.data(), sv.value().data(), sv.value().length());
-        }
-    }
-
     value::value(float f) {
         type = sql_type::FLTN;
 

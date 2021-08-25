@@ -766,33 +766,139 @@ namespace tds {
         value(uint32_t i);
         value(const std::optional<uint32_t>& i);
         value(wchar_t) = delete;
-        value(const std::u16string_view& sv);
 
-        value(const std::u16string& sv) : value(std::u16string_view(sv)) {
+        template<typename... Args>
+        requires std::is_constructible_v<collation, Args...>
+        value(const std::u16string& sv, Args&&... args) : value(std::u16string_view(sv), args...) {
         }
 
-        value(const char16_t* sv) : value(std::u16string_view(sv)) {
+        template<typename... Args>
+        requires std::is_constructible_v<collation, Args...>
+        value(const char16_t* sv, Args&&... args) : value(std::u16string_view(sv), args...) {
         }
 
-        value(const std::optional<std::u16string_view>& sv);
-        value(const std::string_view& sv);
+        template<typename T>
+        requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
+        value(const std::optional<std::basic_string_view<T>>& sv) {
+            if constexpr (std::is_same_v<T, char16_t>)
+                type = sql_type::NVARCHAR;
+            else
+                type = sql_type::VARCHAR;
 
-        value(const std::string& sv) : value(std::string_view(sv)) {
+            if constexpr (std::is_same_v<T, char8_t>)
+                utf8 = true;
+
+            if (!sv.has_value())
+                is_null = true;
+            else {
+                val.resize(sv.value().length() * sizeof(T));
+                memcpy(val.data(), sv.value().data(), val.length());
+            }
+
+            // Latin1_General_CI_AS
+
+            coll.lcid = 1033;
+            coll.ignore_case = 1;
+            coll.ignore_accent = 0;
+            coll.ignore_kana = 1;
+            coll.ignore_width = 1;
+            coll.binary = 0;
+            coll.binary2 = 0;
+            coll.version = 0;
+            coll.sort_id = 0;
+
+            if constexpr (std::is_same_v<T, char8_t>)
+                coll.utf8 = 1;
+            else
+                coll.utf8 = 0;
         }
 
-        value(const char* sv) : value(std::string_view(sv)) {
+        template<typename T, typename... Args>
+        requires ((std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>) && std::is_constructible_v<collation, Args...>)
+        value(const std::optional<std::basic_string_view<T>>& sv, Args&&... args) : coll(args...) {
+            if constexpr (std::is_same_v<T, char16_t>)
+                type = sql_type::NVARCHAR;
+            else
+                type = sql_type::VARCHAR;
+
+            if constexpr (std::is_same_v<T, char8_t>)
+                utf8 = true;
+
+            if (!sv.has_value())
+                is_null = true;
+            else {
+                val.resize(sv.value().length() * sizeof(T));
+                memcpy(val.data(), sv.value().data(), val.length());
+            }
         }
 
-        value(const std::optional<std::string_view>& sv);
-        value(const std::u8string_view& sv);
+        template<typename T>
+        requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
+        value(const std::basic_string_view<T>& sv) {
+            if constexpr (std::is_same_v<T, char16_t>)
+                type = sql_type::NVARCHAR;
+            else
+                type = sql_type::VARCHAR;
 
-        value(const std::u8string& sv) : value(std::u8string_view(sv)) {
+            if constexpr (std::is_same_v<T, char8_t>)
+                utf8 = true;
+
+            val.resize(sv.length() * sizeof(T));
+            memcpy(val.data(), sv.data(), val.length());
+
+            // Latin1_General_CI_AS
+
+            coll.lcid = 1033;
+            coll.ignore_case = 1;
+            coll.ignore_accent = 0;
+            coll.ignore_kana = 1;
+            coll.ignore_width = 1;
+            coll.binary = 0;
+            coll.binary2 = 0;
+            coll.version = 0;
+            coll.sort_id = 0;
+
+            if constexpr (std::is_same_v<T, char8_t>)
+                coll.utf8 = 1;
+            else
+                coll.utf8 = 0;
         }
 
-        value(const char8_t* sv) : value(std::u8string_view(sv)) {
+        template<typename T, typename... Args>
+        requires ((std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>) && std::is_constructible_v<collation, Args...>)
+        value(const std::basic_string_view<T>& sv, Args&&... args) : coll(args...) {
+            if constexpr (std::is_same_v<T, char16_t>)
+                type = sql_type::NVARCHAR;
+            else
+                type = sql_type::VARCHAR;
+
+            if constexpr (std::is_same_v<T, char8_t>)
+                utf8 = true;
+
+            val.resize(sv.length() * sizeof(T));
+            memcpy(val.data(), sv.data(), val.length());
         }
 
-        value(const std::optional<std::u8string_view>& sv);
+        template<typename... Args>
+        requires std::is_constructible_v<collation, Args...>
+        value(const std::string& sv, Args&&... args) : value(std::string_view(sv), args...) {
+        }
+
+        template<typename... Args>
+        requires std::is_constructible_v<collation, Args...>
+        value(const char* sv, Args&&... args) : value(std::string_view(sv), args...) {
+        }
+
+        template<typename... Args>
+        requires std::is_constructible_v<collation, Args...>
+        value(const std::u8string& sv, Args&&... args) : value(std::u8string_view(sv), args...) {
+        }
+
+        template<typename... Args>
+        requires std::is_constructible_v<collation, Args...>
+        value(const char8_t* sv, Args&&... args) : value(std::u8string_view(sv), args...) {
+        }
+
         value(float f);
         value(const std::optional<float>& f);
         value(double d);
