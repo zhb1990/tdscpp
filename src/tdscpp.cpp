@@ -3472,17 +3472,7 @@ namespace tds {
                     else
                         h2->max_length = (uint16_t)p.val.length();
 
-                    h2->collation.lcid = 0x0409; // en-US
-                    h2->collation.ignore_case = 1;
-                    h2->collation.ignore_accent = 0;
-                    h2->collation.ignore_width = 1;
-                    h2->collation.ignore_kana = 1;
-                    h2->collation.binary = 0;
-                    h2->collation.binary2 = 0;
-                    h2->collation.utf8 = 0;
-                    h2->collation.reserved = 0;
-                    h2->collation.version = 0;
-                    h2->collation.sort_id = 52; // nocase.iso
+                    h2->collation = p.coll;
 
                     if (!p.is_null && p.val.length() > 8000) { // MAX
                         auto h3 = (tds_VARCHAR_MAX_param*)h2;
@@ -3529,17 +3519,7 @@ namespace tds {
                     else
                         h2->max_length = (uint16_t)sv.length();
 
-                    h2->collation.lcid = 0x0409; // en-US
-                    h2->collation.ignore_case = 1;
-                    h2->collation.ignore_accent = 0;
-                    h2->collation.ignore_width = 1;
-                    h2->collation.ignore_kana = 1;
-                    h2->collation.binary = 0;
-                    h2->collation.binary2 = 0;
-                    h2->collation.utf8 = p.utf8 && conn.impl->has_utf8 ? 1 : 0;
-                    h2->collation.reserved = 0;
-                    h2->collation.version = 2;
-                    h2->collation.sort_id = 0;
+                    h2->collation = p.coll;
 
                     if (!p.is_null && sv.length() > 8000) { // MAX
                         auto h3 = (tds_VARCHAR_MAX_param*)h2;
@@ -3665,19 +3645,9 @@ namespace tds {
                     *(uint32_t*)ptr = 0x7fffffff;
                     ptr += sizeof(uint32_t);
 
-                    auto col = (collation*)ptr;
+                    auto& col = *(collation*)ptr;
 
-                    col->lcid = 0x0409; // en-US
-                    col->ignore_case = 1;
-                    col->ignore_accent = 0;
-                    col->ignore_width = 1;
-                    col->ignore_kana = 1;
-                    col->binary = 0;
-                    col->binary2 = 0;
-                    col->utf8 = 0;
-                    col->reserved = 0;
-                    col->version = 0;
-                    col->sort_id = 52; // nocase.iso
+                    col = p.coll;
 
                     ptr += sizeof(collation);
 
