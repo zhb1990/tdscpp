@@ -730,7 +730,10 @@ namespace tds {
 
 #pragma pack(push,1)
 
-    struct collation {
+    struct TDSCPP collation {
+        collation() = default;
+        collation(const std::string_view& s);
+
         uint32_t lcid : 20;
         uint32_t ignore_case : 1;
         uint32_t ignore_accent : 1;
