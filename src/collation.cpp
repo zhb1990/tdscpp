@@ -3,6 +3,100 @@
 
 using namespace std;
 
+static weak_ordering compare_strings(const u16string_view& val1, const u16string_view& val2, const tds::collation& coll) {
+    if (val1 == val2)
+        return weak_ordering::equivalent;
+
+    if (val1.empty())
+        return weak_ordering::less;
+
+    if (val2.empty())
+        return weak_ordering::greater;
+
+    if (coll.binary2) {
+        auto sv1 = val1;
+        auto sv2 = val2;
+
+        while (!sv1.empty() && !sv2.empty()) {
+            if (sv1.front() < sv2.front())
+                return weak_ordering::less;
+            else if (sv1.front() > sv2.front())
+                return weak_ordering::greater;
+
+            sv1.remove_prefix(1);
+            sv2.remove_prefix(1);
+        }
+
+        if (sv1.empty() && sv2.empty())
+            return weak_ordering::equivalent;
+        else if (sv1.empty())
+            return weak_ordering::less;
+        else
+            return weak_ordering::greater;
+    }
+
+    if (coll.binary) { // yes, this makes no sense
+        if (val1.front() < val2.front())
+            return weak_ordering::less;
+        else if (val1.front() > val2.front())
+            return weak_ordering::greater;
+
+        auto sv1 = basic_string_view<uint8_t>{(uint8_t*)&val1[1], (val1.length() * sizeof(char16_t)) - 1};
+        auto sv2 = basic_string_view<uint8_t>{(uint8_t*)&val2[1], (val2.length() * sizeof(char16_t)) - 1};
+
+        while (!sv1.empty() && !sv2.empty()) {
+            if (sv1.front() < sv2.front())
+                return weak_ordering::less;
+            else if (sv1.front() > sv2.front())
+                return weak_ordering::greater;
+
+            sv1.remove_prefix(1);
+            sv2.remove_prefix(1);
+        }
+
+        if (sv1.empty() && sv2.empty())
+            return weak_ordering::equivalent;
+        else if (sv1.empty())
+            return weak_ordering::less;
+        else
+            return weak_ordering::greater;
+    }
+
+#ifdef _WIN32
+    DWORD flags = 0;
+
+    if (coll.ignore_case)
+        flags |= LINGUISTIC_IGNORECASE;
+
+    if (coll.ignore_accent)
+        flags |= LINGUISTIC_IGNOREDIACRITIC;
+
+    if (coll.ignore_width)
+        flags |= NORM_IGNOREWIDTH;
+
+    if (coll.ignore_kana)
+        flags |= NORM_IGNOREKANATYPE;
+
+    auto ret = CompareStringW(coll.lcid, flags, (WCHAR*)val1.data(), (int)val1.length(), (WCHAR*)val2.data(), (int)val2.length());
+
+    switch (ret) {
+        case CSTR_LESS_THAN:
+            return weak_ordering::less;
+
+        case CSTR_EQUAL:
+            return weak_ordering::equivalent;
+
+        case CSTR_GREATER_THAN:
+            return weak_ordering::greater;
+
+        default:
+            throw last_error("CompareString", GetLastError());
+    }
+#else
+    throw runtime_error("FIXME - compare_strings");
+#endif
+}
+
 namespace tds {
     string value::collation_name() const {
         string ret;
@@ -553,13 +647,19 @@ namespace tds {
                 return v1 <=> v2;
             }
 
-            // FIXME - VARCHAR
-            // FIXME - CHAR
-            // FIXME - NVARCHAR
-            // FIXME - NCHAR
-            // FIXME - TEXT
-            // FIXME - NTEXT
-            // FIXME - XML
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
+            case sql_type::TEXT:
+            case sql_type::NTEXT: {
+                auto v1 = (u16string)*this;
+                auto v2 = (u16string)v;
+
+                return compare_strings(v1, v2, coll);
+            }
+
+            // FIXME - XML (collation?)
             // FIXME - IMAGE
             // FIXME - UNIQUEIDENTIFIER
             // FIXME - TIME
