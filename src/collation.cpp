@@ -659,17 +659,23 @@ namespace tds {
                 return compare_strings(v1, v2, coll);
             }
 
+            case sql_type::DATETIME2:
+            case sql_type::DATETIM4:
+            case sql_type::DATETIME:
+            case sql_type::DATETIMN: {
+                auto v1 = (datetime)*this;
+                auto v2 = (datetime)v;
+
+                return v1 <=> v2;
+            }
+
             // FIXME - XML (collation?)
-            // FIXME - IMAGE
             // FIXME - UNIQUEIDENTIFIER
             // FIXME - TIME
-            // FIXME - DATETIME2
             // FIXME - DATETIMEOFFSET
             // FIXME - BIT
-            // FIXME - DATETIM4
             // FIXME - REAL
             // FIXME - MONEY
-            // FIXME - DATETIME
             // FIXME - FLOAT
             // FIXME - SQL_VARIANT
             // FIXME - BITN
@@ -677,11 +683,10 @@ namespace tds {
             // FIXME - NUMERIC
             // FIXME - FLTN
             // FIXME - MONEYN
-            // FIXME - DATETIMN
             // FIXME - SMALLMONEY
+            // FIXME - IMAGE
             // FIXME - VARBINARY
             // FIXME - BINARY
-            // FIXME - UDT
 
             default:
                 throw formatted_error("Comparison for type {} unimplemented.", type);
