@@ -708,19 +708,34 @@ namespace tds {
     public:
         constexpr datetimeoffset() = default;
         constexpr datetimeoffset(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
-            datetime(year, month, day, hour, minute, second), offset(offset) { }
-        constexpr datetimeoffset(const std::chrono::year_month_day& d, time_t t, int16_t offset) : datetime(d, t), offset(offset) { }
+            datetime(year, month, day, hour, minute, second), offset(offset) {
+            this->t -= std::chrono::minutes{offset};
+            normalize();
+        }
+
+        constexpr datetimeoffset(const std::chrono::year_month_day& d, time_t t, int16_t offset) : datetime(d, t), offset(offset) {
+            this->t -= std::chrono::minutes{offset};
+            normalize();
+        }
 
         constexpr datetimeoffset(std::chrono::year year, std::chrono::month month, std::chrono::day day, time_t t, int16_t offset) :
-            datetime(year, month, day, t), offset(offset) { }
+            datetime(year, month, day, t), offset(offset) {
+            this->t -= std::chrono::minutes{offset};
+            normalize();
+        }
 
         constexpr datetimeoffset(const std::chrono::time_point<std::chrono::system_clock>& t, int16_t offset) :
-            datetime(t), offset(offset) { }
+            datetime(t), offset(offset) {
+            this->t -= std::chrono::minutes{offset};
+            normalize();
+        }
 
         template<typename T, typename U>
         constexpr datetimeoffset(const std::chrono::year_month_day& d2, std::chrono::duration<T, U> t2, int16_t offset) : offset(offset) {
             d = d2;
             t = std::chrono::duration_cast<time_t>(t2);
+            t -= std::chrono::minutes{offset};
+            normalize();
         }
 
         constexpr operator std::chrono::time_point<std::chrono::system_clock>() const {
@@ -730,6 +745,17 @@ namespace tds {
         static datetimeoffset now();
 
         int16_t offset;
+
+    private:
+        constexpr void normalize() {
+            if (t < time_t::zero()) {
+                d = std::chrono::year_month_day{(std::chrono::sys_days)d - std::chrono::days{1}};
+                t += std::chrono::days{1};
+            } else if (t >= std::chrono::days{1}) {
+                d = std::chrono::year_month_day{(std::chrono::sys_days)d + std::chrono::days{1}};
+                t -= std::chrono::days{1};
+            }
+        }
     };
 
     template<typename T>
@@ -1870,7 +1896,6 @@ struct fmt::formatter<tds::datetimeoffset> {
     template<typename format_context>
     auto format(const tds::datetimeoffset& dto, format_context& ctx) const {
         auto len2 = len;
-        auto hms = std::chrono::hh_mm_ss{dto.t};
 
         if (len_arg != -1) {
             auto arg = ctx.arg(len_arg);
@@ -1886,9 +1911,24 @@ struct fmt::formatter<tds::datetimeoffset> {
             }, arg);
         }
 
+        auto d = dto.d;
+        auto t = dto.t;
+
+        t += std::chrono::minutes{dto.offset};
+
+        if (t < tds::time_t::zero()) {
+            d = std::chrono::year_month_day{(std::chrono::sys_days)d - std::chrono::days{1}};
+            t += std::chrono::days{1};
+        } else if (t >= std::chrono::days{1}) {
+            d = std::chrono::year_month_day{(std::chrono::sys_days)d + std::chrono::days{1}};
+            t -= std::chrono::days{1};
+        }
+
+        auto hms = std::chrono::hh_mm_ss{t};
+
         if (len2 == 0) {
             return fmt::format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:02} {:+03}:{:02}",
-                             (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
+                             (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day(),
                              hms.hours().count(), hms.minutes().count(), hms.seconds().count(),
                              dto.offset / 60, abs(dto.offset) % 60);
         }
@@ -1896,7 +1936,7 @@ struct fmt::formatter<tds::datetimeoffset> {
         double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
 
         return fmt::format_to(ctx.out(), "{:04}-{:02}-{:02} {:02}:{:02}:{:0{}.{}f} {:+03}:{:02}",
-                         (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
+                         (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day(),
                          hms.hours().count(), hms.minutes().count(),
                          s, len2 + 3, len2,
                          dto.offset / 60, abs(dto.offset) % 60);
