@@ -687,13 +687,17 @@ namespace tds {
             return std::chrono::sys_days{d} + t;
         }
 
-        constexpr std::strong_ordering operator<=>(const datetime& dt) {
+        constexpr std::strong_ordering operator<=>(const datetime& dt) const {
             auto r = d <=> dt.d;
 
             if (r != std::strong_ordering::equivalent)
                 return r;
 
             return t <=> dt.t;
+        }
+
+        constexpr bool operator==(const datetime& dt) const {
+            return (*this <=> dt) == std::strong_ordering::equivalent;
         }
 
         std::chrono::year_month_day d;
@@ -1052,6 +1056,10 @@ namespace tds {
 
         std::string collation_name() const;
         std::weak_ordering operator<=>(const value& v) const;
+
+        bool operator==(const value& v) const {
+            return (*this <=> v) == std::weak_ordering::equivalent;
+        }
 
         enum sql_type type;
         std::string val;
