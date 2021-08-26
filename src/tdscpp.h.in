@@ -658,7 +658,7 @@ namespace tds {
 
     using time_t = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
 
-    class TDSCPP datetime {
+    class TDSCPP WARN_UNUSED datetime {
     public:
         constexpr datetime() = default;
 
@@ -691,7 +691,7 @@ namespace tds {
         time_t t;
     };
 
-    class TDSCPP datetimeoffset : public datetime {
+    class TDSCPP WARN_UNUSED datetimeoffset : public datetime {
     public:
         constexpr datetimeoffset() = default;
         constexpr datetimeoffset(std::chrono::year year, std::chrono::month month, std::chrono::day day, uint8_t hour, uint8_t minute, uint8_t second, int16_t offset) :
