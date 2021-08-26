@@ -2719,9 +2719,13 @@ namespace tds {
                     ticks *= 10;
                 }
 
-                auto offset = *(int16_t*)&d[d.length() - sizeof(int16_t)];
+                datetimeoffset dto;
 
-                return datetimeoffset{num_to_ymd((int32_t)n - jan1900), time_t(ticks), offset};
+                dto.d = num_to_ymd((int32_t)n - jan1900);
+                dto.t = time_t(ticks);
+                dto.offset = *(int16_t*)&d[d.length() - sizeof(int16_t)];
+
+                return dto;
             }
 
             // MSSQL doesn't allow conversion to DATETIME2 for integers, floats, or BIT
