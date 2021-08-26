@@ -669,6 +669,13 @@ namespace tds {
                 return v1 <=> v2;
             }
 
+            case sql_type::DATETIMEOFFSET: {
+                auto v1 = (datetimeoffset)*this;
+                auto v2 = (datetimeoffset)v;
+
+                return v1 <=> v2;
+            }
+
             case sql_type::FLOAT:
             case sql_type::REAL:
             case sql_type::FLTN: {
@@ -681,7 +688,6 @@ namespace tds {
             // FIXME - XML (collation?)
             // FIXME - UNIQUEIDENTIFIER
             // FIXME - TIME
-            // FIXME - DATETIMEOFFSET
             // FIXME - BIT
             // FIXME - MONEY
             // FIXME - SQL_VARIANT
