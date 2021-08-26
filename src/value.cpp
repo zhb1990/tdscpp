@@ -1594,7 +1594,10 @@ namespace tds {
                 memcpy(&v, d.data() + d.length() - 5, 3);
                 v &= 0xffffff;
 
-                datetimeoffset dto(num_to_ymd(v - jan1900), (time_t)ticks, *(int16_t*)(d.data() + d.length() - sizeof(int16_t)));
+                datetimeoffset dto;
+                dto.d = num_to_ymd(v - jan1900);
+                dto.t = time_t{ticks};
+                dto.offset = *(int16_t*)(d.data() + d.length() - sizeof(int16_t));
 
                 return fmt::format(FMT_STRING("{:{}}"), dto, max_length2);
             }
