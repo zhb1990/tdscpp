@@ -742,6 +742,21 @@ namespace tds {
             return std::chrono::sys_days{d} + t - std::chrono::minutes{offset};
         }
 
+        constexpr std::weak_ordering operator<=>(const datetime& dt) const {
+            auto r = d <=> dt.d;
+
+            // comparisons ignore the timezone - this is what MSSQL does
+
+            if (r != std::weak_ordering::equivalent)
+                return r;
+
+            return t <=> dt.t;
+        }
+
+        constexpr bool operator==(const datetime& dt) const {
+            return (*this <=> dt) == std::weak_ordering::equivalent;
+        }
+
         static datetimeoffset now();
 
         int16_t offset;
