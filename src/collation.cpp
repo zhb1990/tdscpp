@@ -627,7 +627,7 @@ namespace tds {
         return ret;
     }
 
-    weak_ordering value::operator<=>(const value& v) const {
+    partial_ordering value::operator<=>(const value& v) const {
         switch (type) {
             case sql_type::INTN:
             case sql_type::TINYINT:
@@ -669,19 +669,25 @@ namespace tds {
                 return v1 <=> v2;
             }
 
+            case sql_type::FLOAT:
+            case sql_type::REAL:
+            case sql_type::FLTN: {
+                auto v1 = (double)*this;
+                auto v2 = (double)v;
+
+                return v1 <=> v2;
+            }
+
             // FIXME - XML (collation?)
             // FIXME - UNIQUEIDENTIFIER
             // FIXME - TIME
             // FIXME - DATETIMEOFFSET
             // FIXME - BIT
-            // FIXME - REAL
             // FIXME - MONEY
-            // FIXME - FLOAT
             // FIXME - SQL_VARIANT
             // FIXME - BITN
             // FIXME - DECIMAL
             // FIXME - NUMERIC
-            // FIXME - FLTN
             // FIXME - MONEYN
             // FIXME - SMALLMONEY
             // FIXME - IMAGE

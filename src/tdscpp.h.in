@@ -1055,10 +1055,10 @@ namespace tds {
         }
 
         std::string collation_name() const;
-        std::weak_ordering operator<=>(const value& v) const;
+        std::partial_ordering operator<=>(const value& v) const;
 
         bool operator==(const value& v) const {
-            return (*this <=> v) == std::weak_ordering::equivalent;
+            return (*this <=> v) == std::partial_ordering::equivalent;
         }
 
         enum sql_type type;
