@@ -687,6 +687,15 @@ namespace tds {
             return std::chrono::sys_days{d} + t;
         }
 
+        constexpr std::strong_ordering operator<=>(const datetime& dt) {
+            auto r = d <=> dt.d;
+
+            if (r != std::strong_ordering::equivalent)
+                return r;
+
+            return t <=> dt.t;
+        }
+
         std::chrono::year_month_day d;
         time_t t;
     };
