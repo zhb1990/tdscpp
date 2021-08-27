@@ -685,9 +685,15 @@ namespace tds {
                 return v1 <=> v2;
             }
 
+            case sql_type::TIME: {
+                auto v1 = (time_t)*this;
+                auto v2 = (time_t)v;
+
+                return v1 <=> v2;
+            }
+
             // FIXME - XML (collation?)
             // FIXME - UNIQUEIDENTIFIER
-            // FIXME - TIME
             // FIXME - BIT
             // FIXME - MONEY
             // FIXME - SQL_VARIANT
