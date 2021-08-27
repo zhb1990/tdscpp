@@ -628,6 +628,9 @@ namespace tds {
     }
 
     partial_ordering value::operator<=>(const value& v) const {
+        if (is_null || v.is_null)
+            return partial_ordering::unordered;
+
         switch (type) {
             case sql_type::INTN:
             case sql_type::TINYINT:
