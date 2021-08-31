@@ -562,10 +562,10 @@ namespace tds {
                 const std::string_view& app_name = "tdscpp", const std::string_view& db = "",
                 const msg_handler& message_handler = nullptr, const func_count_handler& count_handler = nullptr,
                 uint16_t port = 1433, encryption_type encrypt = encryption_type::ENCRYPT_OFF,
-                bool check_certificate = false) :
+                bool check_certificate = false, unsigned int codepage = 0) :
                 server(server), user(user), password(password), app_name(app_name), db(db),
                 message_handler(message_handler), count_handler(count_handler), port(port),
-                encrypt(encrypt), check_certificate(check_certificate) {
+                encrypt(encrypt), check_certificate(check_certificate), codepage(codepage) {
         }
 
         std::string server;
@@ -578,6 +578,7 @@ namespace tds {
         uint16_t port;
         encryption_type encrypt;
         bool check_certificate;
+        unsigned int codepage;
     };
 
     class TDSCPP tds {
@@ -651,10 +652,11 @@ namespace tds {
                                         const std::u16string_view& db);
         std::vector<uint8_t> bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols);
         std::vector<uint8_t> bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols);
-
         void bcp_sendmsg(const std::string_view& msg);
         size_t bcp_row_size(const col_info& col, const value& vv);
         void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const std::u16string_view& col_name);
+
+        unsigned int codepage;
     };
 
     using time_t = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;

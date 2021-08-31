@@ -2012,6 +2012,9 @@ namespace tds {
         impl = new tds_impl(opts.server, opts.user, opts.password, opts.app_name, opts.db,
                             opts.message_handler, opts.count_handler, opts.port,
                             opts.encrypt, opts.check_certificate);
+
+        // FIXME - if codepage == 0, find current codepage
+        codepage = opts.codepage;
     }
 
     tds::~tds() {
