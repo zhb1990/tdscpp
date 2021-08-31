@@ -739,7 +739,7 @@ namespace tds {
         }
 
         constexpr operator std::chrono::time_point<std::chrono::system_clock>() const {
-            return std::chrono::sys_days{d} + t - std::chrono::minutes{offset};
+            return std::chrono::sys_days{d} + t;
         }
 
         constexpr std::weak_ordering operator<=>(const datetime& dt) const {
