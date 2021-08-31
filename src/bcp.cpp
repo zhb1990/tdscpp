@@ -165,6 +165,9 @@ namespace tds {
         if (s.empty())
             return u"";
 
+        if (codepage == CP_UTF8)
+            return utf8_to_utf16(s);
+
         u16string us;
 
 #ifdef _WIN32
