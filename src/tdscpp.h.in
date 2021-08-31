@@ -519,8 +519,8 @@ namespace tds {
     }
 #endif
 
-    std::string utf16_to_cp(const std::u16string_view& s, unsigned int codepage);
-    std::u16string cp_to_utf16(const std::string_view& s, unsigned int codepage);
+    std::string TDSCPP utf16_to_cp(const std::u16string_view& s, unsigned int codepage);
+    std::u16string TDSCPP cp_to_utf16(const std::string_view& s, unsigned int codepage);
 
     template<typename T>
     requires std::ranges::input_range<T> && std::ranges::contiguous_range<T>
@@ -657,6 +657,7 @@ namespace tds {
         std::u16string db_name() const;
 
         tds_impl* impl;
+        unsigned int codepage;
 
     private:
         std::vector<col_info> bcp_start(const std::u16string_view& table, const list_of_u16string auto& np,
@@ -666,8 +667,6 @@ namespace tds {
         void bcp_sendmsg(const std::string_view& msg);
         size_t bcp_row_size(const col_info& col, const value& vv);
         void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const std::u16string_view& col_name);
-
-        unsigned int codepage;
     };
 
     using time_t = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
@@ -1233,7 +1232,7 @@ namespace tds {
     class TDSCPP query {
     public:
         query(tds& tds, const std::string_view& q) : conn(tds) {
-            do_query(conn, utf8_to_utf16(q));
+            do_query(conn, cp_to_utf16(q, tds.codepage));
         }
 
         query(tds& tds, const std::u8string_view& q) : conn(tds) {
@@ -1250,7 +1249,7 @@ namespace tds {
 
             add_param(args...);
 
-            do_query(conn, utf8_to_utf16(q));
+            do_query(conn, cp_to_utf16(q, tds.codepage));
         }
 
         template<typename... Args>
