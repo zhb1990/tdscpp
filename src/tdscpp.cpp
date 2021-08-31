@@ -4122,10 +4122,6 @@ namespace tds {
         r2.reset(new rpc(conn, u"sp_execute", static_cast<value>(handle), params));
     }
 
-    void query::do_query(tds& conn, const string_view& q) {
-        do_query(conn, utf8_to_utf16(q));
-    }
-
     uint16_t query::num_columns() const {
         return (uint16_t)r2->cols.size();
     }
