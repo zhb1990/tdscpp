@@ -1448,9 +1448,7 @@ namespace tds {
             case sql_type::XML:
             {
                 u16string_view sv((char16_t*)d.data(), d.length() / sizeof(char16_t));
-                auto s = utf16_to_utf8(sv);
-
-                return fmt::format(FMT_STRING("{}"), s);
+                return utf16_to_utf8(sv);
             }
 
             case sql_type::VARCHAR:
@@ -1459,11 +1457,7 @@ namespace tds {
             case sql_type::VARBINARY:
             case sql_type::BINARY:
             case sql_type::IMAGE:
-            {
-                string_view sv(d.data(), d.length());
-
-                return fmt::format(FMT_STRING("{}"), sv);
-            }
+                return string{d};
 
             case sql_type::REAL:
                 return fmt::format(FMT_STRING("{}"), *(float*)d.data());
