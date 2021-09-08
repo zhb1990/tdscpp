@@ -689,12 +689,19 @@ namespace tds {
                 return v1 <=> v2;
             }
 
+            case sql_type::BIT:
+            case sql_type::BITN:
+            {
+                auto v1 = (bool)*this;
+                auto v2 = (bool)v;
+
+                return (v1 ? 1 : 0) <=> (v2 ? 1 : 0);
+            }
+
             // FIXME - XML (collation?)
             // FIXME - UNIQUEIDENTIFIER
-            // FIXME - BIT
             // FIXME - MONEY
             // FIXME - SQL_VARIANT
-            // FIXME - BITN
             // FIXME - DECIMAL
             // FIXME - NUMERIC
             // FIXME - MONEYN
