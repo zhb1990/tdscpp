@@ -644,16 +644,48 @@ namespace tds {
                 return v1 <=> v2;
             }
 
-            case sql_type::VARCHAR:
-            case sql_type::CHAR:
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
-            case sql_type::TEXT:
             case sql_type::NTEXT: {
-                auto v1 = (u16string)*this;
-                auto v2 = (u16string)v;
+                auto v1 = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
 
-                return compare_strings(v1, v2, coll);
+                switch (v.type) {
+                    case sql_type::NVARCHAR:
+                    case sql_type::NCHAR:
+                    case sql_type::NTEXT: {
+                        auto v2 = u16string_view((char16_t*)v.val.data(), v.val.length() / sizeof(char16_t));
+
+                        return compare_strings(v1, v2, coll);
+                    }
+
+                    default: {
+                        auto v2 = (u16string)v;
+
+                        return compare_strings(v1, v2, coll);
+                    }
+                }
+            }
+
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+            case sql_type::TEXT: {
+                auto v1 = (u16string)*this;
+
+                switch (v.type) {
+                    case sql_type::NVARCHAR:
+                    case sql_type::NCHAR:
+                    case sql_type::NTEXT: {
+                        auto v2 = u16string_view((char16_t*)v.val.data(), v.val.length() / sizeof(char16_t));
+
+                        return compare_strings(v1, v2, coll);
+                    }
+
+                    default: {
+                        auto v2 = (u16string)v;
+
+                        return compare_strings(v1, v2, coll);
+                    }
+                }
             }
 
             case sql_type::DATETIME2:
