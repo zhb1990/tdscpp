@@ -160,8 +160,6 @@ namespace tds {
     }
 
     u16string cp_to_utf16(const string_view& s, unsigned int codepage) {
-        string ret;
-
         if (s.empty())
             return u"";
 
