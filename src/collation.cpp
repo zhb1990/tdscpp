@@ -70,39 +70,25 @@ static weak_ordering compare_strings(u16string_view val1, u16string_view val2, c
             return weak_ordering::greater;
     }
 
-#ifdef _WIN32
-    DWORD flags = 0;
+    if (coll.sort_id != 0)
+        throw runtime_error("String comparison not implemented for SQL collations.");
 
-    if (coll.ignore_case)
-        flags |= LINGUISTIC_IGNORECASE;
+    switch (coll.version) {
+        case 0:
+            return compare_strings_80(val1, val2, coll);
 
-    if (coll.ignore_accent)
-        flags |= LINGUISTIC_IGNOREDIACRITIC;
+        case 1:
+            throw runtime_error("String comparison not implemented for version 90 collations."); // FIXME
 
-    if (coll.ignore_width)
-        flags |= NORM_IGNOREWIDTH;
+        case 2:
+            throw runtime_error("String comparison not implemented for version 100 collations."); // FIXME
 
-    if (coll.ignore_kana)
-        flags |= NORM_IGNOREKANATYPE;
-
-    auto ret = CompareStringW(coll.lcid, flags, (WCHAR*)val1.data(), (int)val1.length(), (WCHAR*)val2.data(), (int)val2.length());
-
-    switch (ret) {
-        case CSTR_LESS_THAN:
-            return weak_ordering::less;
-
-        case CSTR_EQUAL:
-            return weak_ordering::equivalent;
-
-        case CSTR_GREATER_THAN:
-            return weak_ordering::greater;
+        case 3:
+            throw runtime_error("String comparison not implemented for version 140 collations."); // FIXME
 
         default:
-            throw last_error("CompareString", GetLastError());
+            throw runtime_error("Unknown collation version.");
     }
-#else
-    throw runtime_error("FIXME - compare_strings");
-#endif
 }
 
 namespace tds {
