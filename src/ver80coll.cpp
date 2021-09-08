@@ -8296,10 +8296,30 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, u
 
     if (val1.empty() && val2.empty())
         return weak_ordering::equivalent;
-    else if (val1.empty())
-        return weak_ordering::less;
-    else
-        return weak_ordering::greater;
+
+    if (val1.empty()) {
+        while (!val2.empty()) {
+            auto w = get_weight(val2.front());
+
+            if (w != 0xffffffff)
+                return weak_ordering::less;
+
+            val2.remove_prefix(1);
+        }
+
+        return weak_ordering::equivalent;
+    }
+
+    while (!val1.empty()) {
+        auto w = get_weight(val1.front());
+
+        if (w != 0xffffffff)
+            return weak_ordering::greater;
+
+        val1.remove_prefix(1);
+    }
+
+    return weak_ordering::equivalent;
 }
 
 weak_ordering compare_strings_80(const u16string_view& val1, const u16string_view& val2, const tds::collation& coll) {
