@@ -3,7 +3,15 @@
 
 using namespace std;
 
-static weak_ordering compare_strings(const u16string_view& val1, const u16string_view& val2, const tds::collation& coll) {
+static weak_ordering compare_strings(u16string_view val1, u16string_view val2, const tds::collation& coll) {
+    while (!val1.empty() && val1.back() == ' ') {
+        val1.remove_suffix(1);
+    }
+
+    while (!val2.empty() && val2.back() == ' ') {
+        val2.remove_suffix(1);
+    }
+
     if (val1 == val2)
         return weak_ordering::equivalent;
 
