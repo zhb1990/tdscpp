@@ -1340,4 +1340,5 @@ static void buf_rshift(uint8_t* scratch) {
 }
 
 // ver80coll.cpp
-std::weak_ordering compare_strings_80(std::u16string_view val1, std::u16string_view val2, const tds::collation& coll);
+std::weak_ordering compare_strings_80(const std::u16string_view& val1, const std::u16string_view& val2,
+                                      const tds::collation& coll);

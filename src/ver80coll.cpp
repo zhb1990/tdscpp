@@ -8197,6 +8197,48 @@ static const uint32_t weights[] = {
 
 static constexpr unsigned int num_codepoints = sizeof(weights) / sizeof(weights[0]);
 
+static const struct {
+    char16_t cp;
+    char16_t a;
+    char16_t b;
+} expansions[] = {
+    { 0x00c6, 0x0041, 0x0045 },
+    { 0x00de, 0x0054, 0x0048 },
+    { 0x00df, 0x0073, 0x0073 },
+    { 0x00e6, 0x0061, 0x0065 },
+    { 0x00fe, 0x0074, 0x0068 },
+    { 0x0132, 0x0049, 0x004a },
+    { 0x0133, 0x0069, 0x006a },
+    { 0x0152, 0x004f, 0x0045 },
+    { 0x0153, 0x006f, 0x0065 },
+    { 0x01c4, 0x0044, 0x017d },
+    { 0x01c5, 0x0044, 0x017e },
+    { 0x01c6, 0x0064, 0x017e },
+    { 0x01c7, 0x004c, 0x004a },
+    { 0x01c8, 0x004c, 0x006a },
+    { 0x01c9, 0x006c, 0x006a },
+    { 0x01ca, 0x004e, 0x004a },
+    { 0x01cb, 0x004e, 0x006a },
+    { 0x01cc, 0x006e, 0x006a },
+    { 0x01e2, 0x0100, 0x0112 },
+    { 0x01e3, 0x0101, 0x0113 },
+    { 0x01f1, 0x0044, 0x005a },
+    { 0x01f2, 0x0044, 0x007a },
+    { 0x01f3, 0x0064, 0x007a },
+    { 0x01fc, 0x00c1, 0x00c9 },
+    { 0x01fd, 0x00e1, 0x00e9 },
+    { 0x05f0, 0x05d5, 0x05d5 },
+    { 0x05f1, 0x05d5, 0x05d9 },
+    { 0x05f2, 0x05d9, 0x05d9 },
+    { 0xfb00, 0x0066, 0x0066 },
+    { 0xfb01, 0x0066, 0x0069 },
+    { 0xfb02, 0x0066, 0x006C },
+    { 0xfb03, 0x0066, 0xfb01 },
+    { 0xfb04, 0x0066, 0xfb02 },
+    { 0xfb05, 0x017f, 0x0074 },
+    { 0xfb06, 0x0073, 0x0074 }
+};
+
 static uint32_t get_weight(char16_t cp) noexcept {
     if (cp >= num_codepoints)
         return 0xffffffff;
@@ -8204,25 +8246,27 @@ static uint32_t get_weight(char16_t cp) noexcept {
     return weights[cp];
 }
 
-weak_ordering compare_strings_80(u16string_view val1, u16string_view val2, const tds::collation& coll) {
-    uint32_t mask;
+static u16string normalize(const u16string_view& s) {
+    u16string ret{s};
 
-    // FIXME - normalize:
-    // FIXME - LCID-specific rules
-    // FIXME - expansions
     // FIXME - combining marks
 
-    mask = 0xffff0000;
+    // expansions
 
-    if (!coll.ignore_case)
-        mask |= 0x000000ff;
+    for (size_t i = 0; i < ret.length(); i++) {
+        for (const auto& exp : expansions) {
+            if (exp.cp == ret[i]) {
+                ret[i] = exp.a;
+                ret.insert(i + 1, 1, exp.b);
+                break;
+            }
+        }
+    }
 
-    if (!coll.ignore_accent)
-        mask |= 0x0000ff00;
+    return ret;
+}
 
-    // FIXME - kana if necessary
-    // FIXME - width if necessary
-
+static weak_ordering compare_weights(u16string_view val1, u16string_view val2, uint32_t mask) {
     while (!val1.empty() && !val2.empty()) {
         auto w1 = get_weight(val1.front());
 
@@ -8256,4 +8300,24 @@ weak_ordering compare_strings_80(u16string_view val1, u16string_view val2, const
         return weak_ordering::less;
     else
         return weak_ordering::greater;
+}
+
+weak_ordering compare_strings_80(const u16string_view& val1, const u16string_view& val2, const tds::collation& coll) {
+    auto s1 = normalize(val1);
+    auto s2 = normalize(val2);
+
+    // FIXME - LCID-specific rules
+
+    // FIXME - kana if necessary
+    // FIXME - width if necessary
+
+    auto ret = compare_weights(s1, s2, 0xffff0000);
+
+    if (ret == weak_ordering::equivalent && !coll.ignore_accent)
+        ret = compare_weights(s1, s2, 0x0000ff00);
+
+    if (ret == weak_ordering::equivalent && !coll.ignore_case)
+        ret = compare_weights(s1, s2, 0x000000ff);
+
+    return ret;
 }
