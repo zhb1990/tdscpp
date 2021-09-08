@@ -940,9 +940,7 @@ static void value_cp_to_utf8(tds::value& v, const tds::collation& coll) {
     if (cp == CP_UTF8)
         return;
 
-    auto str = decode_charset(v.val, cp);
-
-    v.val = str;
+    v.val = decode_charset(v.val, cp);
 }
 
 static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned int max_length,
