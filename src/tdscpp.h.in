@@ -1432,6 +1432,71 @@ namespace tds {
         return s;
     }
 
+    struct object_name_parts {
+        std::string_view server;
+        std::string_view db;
+        std::string_view schema;
+        std::string_view name;
+    };
+
+    static constexpr object_name_parts parse_object_name(const std::string_view& s) noexcept {
+        bool escaped = false;
+        size_t partstart = 0, partnum = 0;
+        std::array<std::string_view, 4> parts;
+
+        for (size_t i = 0; i < s.length(); i++) {
+            if (!escaped && s[i] == '[')
+                escaped = true;
+            else if (escaped && s[i] == ']') {
+                if (i + 1 < s.length() && s[i+1] == ']') {
+                    i++;
+                    continue;
+                }
+
+                escaped = false;
+            } else if (!escaped && s[i] == '.') {
+                if (partnum < parts.size()) {
+                    parts[partnum] = std::string_view(&s[partstart], i - partstart);
+                    partstart = i + 1;
+                    partnum++;
+                }
+            }
+        }
+
+        if (partnum < parts.size()) {
+            parts[partnum] = std::string_view(&s[partstart], s.length() - partstart);
+            partnum++;
+        }
+
+        object_name_parts onp;
+
+        switch (partnum) {
+            case 1:
+                onp.name = parts[0];
+                break;
+
+            case 2:
+                onp.schema = parts[0];
+                onp.name = parts[1];
+                break;
+
+            case 3:
+                onp.db = parts[0];
+                onp.schema = parts[1];
+                onp.name = parts[2];
+                break;
+
+            default:
+                onp.server = parts[0];
+                onp.db = parts[1];
+                onp.schema = parts[2];
+                onp.name = parts[3];
+                break;
+        }
+
+        return onp;
+    }
+
     uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);
 
     std::vector<uint8_t> tds::bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols) {
