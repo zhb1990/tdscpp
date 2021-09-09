@@ -1076,7 +1076,7 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
                 sv = sv.substr(len);
             }
 
-            if ((type == tds::sql_type::VARCHAR || type == tds::sql_type::CHAR)) {
+            if (type == tds::sql_type::VARCHAR || type == tds::sql_type::CHAR) {
                 if (coll.utf8)
                     col.utf8 = true;
                 else
