@@ -1262,7 +1262,7 @@ namespace tds {
         scale = 0;
 
         val.resize(3);
-        memcpy(val.data(), &secs, val.length());
+        memcpy(val.data(), &secs, val.size());
     }
 
     value::value(const std::optional<time_t>& t) {
@@ -1276,7 +1276,7 @@ namespace tds {
             auto secs = (uint32_t)chrono::duration_cast<chrono::seconds>(t.value()).count();
 
             val.resize(3);
-            memcpy(val.data(), &secs, val.length());
+            memcpy(val.data(), &secs, val.size());
         }
     }
 
@@ -1376,7 +1376,7 @@ namespace tds {
         auto type2 = type;
         unsigned int max_length2 = max_length;
         uint8_t scale2 = scale;
-        string_view d = val;
+        string_view d{(char*)val.data(), val.size()};
 
         if (is_null)
             return "";
@@ -1739,14 +1739,14 @@ namespace tds {
 
     value::operator u16string() const {
         if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT || type == sql_type::XML)
-            return u16string(u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t)));
+            return u16string(u16string_view((char16_t*)val.data(), val.size() / sizeof(char16_t)));
         else
             return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
     }
 
     value::operator int64_t() const {
         auto type2 = type;
-        string_view d = val;
+        string_view d{(char*)val.data(), val.size()};
 
         if (is_null)
             return 0;
@@ -1994,7 +1994,7 @@ namespace tds {
 
     value::operator chrono::year_month_day() const {
         auto type2 = type;
-        string_view d = val;
+        string_view d{(char*)val.data(), val.size()};
 
         if (is_null)
             return chrono::year_month_day{1900y, chrono::January, 1d};
@@ -2145,7 +2145,7 @@ namespace tds {
     value::operator time_t() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
-        string_view d = val;
+        string_view d{(char*)val.data(), val.size()};
 
         if (is_null)
             return time_t::zero();
@@ -2326,7 +2326,7 @@ namespace tds {
     value::operator datetime() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
-        string_view d = val;
+        string_view d{(char*)val.data(), val.size()};
 
         if (is_null)
             return datetime{1900y, chrono::January, 1d, 0, 0, 0};
@@ -2525,7 +2525,7 @@ namespace tds {
     value::operator datetimeoffset() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
-        string_view d = val;
+        string_view d{(char*)val.data(), val.size()};
 
         if (is_null)
             return datetimeoffset{1900y, chrono::January, 1d, 0, 0, 0, 0};
@@ -2732,7 +2732,7 @@ namespace tds {
     value::operator double() const {
         auto type2 = type;
         auto max_length2 = max_length;
-        string_view d = val;
+        string_view d{(char*)val.data(), val.size()};
 
         if (is_null)
             return 0;

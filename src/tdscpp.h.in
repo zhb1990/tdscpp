@@ -859,7 +859,7 @@ namespace tds {
                 is_null = true;
             else {
                 val.resize(sv.value().length() * sizeof(T));
-                memcpy(val.data(), sv.value().data(), val.length());
+                memcpy(val.data(), sv.value().data(), val.size());
             }
 
             // Latin1_General_CI_AS
@@ -895,7 +895,7 @@ namespace tds {
                 is_null = true;
             else {
                 val.resize(sv.value().length() * sizeof(T));
-                memcpy(val.data(), sv.value().data(), val.length());
+                memcpy(val.data(), sv.value().data(), val.size());
             }
         }
 
@@ -911,7 +911,7 @@ namespace tds {
                 utf8 = true;
 
             val.resize(sv.length() * sizeof(T));
-            memcpy(val.data(), sv.data(), val.length());
+            memcpy(val.data(), sv.data(), val.size());
 
             // Latin1_General_CI_AS
 
@@ -943,7 +943,7 @@ namespace tds {
                 utf8 = true;
 
             val.resize(sv.length() * sizeof(T));
-            memcpy(val.data(), sv.data(), val.length());
+            memcpy(val.data(), sv.data(), val.size());
         }
 
         template<typename... Args>
@@ -1050,7 +1050,7 @@ namespace tds {
         template<unsigned N>
         explicit operator numeric<N>() const {
             auto type2 = type;
-            std::string_view d = val;
+            std::string_view d{(char*)val.data(), val.size()};
 
             if (is_null)
                 return 0;
@@ -1116,7 +1116,7 @@ namespace tds {
         }
 
         enum sql_type type;
-        std::string val;
+        std::vector<uint8_t> val;
         bool is_null = false;
         bool is_output = false;
         bool utf8 = false;

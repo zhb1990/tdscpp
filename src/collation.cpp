@@ -647,13 +647,13 @@ namespace tds {
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
             case sql_type::NTEXT: {
-                auto v1 = u16string_view((char16_t*)val.data(), val.length() / sizeof(char16_t));
+                auto v1 = u16string_view((char16_t*)val.data(), val.size() / sizeof(char16_t));
 
                 switch (v.type) {
                     case sql_type::NVARCHAR:
                     case sql_type::NCHAR:
                     case sql_type::NTEXT: {
-                        auto v2 = u16string_view((char16_t*)v.val.data(), v.val.length() / sizeof(char16_t));
+                        auto v2 = u16string_view((char16_t*)v.val.data(), v.val.size() / sizeof(char16_t));
 
                         return compare_strings(v1, v2, coll);
                     }
@@ -675,7 +675,7 @@ namespace tds {
                     case sql_type::NVARCHAR:
                     case sql_type::NCHAR:
                     case sql_type::NTEXT: {
-                        auto v2 = u16string_view((char16_t*)v.val.data(), v.val.length() / sizeof(char16_t));
+                        auto v2 = u16string_view((char16_t*)v.val.data(), v.val.size() / sizeof(char16_t));
 
                         return compare_strings(v1, v2, coll);
                     }

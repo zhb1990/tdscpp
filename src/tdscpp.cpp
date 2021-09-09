@@ -940,7 +940,10 @@ static void value_cp_to_utf8(tds::value& v, const tds::collation& coll) {
     if (cp == CP_UTF8)
         return;
 
-    v.val = decode_charset(v.val, cp);
+    auto str = decode_charset(string_view{(char*)v.val.data(), v.val.size()}, cp);
+
+    v.val.resize(str.length());
+    memcpy(v.val.data(), str.data(), str.length());
 }
 
 static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned int max_length,
@@ -1046,7 +1049,8 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
                     if (sv.length() < chunk_len)
                         throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), chunk_len);
 
-                    col.val += sv.substr(0, chunk_len);
+                    col.val.resize(col.val.size() + chunk_len);
+                    memcpy(col.val.data() + col.val.size() - chunk_len, sv.data(), chunk_len);
                     sv = sv.substr(chunk_len);
                 } while (true);
             } else {
@@ -3152,12 +3156,12 @@ namespace tds {
 
                 case sql_type::DATETIMN:
                 case sql_type::DATE:
-                    bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
+                    bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.size());
                     break;
 
                 case sql_type::UNIQUEIDENTIFIER:
                 case sql_type::MONEYN:
-                    bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length());
+                    bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.size());
                     break;
 
                 case sql_type::INTN:
@@ -3166,16 +3170,16 @@ namespace tds {
                 case sql_type::DATETIME2:
                 case sql_type::DATETIMEOFFSET:
                 case sql_type::BITN:
-                    bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.length()) + sizeof(uint8_t);
+                    bufsize += sizeof(tds_param_header) + sizeof(uint8_t) + (p.is_null ? 0 : p.val.size()) + sizeof(uint8_t);
                     break;
 
                 case sql_type::NVARCHAR:
                     if (p.is_null)
                         bufsize += sizeof(tds_VARCHAR_param);
-                    else if (p.val.length() > 8000) // MAX
-                        bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
+                    else if (p.val.size() > 8000) // MAX
+                        bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.size() + sizeof(uint32_t);
                     else
-                        bufsize += sizeof(tds_VARCHAR_param) + p.val.length();
+                        bufsize += sizeof(tds_VARCHAR_param) + p.val.size();
 
                     break;
 
@@ -3183,24 +3187,24 @@ namespace tds {
                     if (p.is_null)
                         bufsize += sizeof(tds_VARCHAR_param);
                     else if (p.utf8 && !conn.impl->has_utf8) {
-                        auto s = utf8_to_utf16(p.val);
+                        auto s = utf8_to_utf16(string_view{(char*)p.val.data(), p.val.size()});
 
                         if ((s.length() * sizeof(char16_t)) > 8000) // MAX
                             bufsize += sizeof(tds_VARCHAR_MAX_param) + (s.length() * sizeof(char16_t)) + sizeof(uint32_t);
                         else
                             bufsize += sizeof(tds_VARCHAR_param) + (s.length() * sizeof(char16_t));
-                    } else if (p.val.length() > 8000) // MAX
-                        bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.length() + sizeof(uint32_t);
+                    } else if (p.val.size() > 8000) // MAX
+                        bufsize += sizeof(tds_VARCHAR_MAX_param) + p.val.size() + sizeof(uint32_t);
                     else
-                        bufsize += sizeof(tds_VARCHAR_param) + p.val.length();
+                        bufsize += sizeof(tds_VARCHAR_param) + p.val.size();
 
                     break;
 
                 case sql_type::VARBINARY:
-                    if (!p.is_null && p.val.length() > 8000) // MAX
-                        bufsize += sizeof(tds_VARBINARY_MAX_param) + p.val.length() + sizeof(uint32_t);
+                    if (!p.is_null && p.val.size() > 8000) // MAX
+                        bufsize += sizeof(tds_VARBINARY_MAX_param) + p.val.size() + sizeof(uint32_t);
                     else
-                        bufsize += sizeof(tds_VARBINARY_param) + (p.is_null ? 0 : p.val.length());
+                        bufsize += sizeof(tds_VARBINARY_param) + (p.is_null ? 0 : p.val.size());
 
                     break;
 
@@ -3208,7 +3212,7 @@ namespace tds {
                     if (p.is_null)
                         bufsize += offsetof(tds_XML_param, chunk_length);
                     else
-                        bufsize += sizeof(tds_XML_param) + p.val.length() + sizeof(uint32_t);
+                        bufsize += sizeof(tds_XML_param) + p.val.size() + sizeof(uint32_t);
                 break;
 
                 case sql_type::NUMERIC:
@@ -3216,14 +3220,14 @@ namespace tds {
                     bufsize += sizeof(tds_param_header) + 4;
 
                     if (!p.is_null)
-                        bufsize += p.val.length();
+                        bufsize += p.val.size();
                 break;
 
                 case sql_type::IMAGE:
                     bufsize += sizeof(tds_param_header) + sizeof(uint32_t) + sizeof(uint32_t);
 
                     if (!p.is_null)
-                        bufsize += p.val.length();
+                        bufsize += p.val.size();
                 break;
 
                 case sql_type::TEXT:
@@ -3231,7 +3235,7 @@ namespace tds {
                     bufsize += sizeof(tds_param_header) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(collation);
 
                     if (!p.is_null)
-                        bufsize += p.val.length();
+                        bufsize += p.val.size();
                 break;
 
                 default:
@@ -3282,26 +3286,26 @@ namespace tds {
                 case sql_type::FLOAT:
                 case sql_type::SMALLMONEY:
                 case sql_type::BIGINT:
-                    memcpy(ptr, p.val.data(), p.val.length());
+                    memcpy(ptr, p.val.data(), p.val.size());
 
-                    ptr += p.val.length();
+                    ptr += p.val.size();
 
                     break;
 
                 case sql_type::INTN:
                 case sql_type::FLTN:
                 case sql_type::BITN:
-                    *ptr = (uint8_t)p.val.length();
+                    *ptr = (uint8_t)p.val.size();
                     ptr++;
 
                     if (p.is_null) {
                         *ptr = 0;
                         ptr++;
                     } else {
-                        *ptr = (uint8_t)p.val.length();
+                        *ptr = (uint8_t)p.val.size();
                         ptr++;
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
                     }
 
                     break;
@@ -3316,10 +3320,10 @@ namespace tds {
                         *ptr = 0;
                         ptr++;
                     } else {
-                        *ptr = (uint8_t)p.val.length();
+                        *ptr = (uint8_t)p.val.size();
                         ptr++;
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
                     }
 
                     break;
@@ -3330,10 +3334,10 @@ namespace tds {
                         *ptr = 0;
                         ptr++;
                     } else {
-                        *ptr = (uint8_t)p.val.length();
+                        *ptr = (uint8_t)p.val.size();
                         ptr++;
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
                     }
 
                     break;
@@ -3347,10 +3351,10 @@ namespace tds {
                         *ptr = 0;
                         ptr++;
                     } else {
-                        *ptr = (uint8_t)p.val.length();
+                        *ptr = (uint8_t)p.val.size();
                         ptr++;
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
                     }
 
                     break;
@@ -3361,27 +3365,27 @@ namespace tds {
 
                     if (p.is_null || p.val.empty())
                         h2->max_length = sizeof(char16_t);
-                    else if (p.val.length() > 8000) // MAX
+                    else if (p.val.size() > 8000) // MAX
                         h2->max_length = 0xffff;
                     else
-                        h2->max_length = (uint16_t)p.val.length();
+                        h2->max_length = (uint16_t)p.val.size();
 
                     h2->collation = p.coll;
 
-                    if (!p.is_null && p.val.length() > 8000) { // MAX
+                    if (!p.is_null && p.val.size() > 8000) { // MAX
                         auto h3 = (tds_VARCHAR_MAX_param*)h2;
 
-                        h3->length = h3->chunk_length = (uint32_t)p.val.length();
+                        h3->length = h3->chunk_length = (uint32_t)p.val.size();
 
                         ptr += sizeof(tds_VARCHAR_MAX_param) - sizeof(tds_param_header);
 
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
 
                         *(uint32_t*)ptr = 0; // last chunk
                         ptr += sizeof(uint32_t);
                     } else {
-                        h2->length = (uint16_t)(p.is_null ? 0xffff : p.val.length());
+                        h2->length = (uint16_t)(p.is_null ? 0xffff : p.val.size());
 
                         ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
 
@@ -3397,12 +3401,12 @@ namespace tds {
                 case sql_type::VARCHAR:
                 {
                     auto h2 = (tds_VARCHAR_param*)h;
-                    string_view sv = p.val;
+                    string_view sv{(char*)p.val.data(), p.val.size()};
                     u16string tmp;
 
                     if (!p.is_null && !p.val.empty() && p.utf8 && !conn.impl->has_utf8) {
                         h->type = sql_type::NVARCHAR;
-                        tmp = utf8_to_utf16(p.val);
+                        tmp = utf8_to_utf16(string_view{(char*)p.val.data(), p.val.size()});
                         sv = string_view((char*)tmp.data(), tmp.length() * sizeof(char16_t));
                     }
 
@@ -3446,25 +3450,25 @@ namespace tds {
 
                     if (p.is_null || p.val.empty())
                         h2->max_length = 1;
-                    else if (p.val.length() > 8000) // MAX
+                    else if (p.val.size() > 8000) // MAX
                         h2->max_length = 0xffff;
                     else
-                        h2->max_length = (uint16_t)p.val.length();
+                        h2->max_length = (uint16_t)p.val.size();
 
-                    if (!p.is_null && p.val.length() > 8000) { // MAX
+                    if (!p.is_null && p.val.size() > 8000) { // MAX
                         auto h3 = (tds_VARBINARY_MAX_param*)h2;
 
-                        h3->length = h3->chunk_length = (uint32_t)p.val.length();
+                        h3->length = h3->chunk_length = (uint32_t)p.val.size();
 
                         ptr += sizeof(tds_VARBINARY_MAX_param) - sizeof(tds_param_header);
 
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
 
                         *(uint32_t*)ptr = 0; // last chunk
                         ptr += sizeof(uint32_t);
                     } else {
-                        h2->length = (uint16_t)(p.is_null ? 0xffff : p.val.length());
+                        h2->length = (uint16_t)(p.is_null ? 0xffff : p.val.size());
 
                         ptr += sizeof(tds_VARBINARY_param) - sizeof(tds_param_header);
 
@@ -3485,12 +3489,12 @@ namespace tds {
                     if (p.is_null)
                         h2->length = 0xffffffffffffffff;
                     else {
-                        h2->length = h2->chunk_length = (uint32_t)p.val.length();
+                        h2->length = h2->chunk_length = (uint32_t)p.val.size();
 
                         ptr += sizeof(tds_XML_param) - sizeof(tds_param_header);
 
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
 
                         *(uint32_t*)ptr = 0; // last chunk
                         ptr += sizeof(uint32_t);
@@ -3509,11 +3513,11 @@ namespace tds {
                         *ptr = 0;
                         ptr++;
                     } else {
-                        *ptr = (uint8_t)p.val.length();
+                        *ptr = (uint8_t)p.val.size();
                         ptr++;
 
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
                     }
                 break;
 
@@ -3525,11 +3529,11 @@ namespace tds {
                         *(uint32_t*)ptr = 0xffffffff;
                         ptr += sizeof(uint32_t);
                     } else {
-                        *(uint32_t*)ptr = (uint32_t)p.val.length();
+                        *(uint32_t*)ptr = (uint32_t)p.val.size();
                         ptr += sizeof(uint32_t);
 
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
                     }
                 break;
 
@@ -3549,11 +3553,11 @@ namespace tds {
                         *(uint32_t*)ptr = 0xffffffff;
                         ptr += sizeof(uint32_t);
                     } else {
-                        *(uint32_t*)ptr = (uint32_t)p.val.length();
+                        *(uint32_t*)ptr = (uint32_t)p.val.size();
                         ptr += sizeof(uint32_t);
 
-                        memcpy(ptr, p.val.data(), p.val.length());
-                        ptr += p.val.length();
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
                     }
 
                     break;
@@ -4316,7 +4320,7 @@ namespace tds {
                 s += u", ";
 
             s += u"@P" + to_u16string(num) + u" ";
-            s += type_to_string(p.type, p.val.length(), p.precision, p.scale, u"");
+            s += type_to_string(p.type, p.val.size(), p.precision, p.scale, u"");
 
             num++;
         }
@@ -5225,7 +5229,7 @@ namespace tds {
 #ifdef TDSCPP_JSON
     void TDSCPP to_json(nlohmann::json& j, const value& v) {
         auto type2 = v.type;
-        string_view val = v.val;
+        auto val = string_view{(char*)v.val.data(), v.val.size()};
 
         if (v.is_null) {
             j = nlohmann::json(nullptr);

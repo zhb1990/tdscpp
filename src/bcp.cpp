@@ -294,7 +294,7 @@ namespace tds {
                         bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
                     if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
-                        bufsize += vv.val.length();
+                        bufsize += vv.val.size();
 
                         if (col.max_length == -1 && !vv.val.empty())
                             bufsize += sizeof(uint32_t);
@@ -326,7 +326,7 @@ namespace tds {
                         bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
                     if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
-                        bufsize += vv.val.length();
+                        bufsize += vv.val.size();
 
                         if (col.max_length == -1 && !vv.val.empty())
                             bufsize += sizeof(uint32_t);
@@ -352,7 +352,7 @@ namespace tds {
                         bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
                     if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
-                        bufsize += vv.val.length();
+                        bufsize += vv.val.size();
 
                         if (col.max_length == -1 && !vv.val.empty())
                             bufsize += sizeof(uint32_t);
@@ -612,11 +612,11 @@ namespace tds {
                         ptr += sizeof(uint64_t);
 
                         if (!vv.val.empty()) {
-                            *(uint32_t*)ptr = (uint32_t)vv.val.length();
+                            *(uint32_t*)ptr = (uint32_t)vv.val.size();
                             ptr += sizeof(uint32_t);
 
-                            memcpy(ptr, vv.val.data(), vv.val.length());
-                            ptr += vv.val.length();
+                            memcpy(ptr, vv.val.data(), vv.val.size());
+                            ptr += vv.val.size();
                         }
 
                         *(uint32_t*)ptr = 0;
@@ -659,14 +659,17 @@ namespace tds {
                         *(uint16_t*)ptr = 0xffff;
                         ptr += sizeof(uint16_t);
                     } else if ((vv.type == sql_type::VARCHAR || vv.type == sql_type::CHAR) && col.codepage == CP_UTF8) {
-                        if (vv.val.length() > (uint16_t)col.max_length)
-                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).", vv.val, utf16_to_utf8(col_name), col.max_length);
+                        if (vv.val.size() > (uint16_t)col.max_length) {
+                            throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
+                                                  string_view{(char*)vv.val.data(), vv.val.size()},
+                                                  utf16_to_utf8(col_name), col.max_length);
+                        }
 
-                        *(uint16_t*)ptr = (uint16_t)vv.val.length();
+                        *(uint16_t*)ptr = (uint16_t)vv.val.size();
                         ptr += sizeof(uint16_t);
 
-                        memcpy(ptr, vv.val.data(), vv.val.length());
-                        ptr += vv.val.length();
+                        memcpy(ptr, vv.val.data(), vv.val.size());
+                        ptr += vv.val.size();
                     } else if (col.codepage == CP_UTF8) {
                         auto s = (string)vv;
 
@@ -704,11 +707,11 @@ namespace tds {
                         ptr += sizeof(uint64_t);
 
                         if (!vv.val.empty()) {
-                            *(uint32_t*)ptr = (uint32_t)vv.val.length();
+                            *(uint32_t*)ptr = (uint32_t)vv.val.size();
                             ptr += sizeof(uint32_t);
 
-                            memcpy(ptr, vv.val.data(), vv.val.length());
-                            ptr += vv.val.length();
+                            memcpy(ptr, vv.val.data(), vv.val.size());
+                            ptr += vv.val.size();
                         }
 
                         *(uint32_t*)ptr = 0;
@@ -735,17 +738,17 @@ namespace tds {
                         *(uint16_t*)ptr = 0xffff;
                         ptr += sizeof(uint16_t);
                     } else if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
-                        if (vv.val.length() > (uint16_t)col.max_length) {
+                        if (vv.val.size() > (uint16_t)col.max_length) {
                             throw formatted_error("String \"{}\" too long for column {} (maximum length {}).",
-                                                    utf16_to_utf8(u16string_view((char16_t*)vv.val.data(), vv.val.length() / sizeof(char16_t))),
+                                                    utf16_to_utf8(u16string_view((char16_t*)vv.val.data(), vv.val.size() / sizeof(char16_t))),
                                                     utf16_to_utf8(col_name), col.max_length / sizeof(char16_t));
                         }
 
-                        *(uint16_t*)ptr = (uint16_t)vv.val.length();
+                        *(uint16_t*)ptr = (uint16_t)vv.val.size();
                         ptr += sizeof(uint16_t);
 
-                        memcpy(ptr, vv.val.data(), vv.val.length());
-                        ptr += vv.val.length();
+                        memcpy(ptr, vv.val.data(), vv.val.size());
+                        ptr += vv.val.size();
                     } else {
                         auto s = (u16string)vv;
 
@@ -775,11 +778,11 @@ namespace tds {
                         ptr += sizeof(uint64_t);
 
                         if (!vv.val.empty()) {
-                            *(uint32_t*)ptr = (uint32_t)vv.val.length();
+                            *(uint32_t*)ptr = (uint32_t)vv.val.size();
                             ptr += sizeof(uint32_t);
 
-                            memcpy(ptr, vv.val.data(), vv.val.length());
-                            ptr += vv.val.length();
+                            memcpy(ptr, vv.val.data(), vv.val.size());
+                            ptr += vv.val.size();
                         }
 
                         *(uint32_t*)ptr = 0;
@@ -791,14 +794,14 @@ namespace tds {
                         *(uint16_t*)ptr = 0xffff;
                         ptr += sizeof(uint16_t);
                     } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
-                        if (vv.val.length() > (uint16_t)col.max_length)
-                            throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(col_name), vv.val.length(), col.max_length);
+                        if (vv.val.size() > (uint16_t)col.max_length)
+                            throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(col_name), vv.val.size(), col.max_length);
 
-                        *(uint16_t*)ptr = (uint16_t)vv.val.length();
+                        *(uint16_t*)ptr = (uint16_t)vv.val.size();
                         ptr += sizeof(uint16_t);
 
-                        memcpy(ptr, vv.val.data(), vv.val.length());
-                        ptr += vv.val.length();
+                        memcpy(ptr, vv.val.data(), vv.val.size());
+                        ptr += vv.val.size();
                     } else
                         throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
                 }
@@ -1220,7 +1223,7 @@ namespace tds {
                     auto type = vv.type;
                     auto precision = vv.precision;
                     auto scale = vv.scale;
-                    string_view data = vv.val;
+                    string_view data{(char*)vv.val.data(), vv.val.size()};
 
                     if (type == sql_type::SQL_VARIANT) {
                         type = (sql_type)data[0];
