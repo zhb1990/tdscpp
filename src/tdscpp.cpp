@@ -3963,7 +3963,7 @@ namespace tds {
                     for (unsigned int i = 0; i < row.size(); i++) {
                         auto& col = row[i];
 
-                        handle_row_col(col.val, col.is_null, cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                        handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
 
                     break;
@@ -4001,9 +4001,9 @@ namespace tds {
                         }
 
                         if (bsv & 1) // NULL
-                            col.is_null = true;
+                            get<1>(col) = true;
                         else
-                            handle_row_col(col.val, col.is_null, cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
 
                     break;
@@ -4035,16 +4035,16 @@ namespace tds {
     bool rpc::fetch_row() {
         while (!rows.empty() || !finished) {
             if (!rows.empty()) {
-                auto r = move(rows.front());
-
-                rows.pop_front();
+                auto& r = rows.front();
 
                 for (unsigned int i = 0; i < r.size(); i++) {
-                    cols[i].is_null = r[i].is_null;
+                    cols[i].is_null = get<1>(r[i]);
 
                     if (!cols[i].is_null)
-                        cols[i].val = move(r[i].val);
+                        cols[i].val.swap(get<0>(r[i]));
                 }
+
+                rows.pop_front();
 
                 return true;
             }
