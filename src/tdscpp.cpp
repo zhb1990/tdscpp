@@ -934,20 +934,22 @@ static string decode_charset(const string_view& s, unsigned int codepage) {
     return tds::utf16_to_utf8(tds::cp_to_utf16(s, codepage));
 }
 
-static void value_cp_to_utf8(tds::value& v, const tds::collation& coll) {
+static void value_cp_to_utf8(vector<uint8_t, tds::default_init_allocator<uint8_t>>& val,
+                             const tds::collation& coll) {
     auto cp = coll_to_cp(coll);
 
     if (cp == CP_UTF8)
         return;
 
-    auto str = decode_charset(string_view{(char*)v.val.data(), v.val.size()}, cp);
+    auto str = decode_charset(string_view{(char*)val.data(), val.size()}, cp);
 
-    v.val.resize(str.length());
-    memcpy(v.val.data(), str.data(), str.length());
+    val.resize(str.length());
+    memcpy(val.data(), str.data(), str.length());
 }
 
-static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned int max_length,
-                           const tds::collation& coll, string_view& sv) {
+static void handle_row_col(vector<uint8_t, tds::default_init_allocator<uint8_t>>& val, bool& is_null,
+                           enum tds::sql_type type, unsigned int max_length, const tds::collation& coll,
+                           string_view& sv) {
     switch (type) {
         case tds::sql_type::SQL_NULL:
         case tds::sql_type::TINYINT:
@@ -964,12 +966,12 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
         {
             auto len = fixed_len_size(type);
 
-            col.val.resize(len);
-
             if (sv.length() < len)
                 throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
-            memcpy(col.val.data(), sv.data(), len);
+            val.resize(len);
+
+            memcpy(val.data(), sv.data(), len);
 
             sv = sv.substr(len);
 
@@ -996,13 +998,13 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
 
             sv = sv.substr(1);
 
-            col.val.resize(len);
-            col.is_null = len == 0;
-
             if (sv.length() < len)
                 throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
-            memcpy(col.val.data(), sv.data(), len);
+            val.resize(len);
+            is_null = len == 0;
+
+            memcpy(val.data(), sv.data(), len);
             sv = sv.substr(len);
 
             break;
@@ -1023,17 +1025,17 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
 
                 sv = sv.substr(sizeof(uint64_t));
 
-                col.val.clear();
+                val.clear();
 
                 if (len == 0xffffffffffffffff) {
-                    col.is_null = true;
+                    is_null = true;
                     return;
                 }
 
-                col.is_null = false;
+                is_null = false;
 
                 if (len != 0xfffffffffffffffe) // unknown length
-                    col.val.reserve(len);
+                    val.reserve(len);
 
                 do {
                     if (sv.length() < sizeof(uint32_t))
@@ -1049,8 +1051,8 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
                     if (sv.length() < chunk_len)
                         throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), chunk_len);
 
-                    col.val.resize(col.val.size() + chunk_len);
-                    memcpy(col.val.data() + col.val.size() - chunk_len, sv.data(), chunk_len);
+                    val.resize(val.size() + chunk_len);
+                    memcpy(val.data() + val.size() - chunk_len, sv.data(), chunk_len);
                     sv = sv.substr(chunk_len);
                 } while (true);
             } else {
@@ -1062,23 +1064,23 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
                 sv = sv.substr(sizeof(uint16_t));
 
                 if (len == 0xffff) {
-                    col.is_null = true;
+                    is_null = true;
                     return;
                 }
 
-                col.val.resize(len);
-                col.is_null = false;
+                val.resize(len);
+                is_null = false;
 
                 if (sv.length() < len)
                     throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
-                memcpy(col.val.data(), sv.data(), len);
+                memcpy(val.data(), sv.data(), len);
                 sv = sv.substr(len);
             }
 
             if (type == tds::sql_type::VARCHAR || type == tds::sql_type::CHAR) {
                 if (!coll.utf8)
-                    value_cp_to_utf8(col, coll);
+                    value_cp_to_utf8(val, coll);
             }
 
             break;
@@ -1092,14 +1094,14 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
 
             sv = sv.substr(sizeof(uint32_t));
 
-            col.val.resize(len);
-            col.is_null = len == 0xffffffff;
+            val.resize(len);
+            is_null = len == 0xffffffff;
 
-            if (!col.is_null) {
+            if (!is_null) {
                 if (sv.length() < len)
                     throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
-                memcpy(col.val.data(), sv.data(), len);
+                memcpy(val.data(), sv.data(), len);
                 sv = sv.substr(len);
             }
 
@@ -1124,9 +1126,9 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
 
             sv = sv.substr(textptrlen);
 
-            col.is_null = textptrlen == 0;
+            is_null = textptrlen == 0;
 
-            if (!col.is_null) {
+            if (!is_null) {
                 // timestamp
 
                 if (sv.length() < 8)
@@ -1143,14 +1145,14 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
 
                 sv = sv.substr(sizeof(uint32_t));
 
-                col.val.resize(len);
-                col.is_null = len == 0xffffffff;
+                val.resize(len);
+                is_null = len == 0xffffffff;
 
-                if (!col.is_null) {
+                if (!is_null) {
                     if (sv.length() < len)
                         throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
 
-                    memcpy(col.val.data(), sv.data(), len);
+                    memcpy(val.data(), sv.data(), len);
                     sv = sv.substr(len);
                 }
             }
@@ -3962,7 +3964,7 @@ namespace tds {
                     for (unsigned int i = 0; i < row.size(); i++) {
                         auto& col = row[i];
 
-                        handle_row_col(col, cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                        handle_row_col(col.val, col.is_null, cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
 
                     break;
@@ -4002,7 +4004,7 @@ namespace tds {
                         if (bsv & 1) // NULL
                             col.is_null = true;
                         else
-                            handle_row_col(col, cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                            handle_row_col(col.val, col.is_null, cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
 
                     break;
@@ -4747,7 +4749,7 @@ namespace tds {
                     for (unsigned int i = 0; i < row.size(); i++) {
                         auto& col = row[i];
 
-                        handle_row_col(col, cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                        handle_row_col(col.val, col.is_null, cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
 
                     break;
@@ -4787,7 +4789,7 @@ namespace tds {
                         if (bsv & 1) // NULL
                             col.is_null = true;
                         else
-                            handle_row_col(col, cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                            handle_row_col(col.val, col.is_null, cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
 
                     break;
