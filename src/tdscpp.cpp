@@ -934,8 +934,7 @@ static string decode_charset(const string_view& s, unsigned int codepage) {
     return tds::utf16_to_utf8(tds::cp_to_utf16(s, codepage));
 }
 
-static void value_cp_to_utf8(vector<uint8_t, tds::default_init_allocator<uint8_t>>& val,
-                             const tds::collation& coll) {
+static void value_cp_to_utf8(tds::value_data_t& val, const tds::collation& coll) {
     auto cp = coll_to_cp(coll);
 
     if (cp == CP_UTF8)
@@ -947,7 +946,7 @@ static void value_cp_to_utf8(vector<uint8_t, tds::default_init_allocator<uint8_t
     memcpy(val.data(), str.data(), str.length());
 }
 
-static void handle_row_col(vector<uint8_t, tds::default_init_allocator<uint8_t>>& val, bool& is_null,
+static void handle_row_col(tds::value_data_t& val, bool& is_null,
                            enum tds::sql_type type, unsigned int max_length, const tds::collation& coll,
                            string_view& sv) {
     switch (type) {
