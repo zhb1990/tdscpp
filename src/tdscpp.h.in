@@ -875,9 +875,6 @@ namespace tds {
             else
                 type = sql_type::VARCHAR;
 
-            if constexpr (std::is_same_v<T, char8_t>)
-                utf8 = true;
-
             if (!sv.has_value())
                 is_null = true;
             else {
@@ -912,7 +909,7 @@ namespace tds {
                 type = sql_type::VARCHAR;
 
             if constexpr (std::is_same_v<T, char8_t>)
-                utf8 = true;
+                coll.utf8 = true; // FIXME - rather than changing collation, should be changing string into codepage if not UTF-8?
 
             if (!sv.has_value())
                 is_null = true;
@@ -929,9 +926,6 @@ namespace tds {
                 type = sql_type::NVARCHAR;
             else
                 type = sql_type::VARCHAR;
-
-            if constexpr (std::is_same_v<T, char8_t>)
-                utf8 = true;
 
             val.resize(sv.length() * sizeof(T));
             memcpy(val.data(), sv.data(), val.size());
@@ -963,7 +957,7 @@ namespace tds {
                 type = sql_type::VARCHAR;
 
             if constexpr (std::is_same_v<T, char8_t>)
-                utf8 = true;
+                coll.utf8 = true; // FIXME - rather than changing collation, should be changing string into codepage if not UTF-8?
 
             val.resize(sv.length() * sizeof(T));
             memcpy(val.data(), sv.data(), val.size());
@@ -1142,7 +1136,6 @@ namespace tds {
         std::vector<uint8_t, default_init_allocator<uint8_t>> val;
         bool is_null = false;
         bool is_output = false;
-        bool utf8 = false;
         unsigned int max_length = 0;
         uint8_t precision;
         uint8_t scale;

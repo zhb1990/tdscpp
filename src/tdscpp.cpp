@@ -1077,9 +1077,7 @@ static void handle_row_col(tds::value& col, enum tds::sql_type type, unsigned in
             }
 
             if (type == tds::sql_type::VARCHAR || type == tds::sql_type::CHAR) {
-                if (coll.utf8)
-                    col.utf8 = true;
-                else
+                if (!coll.utf8)
                     value_cp_to_utf8(col, coll);
             }
 
@@ -3186,7 +3184,7 @@ namespace tds {
                 case sql_type::VARCHAR:
                     if (p.is_null)
                         bufsize += sizeof(tds_VARCHAR_param);
-                    else if (p.utf8 && !conn.impl->has_utf8) {
+                    else if (p.coll.utf8 && !conn.impl->has_utf8) {
                         auto s = utf8_to_utf16(string_view{(char*)p.val.data(), p.val.size()});
 
                         if ((s.length() * sizeof(char16_t)) > 8000) // MAX
@@ -3404,7 +3402,7 @@ namespace tds {
                     string_view sv{(char*)p.val.data(), p.val.size()};
                     u16string tmp;
 
-                    if (!p.is_null && !p.val.empty() && p.utf8 && !conn.impl->has_utf8) {
+                    if (!p.is_null && !p.val.empty() && p.coll.utf8 && !conn.impl->has_utf8) {
                         h->type = sql_type::NVARCHAR;
                         tmp = utf8_to_utf16(string_view{(char*)p.val.data(), p.val.size()});
                         sv = string_view((char*)tmp.data(), tmp.length() * sizeof(char16_t));
@@ -3799,9 +3797,6 @@ namespace tds {
                                 col.max_length = *(uint16_t*)sv2.data();
 
                                 col.coll = *(collation*)(sv2.data() + sizeof(uint16_t));
-
-                                if ((c.type == sql_type::CHAR || c.type == sql_type::VARCHAR) && conn.impl->has_utf8)
-                                    col.utf8 = col.coll.utf8;
 
                                 len += sizeof(uint16_t) + sizeof(collation);
                                 sv2 = sv2.substr(sizeof(uint16_t) + sizeof(collation));
@@ -4628,9 +4623,6 @@ namespace tds {
                                 col.max_length = *(uint16_t*)sv2.data();
 
                                 col.coll = *(collation*)(sv2.data() + sizeof(uint16_t));
-
-                                if ((c.type == sql_type::CHAR || c.type == sql_type::VARCHAR) && conn.impl->has_utf8)
-                                    col.utf8 = col.coll.utf8;
 
                                 len += sizeof(uint16_t) + sizeof(collation);
                                 sv2 = sv2.substr(sizeof(uint16_t) + sizeof(collation));
