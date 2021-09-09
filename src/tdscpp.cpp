@@ -4324,25 +4324,6 @@ namespace tds {
         return s;
     }
 
-    u16string sql_escape(const u16string_view& sv) {
-        u16string s;
-
-        s.reserve(sv.length() + 2);
-
-        s = u"[";
-
-        for (auto c : sv) {
-            if (c == u']')
-                s += u"]]";
-            else
-                s += c;
-        }
-
-        s += u"]";
-
-        return s;
-    }
-
     map<u16string, col_info> get_col_info(tds& tds, const u16string_view& table, const u16string_view& db) {
         map<u16string, col_info> info;
 

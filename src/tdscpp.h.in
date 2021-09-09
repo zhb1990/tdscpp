@@ -1517,7 +1517,6 @@ namespace tds {
     }
 
     std::map<std::u16string, col_info> TDSCPP get_col_info(tds& tds, const std::u16string_view& table, const std::u16string_view& db);
-    std::u16string TDSCPP sql_escape(const std::u16string_view& sv);
     std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, const std::u16string_view& collation);
 
     std::vector<col_info> tds::bcp_start(const std::u16string_view& table, const list_of_u16string auto& np, const std::u16string_view& db) {
@@ -1552,7 +1551,7 @@ namespace tds {
                 if (!first)
                     q += u", ";
 
-                q += sql_escape(*it) + u" ";
+                q += escape(*it) + u" ";
                 q += type_to_string(col.type, col.max_length, col.precision, col.scale, col.collation);
 
                 first = false;
