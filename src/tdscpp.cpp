@@ -4747,7 +4747,8 @@ namespace tds {
 
                 case token::ROW:
                 {
-                    vector<value> row;
+                    rows.emplace_back();
+                    auto& row = rows.back();
 
                     row.resize(cols.size());
 
@@ -4757,8 +4758,6 @@ namespace tds {
                         handle_row_col(col, cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
 
-                    rows.push_back(row);
-
                     break;
                 }
 
@@ -4767,7 +4766,8 @@ namespace tds {
                     if (cols.empty())
                         break;
 
-                    vector<value> row;
+                    rows.emplace_back();
+                    auto& row = rows.back();
 
                     row.resize(cols.size());
 
@@ -4797,8 +4797,6 @@ namespace tds {
                         else
                             handle_row_col(col, cols[i].type, cols[i].max_length, cols[i].coll, sv);
                     }
-
-                    rows.push_back(row);
 
                     break;
                 }
