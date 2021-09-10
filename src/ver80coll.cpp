@@ -8249,8 +8249,6 @@ static uint32_t get_weight(char16_t cp) noexcept {
 static u16string normalize(const u16string_view& s) {
     u16string ret{s};
 
-    // FIXME - combining marks
-
     // expansions
 
     for (size_t i = 0; i < ret.length(); i++) {
@@ -8266,32 +8264,76 @@ static u16string normalize(const u16string_view& s) {
     return ret;
 }
 
-static weak_ordering compare_weights(u16string_view val1, u16string_view val2, uint32_t mask) {
+enum class weight {
+    primary,
+    accent,
+    letter_case
+};
+
+static weak_ordering compare_weights(u16string_view val1, u16string_view val2, enum weight type) {
     while (!val1.empty() && !val2.empty()) {
         auto w1 = get_weight(val1.front());
 
-        if (w1 == 0xffffffff) {
+        if (w1 == 0xffffffff || (type != weight::accent && (w1 >> 24) == 1)) {
             val1.remove_prefix(1);
             continue;
         }
 
         auto w2 = get_weight(val2.front());
 
-        if (w2 == 0xffffffff) {
+        if (w2 == 0xffffffff || (type != weight::accent && (w2 >> 24) == 1)) {
             val2.remove_prefix(1);
             continue;
         }
 
-        w1 &= mask;
-        w2 &= mask;
+        val1.remove_prefix(1);
+        val2.remove_prefix(1);
+
+        switch (type) {
+            case weight::primary:
+                w1 >>= 16;
+                w2 >>= 16;
+            break;
+
+            case weight::accent: {
+                w1 = (w1 & 0xff00) >> 8;
+                w2 = (w2 & 0xff00) >> 8;
+
+                while (!val1.empty()) {
+                    auto w = get_weight(val1.front());
+
+                    if ((w >> 24) != 1)
+                        break;
+
+                    w1 += (w & 0xff00) >> 8;
+
+                    val1.remove_prefix(1);
+                }
+
+                while (!val2.empty()) {
+                    auto w = get_weight(val2.front());
+
+                    if ((w >> 24) != 1)
+                        break;
+
+                    w1 += (w & 0xff00) >> 8;
+
+                    val2.remove_prefix(1);
+                }
+
+                break;
+            }
+
+            case weight::letter_case:
+                w1 &= 0xff;
+                w2 &= 0xff;
+            break;
+        }
 
         if (w1 < w2)
             return weak_ordering::less;
         else if (w2 < w1)
             return weak_ordering::greater;
-
-        val1.remove_prefix(1);
-        val2.remove_prefix(1);
     }
 
     if (val1.empty() && val2.empty())
@@ -8301,7 +8343,7 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, u
         while (!val2.empty()) {
             auto w = get_weight(val2.front());
 
-            if (w != 0xffffffff)
+            if (w != 0xffffffff && (type == weight::accent || (w >> 24) != 1))
                 return weak_ordering::less;
 
             val2.remove_prefix(1);
@@ -8313,7 +8355,7 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, u
     while (!val1.empty()) {
         auto w = get_weight(val1.front());
 
-        if (w != 0xffffffff)
+        if (w != 0xffffffff && (type == weight::accent || (w >> 24) != 1))
             return weak_ordering::greater;
 
         val1.remove_prefix(1);
@@ -8331,13 +8373,13 @@ weak_ordering compare_strings_80(const u16string_view& val1, const u16string_vie
     // FIXME - kana if necessary
     // FIXME - width if necessary
 
-    auto ret = compare_weights(s1, s2, 0xffff0000);
+    auto ret = compare_weights(s1, s2, weight::primary);
 
     if (ret == weak_ordering::equivalent && !coll.ignore_accent)
-        ret = compare_weights(s1, s2, 0x0000ff00);
+        ret = compare_weights(s1, s2, weight::accent);
 
     if (ret == weak_ordering::equivalent && !coll.ignore_case)
-        ret = compare_weights(s1, s2, 0x000000ff);
+        ret = compare_weights(s1, s2, weight::letter_case);
 
     return ret;
 }
