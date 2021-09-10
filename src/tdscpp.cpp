@@ -1992,8 +1992,15 @@ namespace tds {
                             opts.message_handler, opts.count_handler, opts.port,
                             opts.encrypt, opts.check_certificate);
 
-        // FIXME - if codepage == 0, find current codepage
         codepage = opts.codepage;
+
+        if (codepage == 0) {
+#ifdef _WIN32
+            codepage = GetACP();
+#else
+            codepage = CP_UTF8; // FIXME - get from LANG
+#endif
+        }
     }
 
     tds::~tds() {
