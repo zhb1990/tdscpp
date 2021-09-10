@@ -893,13 +893,15 @@ namespace tds {
             coll.ignore_width = 1;
             coll.binary = 0;
             coll.binary2 = 0;
-            coll.version = 0;
             coll.sort_id = 0;
 
-            if constexpr (std::is_same_v<T, char8_t>)
+            if constexpr (std::is_same_v<T, char8_t>) {
+                coll.version = 2;
                 coll.utf8 = 1;
-            else
+            } else {
+                coll.version = 0;
                 coll.utf8 = 0;
+            }
         }
 
         template<typename T, typename... Args>
@@ -941,13 +943,15 @@ namespace tds {
             coll.ignore_width = 1;
             coll.binary = 0;
             coll.binary2 = 0;
-            coll.version = 0;
             coll.sort_id = 0;
 
-            if constexpr (std::is_same_v<T, char8_t>)
+            if constexpr (std::is_same_v<T, char8_t>) {
+                coll.version = 2;
                 coll.utf8 = 1;
-            else
+            } else {
+                coll.version = 0;
                 coll.utf8 = 0;
+            }
         }
 
         template<typename T, typename... Args>
