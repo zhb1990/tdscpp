@@ -1455,17 +1455,23 @@ namespace tds {
         return s;
     }
 
+    template<typename T>
     struct object_name_parts {
-        std::string_view server;
-        std::string_view db;
-        std::string_view schema;
-        std::string_view name;
+        std::basic_string_view<T> server;
+        std::basic_string_view<T> db;
+        std::basic_string_view<T> schema;
+        std::basic_string_view<T> name;
     };
 
-    static constexpr object_name_parts parse_object_name(const std::string_view& s) noexcept {
+    template<typename T>
+    concept is_char_type = std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t> || std::is_same_v<T, wchar_t> || std::is_same_v<T, char32_t>;
+
+    template<typename T>
+    requires is_char_type<T>
+    static constexpr object_name_parts<T> parse_object_name(const std::basic_string_view<T>& s) noexcept {
         bool escaped = false;
         size_t partstart = 0, partnum = 0;
-        std::array<std::string_view, 4> parts;
+        std::array<std::basic_string_view<T>, 4> parts;
 
         for (size_t i = 0; i < s.length(); i++) {
             if (!escaped && s[i] == '[')
@@ -1479,7 +1485,7 @@ namespace tds {
                 escaped = false;
             } else if (!escaped && s[i] == '.') {
                 if (partnum < parts.size()) {
-                    parts[partnum] = std::string_view(&s[partstart], i - partstart);
+                    parts[partnum] = std::basic_string_view<T>(&s[partstart], i - partstart);
                     partstart = i + 1;
                     partnum++;
                 }
@@ -1487,11 +1493,11 @@ namespace tds {
         }
 
         if (partnum < parts.size()) {
-            parts[partnum] = std::string_view(&s[partstart], s.length() - partstart);
+            parts[partnum] = std::basic_string_view<T>(&s[partstart], s.length() - partstart);
             partnum++;
         }
 
-        object_name_parts onp;
+        object_name_parts<T> onp;
 
         switch (partnum) {
             case 1:
@@ -1518,6 +1524,18 @@ namespace tds {
         }
 
         return onp;
+    }
+
+    template<typename T>
+    requires is_char_type<T>
+    static constexpr object_name_parts<T> parse_object_name(const T* s) noexcept {
+        return parse_object_name(std::basic_string_view<T>{s});
+    }
+
+    template<typename T>
+    requires is_char_type<T>
+    static constexpr object_name_parts<T> parse_object_name(const std::basic_string<T>& s) noexcept {
+        return parse_object_name(std::basic_string_view<T>{s});
     }
 
     uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);

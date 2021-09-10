@@ -5646,4 +5646,34 @@ namespace tds {
     static_assert(test_parse_object_name("[na[me]", "", "", "", "[na[me]"));
     static_assert(test_parse_object_name("[na.me]", "", "", "", "[na.me]"));
     static_assert(test_parse_object_name("[na]]me]", "", "", "", "[na]]me]"));
+
+    constexpr bool test_parse_object_name_u16(const u16string_view& s, const u16string_view& exp_server,
+                                              const u16string_view& exp_db, const u16string_view& exp_schema,
+                                              const u16string_view& exp_name) {
+        auto onp = parse_object_name(s);
+
+        return exp_server == onp.server && exp_db == onp.db && exp_schema == onp.schema && exp_name == onp.name;
+    }
+
+    static_assert(test_parse_object_name_u16(u"server.db.schema.name", u"server", u"db", u"schema", u"name"));
+    static_assert(test_parse_object_name_u16(u"server.db.schema.name.extra", u"server", u"db", u"schema", u"name"));
+    static_assert(test_parse_object_name_u16(u"[server].[db].[schema].[name]", u"[server]", u"[db]", u"[schema]", u"[name]"));
+    static_assert(test_parse_object_name_u16(u"[ser[ver].[d[b].[sch[ema].[na[me]", u"[ser[ver]", u"[d[b]", u"[sch[ema]", u"[na[me]"));
+    static_assert(test_parse_object_name_u16(u"[ser.ver].[d.b].[sch.ema].[na.me]", u"[ser.ver]", u"[d.b]", u"[sch.ema]", u"[na.me]"));
+    static_assert(test_parse_object_name_u16(u"[ser]]ver].[d]]b].[sch]]ema].[na]]me]", u"[ser]]ver]", u"[d]]b]", u"[sch]]ema]", u"[na]]me]"));
+    static_assert(test_parse_object_name_u16(u"db.schema.name", u"", u"db", u"schema", u"name"));
+    static_assert(test_parse_object_name_u16(u"[db].[schema].[name]", u"", u"[db]", u"[schema]", u"[name]"));
+    static_assert(test_parse_object_name_u16(u"[d[b].[sch[ema].[na[me]", u"", u"[d[b]", u"[sch[ema]", u"[na[me]"));
+    static_assert(test_parse_object_name_u16(u"[d.b].[sch.ema].[na.me]", u"", u"[d.b]", u"[sch.ema]", u"[na.me]"));
+    static_assert(test_parse_object_name_u16(u"[d]]b].[sch]]ema].[na]]me]", u"", u"[d]]b]", u"[sch]]ema]", u"[na]]me]"));
+    static_assert(test_parse_object_name_u16(u"schema.name", u"", u"", u"schema", u"name"));
+    static_assert(test_parse_object_name_u16(u"[schema].[name]", u"", u"", u"[schema]", u"[name]"));
+    static_assert(test_parse_object_name_u16(u"[sch[ema].[na[me]", u"", u"", u"[sch[ema]", u"[na[me]"));
+    static_assert(test_parse_object_name_u16(u"[sch.ema].[na.me]", u"", u"", u"[sch.ema]", u"[na.me]"));
+    static_assert(test_parse_object_name_u16(u"[sch]]ema].[na]]me]", u"", u"", u"[sch]]ema]", u"[na]]me]"));
+    static_assert(test_parse_object_name_u16(u"name", u"", u"", u"", u"name"));
+    static_assert(test_parse_object_name_u16(u"[name]", u"", u"", u"", u"[name]"));
+    static_assert(test_parse_object_name_u16(u"[na[me]", u"", u"", u"", u"[na[me]"));
+    static_assert(test_parse_object_name_u16(u"[na.me]", u"", u"", u"", u"[na.me]"));
+    static_assert(test_parse_object_name_u16(u"[na]]me]", u"", u"", u"", u"[na]]me]"));
 };
