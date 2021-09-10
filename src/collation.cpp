@@ -669,6 +669,12 @@ namespace tds {
             case sql_type::VARCHAR:
             case sql_type::CHAR:
             case sql_type::TEXT: {
+                if ((v.type == sql_type::VARCHAR || v.type == sql_type::CHAR || v.type == sql_type::TEXT) &&
+                    v.coll.lcid == coll.lcid && !!v.coll.utf8 == !!coll.utf8) {
+                    if (val == v.val)
+                        return partial_ordering::equivalent;
+                }
+
                 auto v1 = (u16string)*this;
 
                 switch (v.type) {
