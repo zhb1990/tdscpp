@@ -1036,6 +1036,7 @@ namespace tds {
         }
 
         explicit operator std::string() const;
+        explicit operator std::u8string() const;
         explicit operator std::u16string() const;
         explicit operator int64_t() const;
         explicit operator double() const;

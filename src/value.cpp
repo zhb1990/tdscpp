@@ -1737,6 +1737,37 @@ namespace tds {
         }
     }
 
+    value::operator u8string() const {
+        if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT || type == sql_type::XML) {
+            auto sv = u16string_view((char16_t*)val.data(), val.size() / sizeof(char16_t));
+            u8string ret(utf16_to_utf8_len(sv), 0);
+
+            utf16_to_utf8_range(sv, ret);
+
+            return ret;
+        } else if (type == sql_type::VARCHAR || type == sql_type::CHAR || type == sql_type::TEXT) {
+            auto sv = string_view{(char*)val.data(), val.size()};
+
+            if (coll.utf8)
+                return u8string{u8string_view{(char8_t*)sv.data(), sv.length()}};
+
+            auto cp = coll_to_cp(coll);
+            auto u16s = cp_to_utf16(sv, cp);
+
+            u8string ret(utf16_to_utf8_len(u16string_view{u16s}), 0);
+
+            utf16_to_utf8_range(u16string_view{u16s}, ret);
+
+            return ret;
+        } else {
+            auto s = operator string();
+
+            // FIXME - is there any way to use move or swap here?
+
+            return u8string{u8string_view{(char8_t*)s.data(), s.length()}};
+        }
+    }
+
     value::operator u16string() const {
         if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT || type == sql_type::XML)
             return u16string(u16string_view((char16_t*)val.data(), val.size() / sizeof(char16_t)));
