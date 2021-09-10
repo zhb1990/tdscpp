@@ -1740,8 +1740,17 @@ namespace tds {
     value::operator u16string() const {
         if (type == sql_type::NVARCHAR || type == sql_type::NCHAR || type == sql_type::NTEXT || type == sql_type::XML)
             return u16string(u16string_view((char16_t*)val.data(), val.size() / sizeof(char16_t)));
-        else
-            return utf8_to_utf16(operator string()); // FIXME - VARCHARs might not be valid UTF-8
+        else if (type == sql_type::VARCHAR || type == sql_type::CHAR || type == sql_type::TEXT) {
+            auto sv = string_view{(char*)val.data(), val.size()};
+
+            if (coll.utf8)
+                return utf8_to_utf16(sv);
+
+            auto cp = coll_to_cp(coll);
+
+            return cp_to_utf16(sv, cp);
+        } else
+            return utf8_to_utf16(operator string());
     }
 
     value::operator int64_t() const {

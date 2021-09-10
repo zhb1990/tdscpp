@@ -735,7 +735,7 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
     }
 }
 
-static unsigned int coll_to_cp(const tds::collation& coll) {
+unsigned int coll_to_cp(const tds::collation& coll) {
     if (coll.sort_id == 0) { // Windows collations
         switch (coll.lcid & 0xffff) {
             case 1054: // th-TH
@@ -930,25 +930,8 @@ static unsigned int coll_to_cp(const tds::collation& coll) {
     }
 }
 
-static string decode_charset(const string_view& s, unsigned int codepage) {
-    return tds::utf16_to_utf8(tds::cp_to_utf16(s, codepage));
-}
-
-static void value_cp_to_utf8(tds::value_data_t& val, const tds::collation& coll) {
-    auto cp = coll_to_cp(coll);
-
-    if (cp == CP_UTF8)
-        return;
-
-    auto str = decode_charset(string_view{(char*)val.data(), val.size()}, cp);
-
-    val.resize(str.length());
-    memcpy(val.data(), str.data(), str.length());
-}
-
-static void handle_row_col(tds::value_data_t& val, bool& is_null,
-                           enum tds::sql_type type, unsigned int max_length, const tds::collation& coll,
-                           string_view& sv) {
+static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_type type,
+                           unsigned int max_length, string_view& sv) {
     switch (type) {
         case tds::sql_type::SQL_NULL:
         case tds::sql_type::TINYINT:
@@ -1075,11 +1058,6 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null,
 
                 memcpy(val.data(), sv.data(), len);
                 sv = sv.substr(len);
-            }
-
-            if (type == tds::sql_type::VARCHAR || type == tds::sql_type::CHAR) {
-                if (!coll.utf8)
-                    value_cp_to_utf8(val, coll);
             }
 
             break;
@@ -3963,7 +3941,7 @@ namespace tds {
                     for (unsigned int i = 0; i < row.size(); i++) {
                         auto& col = row[i];
 
-                        handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                        handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sv);
                     }
 
                     break;
@@ -4003,7 +3981,7 @@ namespace tds {
                         if (bsv & 1) // NULL
                             get<1>(col) = true;
                         else
-                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sv);
                     }
 
                     break;
@@ -4748,7 +4726,7 @@ namespace tds {
                     for (unsigned int i = 0; i < row.size(); i++) {
                         auto& col = row[i];
 
-                        handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                        handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sv);
                     }
 
                     break;
@@ -4788,7 +4766,7 @@ namespace tds {
                         if (bsv & 1) // NULL
                             get<1>(col) = true;
                         else
-                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, cols[i].coll, sv);
+                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sv);
                     }
 
                     break;
