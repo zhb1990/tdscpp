@@ -8316,7 +8316,7 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, e
                     if ((w >> 24) != 1)
                         break;
 
-                    w1 += (w & 0xff00) >> 8;
+                    w2 += (w & 0xff00) >> 8;
 
                     val2.remove_prefix(1);
                 }
