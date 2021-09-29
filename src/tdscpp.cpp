@@ -4101,7 +4101,7 @@ namespace tds {
         if (handle.is_null)
             throw runtime_error("sp_prepare failed.");
 
-        r2.reset(new rpc(conn, u"sp_execute", static_cast<value>(handle), params));
+        r2 = make_unique<rpc>(conn, u"sp_execute", static_cast<value>(handle), params);
     }
 
     uint16_t query::num_columns() const {
