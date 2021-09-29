@@ -4315,9 +4315,9 @@ namespace tds {
             unique_ptr<query> sq2;
 
             if (db.empty())
-                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM sys.columns WHERE object_id = OBJECT_ID(?)", table));
+                sq2 = make_unique<query>(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM sys.columns WHERE object_id = OBJECT_ID(?)", table);
             else
-                sq2.reset(new query(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM " + u16string(db) + u".sys.columns WHERE object_id = OBJECT_ID(?)", u16string(db) + u"." + u16string(table)));
+                sq2 = make_unique<query>(tds, u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM " + u16string(db) + u".sys.columns WHERE object_id = OBJECT_ID(?)", u16string(db) + u"." + u16string(table));
 
             auto& sq = *sq2;
 
