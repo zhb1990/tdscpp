@@ -1988,9 +1988,9 @@ namespace tds {
 #endif
 
     tds::tds(const options& opts) {
-        impl = new tds_impl(opts.server, opts.user, opts.password, opts.app_name, opts.db,
-                            opts.message_handler, opts.count_handler, opts.port,
-                            opts.encrypt, opts.check_certificate);
+        impl = make_unique<tds_impl>(opts.server, opts.user, opts.password, opts.app_name, opts.db,
+                                     opts.message_handler, opts.count_handler, opts.port,
+                                     opts.encrypt, opts.check_certificate);
 
         codepage = opts.codepage;
 
@@ -2004,7 +2004,7 @@ namespace tds {
     }
 
     tds::~tds() {
-        delete impl;
+        // needs to be defined for unique_ptr<tds_impl> to work
     }
 
     tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,

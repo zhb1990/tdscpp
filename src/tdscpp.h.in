@@ -654,7 +654,7 @@ namespace tds {
         uint16_t spid() const;
         std::u16string db_name() const;
 
-        tds_impl* impl;
+        std::unique_ptr<tds_impl> impl;
         unsigned int codepage;
 
     private:
