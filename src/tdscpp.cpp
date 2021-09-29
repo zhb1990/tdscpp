@@ -2340,7 +2340,7 @@ namespace tds {
             SecBufferDesc out;
             uint32_t context_attr;
 
-            sspih.reset(new sspi_handle);
+            sspih = make_unique<sspi_handle>();
 
             outbuf.cbBuffer = 0;
             outbuf.BufferType = SECBUFFER_TOKEN;
