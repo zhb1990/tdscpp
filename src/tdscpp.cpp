@@ -2054,7 +2054,7 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         if (server_enc != encryption_type::ENCRYPT_NOT_SUP)
-            ssl.reset(new tds_ssl(*this));
+            ssl = make_unique<tds_ssl>(*this);
 #endif
 
         send_login_msg(user, password, server, app_name, db);
