@@ -4017,22 +4017,28 @@ namespace tds {
             finished = true;
     }
 
+    bool rpc::fetch_row_no_wait() {
+        if (rows.empty())
+            return false;
+
+        auto& r = rows.front();
+
+        for (unsigned int i = 0; i < r.size(); i++) {
+            cols[i].is_null = get<1>(r[i]);
+
+            if (!cols[i].is_null)
+                cols[i].val.swap(get<0>(r[i]));
+        }
+
+        rows.pop_front();
+
+        return true;
+    }
+
     bool rpc::fetch_row() {
         while (!rows.empty() || !finished) {
-            if (!rows.empty()) {
-                auto& r = rows.front();
-
-                for (unsigned int i = 0; i < r.size(); i++) {
-                    cols[i].is_null = get<1>(r[i]);
-
-                    if (!cols[i].is_null)
-                        cols[i].val.swap(get<0>(r[i]));
-                }
-
-                rows.pop_front();
-
+            if (fetch_row_no_wait())
                 return true;
-            }
 
             if (finished)
                 return false;
@@ -4114,6 +4120,10 @@ namespace tds {
 
     bool query::fetch_row() {
         return r2->fetch_row();
+    }
+
+    bool query::fetch_row_no_wait() {
+        return r2->fetch_row_no_wait();
     }
 
     query::~query() {

@@ -1195,6 +1195,7 @@ namespace tds {
         const column& operator[](uint16_t i) const;
 
         bool fetch_row();
+        bool fetch_row_no_wait();
 
         int32_t return_status = 0;
         std::vector<column> cols;
@@ -1300,6 +1301,7 @@ namespace tds {
         const column& operator[](uint16_t i) const;
 
         bool fetch_row();
+        bool fetch_row_no_wait();
 
     private:
         void do_query(tds& conn, const std::u16string_view& q);
