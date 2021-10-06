@@ -603,6 +603,8 @@ namespace tds {
         tds(const tds&) = delete;
         tds& operator=(const tds&) = delete;
 
+        tds(tds&& that) noexcept;
+
         ~tds();
 
         void run(const std::string_view& s);

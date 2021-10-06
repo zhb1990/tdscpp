@@ -2007,6 +2007,11 @@ namespace tds {
         // needs to be defined for unique_ptr<tds_impl> to work
     }
 
+    tds::tds(tds&& that) noexcept {
+        impl.swap(that.impl);
+        codepage = that.codepage;
+    }
+
     tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
                        const string_view& app_name, const string_view& db, const msg_handler& message_handler,
                        const func_count_handler& count_handler, uint16_t port, encryption_type enc,
