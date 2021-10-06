@@ -600,6 +600,9 @@ namespace tds {
         requires std::is_constructible_v<options, Args...>
         tds(Args&&... args) : tds((const options&)options(args...)) { }
 
+        tds(const tds&) = delete;
+        tds& operator=(const tds&) = delete;
+
         ~tds();
 
         void run(const std::string_view& s);
