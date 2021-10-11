@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.10.1)
 
+project(tdscpp VERSION 1.0)
+
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
-
-project(tdscpp VERSION 1.0)
 
 option(WITH_JSON           "Include JSON support" ON)
 option(BUILD_SAMPLE        "Build sample program" ON)
@@ -31,7 +31,12 @@ if(WITH_OPENSSL)
     find_package(OpenSSL REQUIRED)
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+if(MSVC AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.21)
+    set(CMAKE_CXX_STANDARD 23) # /std:c++latest
+else()
+    set(CMAKE_CXX_STANDARD 20)
+endif()
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
