@@ -10,7 +10,6 @@
 #include <list>
 #include <map>
 #include <charconv>
-#include <fmt/format.h>
 #include <sys/types.h>
 
 #ifndef _WIN32
