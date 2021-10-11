@@ -8267,21 +8267,37 @@ static u16string normalize(const u16string_view& s) {
 enum class weight {
     primary,
     accent,
-    letter_case
+    letter_case,
+    punctuation
 };
+
+static bool skip_char(uint32_t w, enum weight type) {
+    if (w == 0)
+        return true;
+
+    if (type != weight::accent && (w >> 24) == 1)
+        return true;
+
+    if (type != weight::punctuation && (w >> 24) == 6)
+        return true;
+    else if (type == weight::punctuation && (w >> 24) != 6)
+        return true;
+
+    return false;
+}
 
 static weak_ordering compare_weights(u16string_view val1, u16string_view val2, enum weight type) {
     while (!val1.empty() && !val2.empty()) {
         auto w1 = get_weight(val1.front());
 
-        if (w1 == 0 || (type != weight::accent && (w1 >> 24) == 1)) {
+        if (skip_char(w1, type)) {
             val1.remove_prefix(1);
             continue;
         }
 
         auto w2 = get_weight(val2.front());
 
-        if (w2 == 0 || (type != weight::accent && (w2 >> 24) == 1)) {
+        if (skip_char(w2, type)) {
             val2.remove_prefix(1);
             continue;
         }
@@ -8291,6 +8307,7 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, e
 
         switch (type) {
             case weight::primary:
+            case weight::punctuation:
                 w1 >>= 16;
                 w2 >>= 16;
             break;
@@ -8343,7 +8360,7 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, e
         while (!val2.empty()) {
             auto w = get_weight(val2.front());
 
-            if (w != 0 && (type == weight::accent || (w >> 24) != 1))
+            if (!skip_char(w, type))
                 return weak_ordering::less;
 
             val2.remove_prefix(1);
@@ -8355,7 +8372,7 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, e
     while (!val1.empty()) {
         auto w = get_weight(val1.front());
 
-        if (w != 0 && (type == weight::accent || (w >> 24) != 1))
+        if (!skip_char(w, type))
             return weak_ordering::greater;
 
         val1.remove_prefix(1);
@@ -8380,6 +8397,9 @@ weak_ordering compare_strings_80(const u16string_view& val1, const u16string_vie
 
     if (ret == weak_ordering::equivalent && !coll.ignore_case)
         ret = compare_weights(s1, s2, weight::letter_case);
+
+    if (ret == weak_ordering::equivalent)
+        ret = compare_weights(s1, s2, weight::punctuation);
 
     return ret;
 }
