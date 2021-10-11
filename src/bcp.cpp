@@ -14,10 +14,14 @@ using namespace std;
 
 template<unsigned N>
 static void double_to_int(double d, uint8_t* scratch) {
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
     auto v = *(uint64_t*)&d;
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
     uint64_t exp = v >> 52;
     uint64_t frac = v & 0xfffffffffffff;
 

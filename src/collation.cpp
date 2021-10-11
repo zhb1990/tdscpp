@@ -6282,8 +6282,10 @@ namespace tds {
             if (coll.name != s)
                 continue;
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wconversion"
+#endif
             lcid = coll.lcid;
             ignore_case = coll.ignore_case ? 1 : 0;
             ignore_accent = coll.ignore_accent ? 1 : 0;
@@ -6294,7 +6296,9 @@ namespace tds {
             utf8 = coll.utf8 ? 1 : 0;
             version = coll.version;
             sort_id = coll.sort_id;
+#ifdef __GNUC__
 #pragma GCC diagnostic pop
+#endif
 
             return;
         }
