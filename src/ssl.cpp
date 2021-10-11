@@ -265,7 +265,11 @@ static void add_certs_to_store(X509_STORE* store) {
     if (!h)
         throw formatted_error("CertOpenSystemStore failed (error {})", GetLastError());
 
-    while ((certctx = CertEnumCertificatesInStore(h.get(), certctx))) {
+    while (true) {
+        certctx = CertEnumCertificatesInStore(h.get(), certctx);
+        if (!certctx)
+            break;
+
         if (!(certctx->dwCertEncodingType & X509_ASN_ENCODING))
             continue;
 
