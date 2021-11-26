@@ -740,8 +740,84 @@ namespace tds {
             // FIXME - UNIQUEIDENTIFIER
             // FIXME - MONEY
             // FIXME - SQL_VARIANT
-            // FIXME - DECIMAL
-            // FIXME - NUMERIC
+
+            case sql_type::NUMERIC:
+            case sql_type::DECIMAL:
+            {
+                numeric<0> n, n2;
+                int scale_diff = scale;
+                span<uint8_t> d((uint8_t*)val.data(), val.size());
+
+                n.neg = d[0] == 0;
+
+                if (d.size() >= 9)
+                    n.low_part = *(uint64_t*)&d[1];
+                else
+                    n.low_part = *(uint32_t*)&d[1];
+
+                if (d.size() >= 17)
+                    n.high_part = *(uint64_t*)&d[1 + sizeof(uint64_t)];
+                else if (d.size() >= 13)
+                    n.high_part = *(uint32_t*)&d[1 + sizeof(uint64_t)];
+                else
+                    n.high_part = 0;
+
+                switch (v.type) {
+                    case sql_type::TINYINT:
+                    case sql_type::SMALLINT:
+                    case sql_type::INT:
+                    case sql_type::BIGINT:
+                    case sql_type::INTN:
+                        n2 = (int64_t)v;
+                        break;
+
+                    case sql_type::NUMERIC:
+                    case sql_type::DECIMAL: {
+                        span<uint8_t> d2((uint8_t*)v.val.data(), v.val.size());
+                        n2.neg = d2[0] == 0;
+
+                        if (d.size() >= 9)
+                            n2.low_part = *(uint64_t*)&d2[1];
+                        else
+                            n2.low_part = *(uint32_t*)&d2[1];
+
+                        if (d.size() >= 17)
+                            n2.high_part = *(uint64_t*)&d2[1 + sizeof(uint64_t)];
+                        else if (d.size() >= 13)
+                            n2.high_part = *(uint32_t*)&d2[1 + sizeof(uint64_t)];
+                        else
+                            n2.high_part = 0;
+
+                        scale_diff -= v.scale;
+                        break;
+                    }
+
+                    // FIXME - REAL / FLOAT
+
+                    default:
+                        n2 = (int64_t)v; // FIXME - should be double when supported
+                        break;
+                }
+
+                while (scale_diff < 0) {
+                    if (n.high_part >= std::numeric_limits<uint64_t>::max() / 10)
+                        throw runtime_error("Overflow while doing NUMERIC comparison.");
+
+                    n.ten_mult();
+                    scale_diff++;
+                }
+
+                while (scale_diff > 0) {
+                    if (n2.high_part >= std::numeric_limits<uint64_t>::max() / 10)
+                        throw runtime_error("Overflow while doing NUMERIC comparison.");
+
+                    n2.ten_mult();
+                    scale_diff--;
+                }
+
+                return n <=> n2;
+            }
+
             // FIXME - MONEYN
             // FIXME - SMALLMONEY
             // FIXME - IMAGE
