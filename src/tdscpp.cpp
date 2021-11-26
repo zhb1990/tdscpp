@@ -5631,6 +5631,24 @@ namespace tds {
     static_assert(numeric<21>(1) > numeric<21>(-1));
     static_assert(numeric<21>(7) > numeric<21>(4));
     static_assert(numeric<21>(-7) < numeric<21>(-4));
+    static_assert(numeric<0>(1) == numeric<1>(1));
+    static_assert(numeric<0>(-1) < numeric<1>(1));
+    static_assert(numeric<0>(1) > numeric<1>(-1));
+    static_assert(numeric<0>(7) > numeric<1>(4));
+    static_assert(numeric<0>(-7) < numeric<1>(-4));
+    static_assert(numeric<21>(1) == numeric<20>(1));
+    static_assert(numeric<21>(-1) < numeric<20>(1));
+    static_assert(numeric<21>(1) > numeric<20>(-1));
+    static_assert(numeric<21>(7) > numeric<20>(4));
+    static_assert(numeric<21>(-7) < numeric<20>(-4));
+    static_assert(numeric<1>(1) > numeric<0>(-1));
+    static_assert(numeric<1>(-1) < numeric<0>(1));
+    static_assert(numeric<1>(4) < numeric<0>(7));
+    static_assert(numeric<1>(-4) > numeric<0>(-7));
+    static_assert(numeric<20>(1) > numeric<21>(-1));
+    static_assert(numeric<20>(-1) < numeric<21>(1));
+    static_assert(numeric<20>(4) < numeric<21>(7));
+    static_assert(numeric<20>(-4) > numeric<21>(-7));
 
     constexpr bool test_parse_object_name(const string_view& s, const string_view& exp_server, const string_view& exp_db,
                                           const string_view& exp_schema, const string_view& exp_name) {

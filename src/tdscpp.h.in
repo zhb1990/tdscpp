@@ -1824,6 +1824,36 @@ namespace tds {
             return std::strong_ordering::equal;
         }
 
+        template<unsigned N2>
+        requires (N2 < N)
+        constexpr std::partial_ordering operator<=>(const numeric<N2>& n) const {
+            if (neg && !n.neg)
+                return std::partial_ordering::less;
+            else if (!neg && n.neg)
+                return std::partial_ordering::greater;
+
+            auto n2 = n;
+
+            for (unsigned int i = N2; i < N; i++) {
+                if (n2.high_part >= std::numeric_limits<uint64_t>::max() / 10)
+                    return std::partial_ordering::unordered; // overflow
+
+                n2.ten_mult();
+            }
+
+            if (high_part < n2.high_part)
+                return neg ? std::partial_ordering::greater : std::partial_ordering::less;
+            else if (high_part > n2.high_part)
+                return neg ? std::partial_ordering::less : std::partial_ordering::greater;
+
+            if (low_part < n2.low_part)
+                return neg ? std::partial_ordering::greater : std::partial_ordering::less;
+            else if (low_part > n2.low_part)
+                return neg ? std::partial_ordering::less : std::partial_ordering::greater;
+
+            return std::partial_ordering::equivalent;
+        }
+
         uint64_t low_part, high_part;
         bool neg;
     };
