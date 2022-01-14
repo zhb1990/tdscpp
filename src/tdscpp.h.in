@@ -1263,9 +1263,10 @@ namespace tds {
         std::u16string name;
     };
 
-    template<typename... Args>
+    template<typename T, size_t arg_count>
+    requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
     struct checker {
-        consteval checker(const char* q) : sv(q) {
+        consteval checker(const T* q) : sv(q) {
             if (sv.empty())
                 throw;
 
@@ -1294,29 +1295,49 @@ namespace tds {
             if (in_quotes)
                 throw;
 
-            if (qm != sizeof...(Args))
+            if (qm != arg_count)
                 throw;
         }
 
-        std::string_view sv;
+        std::basic_string_view<T> sv;
+    };
+
+    template<typename T>
+    requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
+    struct no_check {
+        consteval no_check(const T* q) : sv(q) { }
+
+        no_check(const std::basic_string<T>& q) : sv(q) { }
+
+        std::basic_string_view<T> sv;
     };
 
     class TDSCPP query {
     public:
-        query(tds& tds, std::string_view q) : conn(tds) {
-            do_query(conn, cp_to_utf16(q, tds.codepage));
+        query(tds& tds, std::type_identity_t<checker<char, 0>> q) : conn(tds) {
+            do_query(conn, cp_to_utf16(q.sv, tds.codepage));
         }
 
-        query(tds& tds, std::u8string_view q) : conn(tds) {
-            do_query(conn, utf8_to_utf16(q));
+        query(tds& tds, std::type_identity_t<checker<char8_t, 0>> q) : conn(tds) {
+            do_query(conn, utf8_to_utf16(q.sv));
         }
 
-        query(tds& tds, std::u16string_view q) : conn(tds) {
-            do_query(conn, q);
+        query(tds& tds, std::type_identity_t<checker<char16_t, 0>> q) : conn(tds) {
+            do_query(conn, q.sv);
+        }
+
+        template<typename T>
+        query(tds& tds, no_check<T> q) : conn(tds) {
+            if constexpr (std::is_same_v<T, char>)
+                do_query(conn, cp_to_utf16(q.sv, tds.codepage));
+            else if constexpr (std::is_same_v<T, char8_t>)
+                do_query(conn, utf8_to_utf16(q.sv));
+            else
+                do_query(conn, q.sv);
         }
 
         template<typename... Args>
-        query(tds& tds, std::type_identity_t<checker<Args...>> q, Args&&... args) : conn(tds) {
+        query(tds& tds, std::type_identity_t<checker<char, sizeof...(Args)>> q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -1325,21 +1346,35 @@ namespace tds {
         }
 
         template<typename... Args>
-        query(tds& tds, std::u8string_view q, Args&&... args) : conn(tds) {
+        query(tds& tds, std::type_identity_t<checker<char8_t, sizeof...(Args)>> q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
 
-            do_query(conn, utf8_to_utf16(q));
+            do_query(conn, utf8_to_utf16(q.sv));
         }
 
         template<typename... Args>
-        query(tds& tds, std::u16string_view q, Args&&... args) : conn(tds) {
+        query(tds& tds, std::type_identity_t<checker<char16_t, sizeof...(Args)>> q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
 
-            do_query(conn, q);
+            do_query(conn, q.sv);
+        }
+
+        template<typename T, typename... Args>
+        query(tds& tds, no_check<T> q, Args&&... args) : conn(tds) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            if constexpr (std::is_same_v<T, char>)
+                do_query(conn, cp_to_utf16(q.sv, tds.codepage));
+            else if constexpr (std::is_same_v<T, char8_t>)
+                do_query(conn, utf8_to_utf16(q.sv));
+            else
+                do_query(conn, q.sv);
         }
 
         query(const query&) = delete;
