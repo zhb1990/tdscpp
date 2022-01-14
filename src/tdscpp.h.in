@@ -2288,6 +2288,95 @@ struct fmt::formatter<tds::numeric<N>> {
     }
 };
 
+template<>
+struct fmt::formatter<enum tds::token> {
+    constexpr auto parse(format_parse_context& ctx) {
+        auto it = ctx.begin();
+
+        if (it != ctx.end() && *it != '}')
+            throw format_error("invalid format");
+
+        return it;
+    }
+
+    template<typename format_context>
+    auto format(enum tds::token t, format_context& ctx) const {
+        switch (t) {
+            case tds::token::OFFSET:
+                return fmt::format_to(ctx.out(), "OFFSET");
+
+            case tds::token::RETURNSTATUS:
+                return fmt::format_to(ctx.out(), "RETURNSTATUS");
+
+            case tds::token::COLMETADATA:
+                return fmt::format_to(ctx.out(), "COLMETADATA");
+
+            case tds::token::ALTMETADATA:
+                return fmt::format_to(ctx.out(), "ALTMETADATA");
+
+            case tds::token::DATACLASSIFICATION:
+                return fmt::format_to(ctx.out(), "DATACLASSIFICATION");
+
+            case tds::token::TABNAME:
+                return fmt::format_to(ctx.out(), "TABNAME");
+
+            case tds::token::COLINFO:
+                return fmt::format_to(ctx.out(), "COLINFO");
+
+            case tds::token::ORDER:
+                return fmt::format_to(ctx.out(), "ORDER");
+
+            case tds::token::TDS_ERROR:
+                return fmt::format_to(ctx.out(), "ERROR");
+
+            case tds::token::INFO:
+                return fmt::format_to(ctx.out(), "INFO");
+
+            case tds::token::RETURNVALUE:
+                return fmt::format_to(ctx.out(), "RETURNVALUE");
+
+            case tds::token::LOGINACK:
+                return fmt::format_to(ctx.out(), "LOGINACK");
+
+            case tds::token::FEATUREEXTACK:
+                return fmt::format_to(ctx.out(), "FEATUREEXTACK");
+
+            case tds::token::ROW:
+                return fmt::format_to(ctx.out(), "ROW");
+
+            case tds::token::NBCROW:
+                return fmt::format_to(ctx.out(), "NBCROW");
+
+            case tds::token::ALTROW:
+                return fmt::format_to(ctx.out(), "ALTROW");
+
+            case tds::token::ENVCHANGE:
+                return fmt::format_to(ctx.out(), "ENVCHANGE");
+
+            case tds::token::SESSIONSTATE:
+                return fmt::format_to(ctx.out(), "SESSIONSTATE");
+
+            case tds::token::SSPI:
+                return fmt::format_to(ctx.out(), "SSPI");
+
+            case tds::token::FEDAUTHINFO:
+                return fmt::format_to(ctx.out(), "FEDAUTHINFO");
+
+            case tds::token::DONE:
+                return fmt::format_to(ctx.out(), "DONE");
+
+            case tds::token::DONEPROC:
+                return fmt::format_to(ctx.out(), "DONEPROC");
+
+            case tds::token::DONEINPROC:
+                return fmt::format_to(ctx.out(), "DONEINPROC");
+
+            default:
+                return fmt::format_to(ctx.out(), "{:x}", (uint8_t)t);
+        }
+    }
+};
+
 #ifdef _MSC_VER
 #define pragma warning(pop)
 #endif
