@@ -1263,6 +1263,44 @@ namespace tds {
         std::u16string name;
     };
 
+    template<typename... Args>
+    struct checker {
+        consteval checker(const char* q) : sv(q) {
+            if (sv.empty())
+                throw;
+
+            bool in_quotes = false;
+            unsigned int brackets = 0, qm = 0;
+
+            for (auto c : sv) {
+                if (c == '\'')
+                    in_quotes = !in_quotes;
+                else if (!in_quotes) {
+                    if (c == '(')
+                        brackets++;
+                    else if (c == ')') {
+                        if (brackets == 0)
+                            throw;
+
+                        brackets--;
+                    } else if (c == '?')
+                        qm++;
+                }
+            }
+
+            if (brackets != 0)
+                throw;
+
+            if (in_quotes)
+                throw;
+
+            if (qm != sizeof...(Args))
+                throw;
+        }
+
+        std::string_view sv;
+    };
+
     class TDSCPP query {
     public:
         query(tds& tds, std::string_view q) : conn(tds) {
@@ -1278,12 +1316,12 @@ namespace tds {
         }
 
         template<typename... Args>
-        query(tds& tds, std::string_view q, Args&&... args) : conn(tds) {
+        query(tds& tds, std::type_identity_t<checker<Args...>> q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
 
-            do_query(conn, cp_to_utf16(q, tds.codepage));
+            do_query(conn, cp_to_utf16(q.sv, tds.codepage));
         }
 
         template<typename... Args>
