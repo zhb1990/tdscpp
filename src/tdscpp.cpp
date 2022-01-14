@@ -2011,8 +2011,8 @@ namespace tds {
         codepage = that.codepage;
     }
 
-    tds_impl::tds_impl(const string& server, const string_view& user, const string_view& password,
-                       const string_view& app_name, const string_view& db, const msg_handler& message_handler,
+    tds_impl::tds_impl(const string& server, string_view user, string_view password,
+                       string_view app_name, string_view db, const msg_handler& message_handler,
                        const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                        bool check_certificate) :
                        message_handler(message_handler), count_handler(count_handler), check_certificate(check_certificate) {
@@ -2311,8 +2311,8 @@ namespace tds {
     };
 #endif
 
-    void tds_impl::send_login_msg(const string_view& user, const string_view& password, const string_view& server,
-                                  const string_view& app_name, const string_view& db) {
+    void tds_impl::send_login_msg(string_view user, string_view password, string_view server,
+                                  string_view app_name, string_view db) {
         enum tds_msg type;
         string payload, sspi;
 #ifdef _WIN32
@@ -2585,7 +2585,7 @@ namespace tds {
     }
 
 #ifdef _WIN32
-    void tds_impl::send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const u16string& spn, const string_view& sspi) {
+    void tds_impl::send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const u16string& spn, string_view sspi) {
         SECURITY_STATUS sec_status;
         TimeStamp timestamp;
         SecBuffer inbufs[2], outbuf;
@@ -2637,11 +2637,11 @@ namespace tds {
 
     void tds_impl::send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
                                    uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
-                                   uint8_t option_flags3, uint32_t collation, const u16string_view& client_name,
-                                   const u16string_view& username, const u16string_view& password, const u16string_view& app_name,
-                                   const u16string_view& server_name, const u16string_view& interface_library,
-                                   const u16string_view& locale, const u16string_view& database, const string& sspi,
-                                   const u16string_view& attach_db, const u16string_view& new_password) {
+                                   uint8_t option_flags3, uint32_t collation, u16string_view client_name,
+                                   u16string_view username, u16string_view password, u16string_view app_name,
+                                   u16string_view server_name, u16string_view interface_library,
+                                   u16string_view locale, u16string_view database, const string& sspi,
+                                   u16string_view attach_db, u16string_view new_password) {
         uint32_t length;
         uint16_t off;
 
@@ -2849,7 +2849,7 @@ namespace tds {
         send_msg(tds_msg::tds7_login, payload);
     }
 
-    void tds_impl::send_raw(const string_view& msg) {
+    void tds_impl::send_raw(string_view msg) {
         auto ptr = (uint8_t*)msg.data();
         auto left = (int)msg.length();
 
@@ -2890,9 +2890,9 @@ namespace tds {
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-    void tds_impl::send_msg(enum tds_msg type, const string_view& msg, bool do_ssl)
+    void tds_impl::send_msg(enum tds_msg type, string_view msg, bool do_ssl)
 #else
-    void tds_impl::send_msg(enum tds_msg type, const string_view& msg)
+    void tds_impl::send_msg(enum tds_msg type, string_view msg)
 #endif
     {
         string payload;
@@ -3114,11 +3114,11 @@ namespace tds {
                         tim->state, tim->severity, error);
     }
 
-    void rpc::do_rpc(tds& conn, const string_view& name) {
+    void rpc::do_rpc(tds& conn, string_view name) {
         do_rpc(conn, utf8_to_utf16(name));
     }
 
-    void rpc::do_rpc(tds& conn, const u16string_view& name) {
+    void rpc::do_rpc(tds& conn, u16string_view name) {
         size_t bufsize;
 
         this->name = name;
@@ -4074,7 +4074,7 @@ namespace tds {
     }
 
     // FIXME - can we do static assert if no. of question marks different from no. of parameters?
-    void query::do_query(tds& conn, const u16string_view& q) {
+    void query::do_query(tds& conn, u16string_view q) {
         if (!params.empty()) {
             u16string q2;
             bool in_quotes = false;
@@ -4143,7 +4143,7 @@ namespace tds {
         }
     }
 
-    u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, const u16string_view& collation) {
+    u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, u16string_view collation) {
         switch (type) {
             case sql_type::TINYINT:
                 return u"TINYINT";
@@ -4322,7 +4322,7 @@ namespace tds {
         return s;
     }
 
-    map<u16string, col_info> get_col_info(tds& tds, const u16string_view& table, const u16string_view& db) {
+    map<u16string, col_info> get_col_info(tds& tds, u16string_view table, u16string_view db) {
         map<u16string, col_info> info;
 
         {
@@ -4377,11 +4377,11 @@ namespace tds {
         return info;
     }
 
-    batch::batch(tds& conn, const u16string_view& q) {
+    batch::batch(tds& conn, u16string_view q) {
         impl = new batch_impl(conn, q);
     }
 
-    batch::batch(tds& conn, const string_view& q) {
+    batch::batch(tds& conn, string_view q) {
         impl = new batch_impl(conn, utf8_to_utf16(q));
     }
 
@@ -4389,7 +4389,7 @@ namespace tds {
         delete impl;
     }
 
-    batch_impl::batch_impl(tds& conn, const u16string_view& q) : conn(conn) {
+    batch_impl::batch_impl(tds& conn, u16string_view q) : conn(conn) {
         size_t bufsize;
 
         bufsize = sizeof(tds_all_headers) + (q.length() * sizeof(uint16_t));
@@ -4862,7 +4862,7 @@ namespace tds {
         return impl->cols[i];
     }
 
-    void tds_impl::handle_envchange_msg(const string_view& sv) {
+    void tds_impl::handle_envchange_msg(string_view sv) {
         auto ec = (tds_envchange*)(sv.data() - offsetof(tds_envchange, type));
 
         switch (ec->type) {
@@ -5277,7 +5277,7 @@ namespace tds {
         return impl->spid;
     }
 
-    static uint16_t parse_instance_string(string_view s, const string_view& instance) {
+    static uint16_t parse_instance_string(string_view s, string_view instance) {
         vector<string_view> instance_list;
 
         while (!s.empty()) {
@@ -5344,7 +5344,7 @@ namespace tds {
         throw runtime_error(exc);
     }
 
-    uint16_t get_instance_port(const string& server, const string_view& instance) {
+    uint16_t get_instance_port(const string& server, string_view instance) {
         struct addrinfo hints;
         struct addrinfo* res;
         struct addrinfo* orig_res;
@@ -5650,8 +5650,8 @@ namespace tds {
     static_assert(numeric<20>(4) < numeric<21>(7));
     static_assert(numeric<20>(-4) > numeric<21>(-7));
 
-    constexpr bool test_parse_object_name(const string_view& s, const string_view& exp_server, const string_view& exp_db,
-                                          const string_view& exp_schema, const string_view& exp_name) {
+    constexpr bool test_parse_object_name(string_view s, string_view exp_server, string_view exp_db,
+                                          string_view exp_schema, string_view exp_name) {
         auto onp = parse_object_name(s);
 
         return exp_server == onp.server && exp_db == onp.db && exp_schema == onp.schema && exp_name == onp.name;
@@ -5679,9 +5679,9 @@ namespace tds {
     static_assert(test_parse_object_name("[na.me]", "", "", "", "[na.me]"));
     static_assert(test_parse_object_name("[na]]me]", "", "", "", "[na]]me]"));
 
-    constexpr bool test_parse_object_name_u16(const u16string_view& s, const u16string_view& exp_server,
-                                              const u16string_view& exp_db, const u16string_view& exp_schema,
-                                              const u16string_view& exp_name) {
+    constexpr bool test_parse_object_name_u16(u16string_view s, u16string_view exp_server,
+                                              u16string_view exp_db, u16string_view exp_schema,
+                                              u16string_view exp_name) {
         auto onp = parse_object_name(s);
 
         return exp_server == onp.server && exp_db == onp.db && exp_schema == onp.schema && exp_name == onp.name;

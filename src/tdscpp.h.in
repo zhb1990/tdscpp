@@ -140,7 +140,7 @@ namespace tds {
 
     static_assert(sizeof(tds_colmetadata_col) == 7, "tds_colmetadata_col has wrong size");
 
-    using msg_handler = std::function<void(const std::string_view& server, const std::string_view& message, const std::string_view& proc_name,
+    using msg_handler = std::function<void(std::string_view server, std::string_view message, std::string_view proc_name,
                                       int32_t msgno, int32_t line_number, int16_t state, uint8_t severity, bool error)>;
     using func_count_handler = std::function<void(uint64_t count, uint16_t curcmd)>;
 
@@ -150,7 +150,7 @@ namespace tds {
     class col_info {
     public:
         col_info(sql_type type, int16_t max_length, uint8_t precision, uint8_t scale,
-                const std::u16string_view& collation, bool nullable, unsigned int codepage) :
+                std::u16string_view collation, bool nullable, unsigned int codepage) :
                 type(type), max_length(max_length), precision(precision), scale(scale),
                 collation(collation), nullable(nullable), codepage(codepage) {
         }
@@ -304,7 +304,7 @@ namespace tds {
         utf8_to_utf16_range(std::string_view((char*)sv.data(), sv.length()), t);
     }
 
-    static CONSTEXPR_STRING std::u16string utf8_to_utf16(const std::string_view& sv) {
+    static CONSTEXPR_STRING std::u16string utf8_to_utf16(std::string_view sv) {
         if (sv.empty())
             return u"";
 
@@ -315,7 +315,7 @@ namespace tds {
         return ret;
     }
 
-    static CONSTEXPR_STRING std::u16string utf8_to_utf16(const std::u8string_view& sv) {
+    static CONSTEXPR_STRING std::u16string utf8_to_utf16(std::u8string_view sv) {
         if (sv.empty())
             return u"";
 
@@ -502,7 +502,7 @@ namespace tds {
         }
     }
 
-    static CONSTEXPR_STRING std::string utf16_to_utf8(const std::u16string_view& sv) {
+    static CONSTEXPR_STRING std::string utf16_to_utf8(std::u16string_view sv) {
         if (sv.empty())
             return "";
 
@@ -514,7 +514,7 @@ namespace tds {
     }
 
 #if defined(_WIN32) || __WCHAR_WIDTH__ == 16
-    static CONSTEXPR_STRING std::string utf16_to_utf8(const std::wstring_view& sv) {
+    static CONSTEXPR_STRING std::string utf16_to_utf8(std::wstring_view sv) {
         if (sv.empty())
             return "";
 
@@ -526,8 +526,8 @@ namespace tds {
     }
 #endif
 
-    std::string TDSCPP utf16_to_cp(const std::u16string_view& s, unsigned int codepage);
-    std::u16string TDSCPP cp_to_utf16(const std::string_view& s, unsigned int codepage);
+    std::string TDSCPP utf16_to_cp(std::u16string_view s, unsigned int codepage);
+    std::u16string TDSCPP cp_to_utf16(std::string_view s, unsigned int codepage);
 
     template<typename T>
     requires std::ranges::input_range<T> && std::ranges::contiguous_range<T>
@@ -536,7 +536,7 @@ namespace tds {
     }
 
     size_t TDSCPP bcp_colmetadata_size(const col_info& col);
-    void TDSCPP bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, const std::u16string_view& name);
+    void TDSCPP bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, std::u16string_view name);
 
     template<typename T>
     concept list_of_values = std::ranges::input_range<T> && std::is_convertible_v<std::ranges::range_value_t<T>, value>;
@@ -576,8 +576,8 @@ namespace tds {
     };
 
     struct options {
-        options(const std::string_view& server, const std::string_view& user = "", const std::string_view& password = "",
-                const std::string_view& app_name = "tdscpp", const std::string_view& db = "",
+        options(std::string_view server, std::string_view user = "", std::string_view password = "",
+                std::string_view app_name = "tdscpp", std::string_view db = "",
                 const msg_handler& message_handler = nullptr, const func_count_handler& count_handler = nullptr,
                 uint16_t port = 1433, encryption_type encrypt = encryption_type::ENCRYPT_OFF,
                 bool check_certificate = false, unsigned int codepage = 0) :
@@ -614,14 +614,14 @@ namespace tds {
 
         ~tds();
 
-        void run(const std::string_view& s);
-        void run(const std::u16string_view& s);
+        void run(std::string_view s);
+        void run(std::u16string_view s);
 
         template<typename... Args>
-        void run(const std::string_view& s, Args&&... args);
+        void run(std::string_view s, Args&&... args);
 
         template<typename... Args>
-        void run(const std::u16string_view& s, Args&&... args);
+        void run(std::u16string_view s, Args&&... args);
 
         template<string_or_u16string T = std::u16string_view>
         void bcp(const string_or_u16string auto& table, const list_of_u16string auto& np,
@@ -670,13 +670,13 @@ namespace tds {
         unsigned int codepage;
 
     private:
-        std::vector<col_info> bcp_start(const std::u16string_view& table, const list_of_u16string auto& np,
-                                        const std::u16string_view& db);
+        std::vector<col_info> bcp_start(std::u16string_view table, const list_of_u16string auto& np,
+                                        std::u16string_view db);
         std::vector<uint8_t> bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols);
         std::vector<uint8_t> bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols);
-        void bcp_sendmsg(const std::string_view& msg);
+        void bcp_sendmsg(std::string_view msg);
         size_t bcp_row_size(const col_info& col, const value& vv);
-        void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const std::u16string_view& col_name);
+        void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, std::u16string_view col_name);
     };
 
     using time_t = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
@@ -809,7 +809,7 @@ namespace tds {
 
     struct TDSCPP collation {
         collation() = default;
-        collation(const std::string_view& s);
+        collation(std::string_view s);
 
         uint32_t lcid : 20;
         uint32_t ignore_case : 1;
@@ -935,7 +935,7 @@ namespace tds {
 
         template<typename T>
         requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
-        value(const std::basic_string_view<T>& sv) {
+        value(std::basic_string_view<T> sv) {
             if constexpr (std::is_same_v<T, char16_t>)
                 type = sql_type::NVARCHAR;
             else
@@ -966,7 +966,7 @@ namespace tds {
 
         template<typename T, typename... Args>
         requires ((std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>) && std::is_constructible_v<collation, Args...>)
-        value(const std::basic_string_view<T>& sv, Args&&... args) : coll(args...) {
+        value(std::basic_string_view<T> sv, Args&&... args) : coll(args...) {
             if constexpr (std::is_same_v<T, char16_t>)
                 type = sql_type::NVARCHAR;
             else
@@ -1177,7 +1177,7 @@ namespace tds {
         ~rpc();
 
         template<typename... Args>
-        rpc(tds& tds, const std::u16string_view& rpc_name, Args&&... args) : conn(tds) {
+        rpc(tds& tds, std::u16string_view rpc_name, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -1185,12 +1185,12 @@ namespace tds {
             do_rpc(conn, rpc_name);
         }
 
-        rpc(tds& tds, const std::u16string_view& rpc_name) : conn(tds) {
+        rpc(tds& tds, std::u16string_view rpc_name) : conn(tds) {
             do_rpc(conn, rpc_name);
         }
 
         template<typename... Args>
-        rpc(tds& tds, const std::string_view& rpc_name, Args&&... args) : conn(tds) {
+        rpc(tds& tds, std::string_view rpc_name, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -1198,7 +1198,7 @@ namespace tds {
             do_rpc(conn, rpc_name);
         }
 
-        rpc(tds& tds, const std::string_view& rpc_name) : conn(tds) {
+        rpc(tds& tds, std::string_view rpc_name) : conn(tds) {
             do_rpc(conn, rpc_name);
         }
 
@@ -1248,8 +1248,8 @@ namespace tds {
                 params.emplace_back(v.value());
         }
 
-        void do_rpc(tds& conn, const std::u16string_view& name);
-        void do_rpc(tds& conn, const std::string_view& name);
+        void do_rpc(tds& conn, std::u16string_view name);
+        void do_rpc(tds& conn, std::string_view name);
         void wait_for_packet();
 
         tds& conn;
@@ -1265,20 +1265,20 @@ namespace tds {
 
     class TDSCPP query {
     public:
-        query(tds& tds, const std::string_view& q) : conn(tds) {
+        query(tds& tds, std::string_view q) : conn(tds) {
             do_query(conn, cp_to_utf16(q, tds.codepage));
         }
 
-        query(tds& tds, const std::u8string_view& q) : conn(tds) {
+        query(tds& tds, std::u8string_view q) : conn(tds) {
             do_query(conn, utf8_to_utf16(q));
         }
 
-        query(tds& tds, const std::u16string_view& q) : conn(tds) {
+        query(tds& tds, std::u16string_view q) : conn(tds) {
             do_query(conn, q);
         }
 
         template<typename... Args>
-        query(tds& tds, const std::string_view& q, Args&&... args) : conn(tds) {
+        query(tds& tds, std::string_view q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -1287,7 +1287,7 @@ namespace tds {
         }
 
         template<typename... Args>
-        query(tds& tds, const std::u8string_view& q, Args&&... args) : conn(tds) {
+        query(tds& tds, std::u8string_view q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -1296,7 +1296,7 @@ namespace tds {
         }
 
         template<typename... Args>
-        query(tds& tds, const std::u16string_view& q, Args&&... args) : conn(tds) {
+        query(tds& tds, std::u16string_view q, Args&&... args) : conn(tds) {
             params.reserve(sizeof...(args));
 
             add_param(args...);
@@ -1316,7 +1316,7 @@ namespace tds {
         bool fetch_row_no_wait();
 
     private:
-        void do_query(tds& conn, const std::u16string_view& q);
+        void do_query(tds& conn, std::u16string_view q);
 
         template<typename T, typename... Args>
         void add_param(T&& t, Args&&... args) {
@@ -1369,7 +1369,7 @@ namespace tds {
     };
 
     template<typename... Args>
-    void tds::run(const std::string_view& s, Args&&... args) {
+    void tds::run(std::string_view s, Args&&... args) {
         query q(*this, s, args...);
 
         while (q.fetch_row()) {
@@ -1377,7 +1377,7 @@ namespace tds {
     }
 
     template<typename... Args>
-    void tds::run(const std::u16string_view& s, Args&&... args) {
+    void tds::run(std::u16string_view s, Args&&... args) {
         query q(*this, s, args...);
 
         while (q.fetch_row()) {
@@ -1388,8 +1388,8 @@ namespace tds {
 
     class TDSCPP batch {
     public:
-        batch(tds& conn, const std::u16string_view& q);
-        batch(tds& conn, const std::string_view& q);
+        batch(tds& conn, std::u16string_view q);
+        batch(tds& conn, std::string_view q);
         ~batch();
 
         uint16_t num_columns() const;
@@ -1400,14 +1400,14 @@ namespace tds {
         batch_impl* impl;
     };
 
-    void __inline tds::run(const std::string_view& s) {
+    void __inline tds::run(std::string_view s) {
         batch b(*this, s);
 
         while (b.fetch_row()) {
         }
     }
 
-    void __inline tds::run(const std::u16string_view& s) {
+    void __inline tds::run(std::u16string_view s) {
         batch b(*this, s);
 
         while (b.fetch_row()) {
@@ -1433,7 +1433,7 @@ namespace tds {
     }
 #endif
 
-    static std::string __inline escape(const std::string_view& sv) {
+    static std::string __inline escape(std::string_view sv) {
         std::string s{"["};
 
         s.reserve(sv.length() + 2);
@@ -1450,7 +1450,7 @@ namespace tds {
         return s;
     }
 
-    static std::u16string __inline escape(const std::u16string_view& sv) {
+    static std::u16string __inline escape(std::u16string_view sv) {
         std::u16string s{u"["};
 
         s.reserve(sv.length() + 2);
@@ -1480,7 +1480,7 @@ namespace tds {
 
     template<typename T>
     requires is_char_type<T>
-    static constexpr object_name_parts<T> parse_object_name(const std::basic_string_view<T>& s) noexcept {
+    static constexpr object_name_parts<T> parse_object_name(std::basic_string_view<T> s) noexcept {
         bool escaped = false;
         size_t partstart = 0, partnum = 0;
         std::array<std::basic_string_view<T>, 4> parts;
@@ -1550,7 +1550,7 @@ namespace tds {
         return parse_object_name(std::basic_string_view<T>{s});
     }
 
-    uint16_t TDSCPP get_instance_port(const std::string& server, const std::string_view& instance);
+    uint16_t TDSCPP get_instance_port(const std::string& server, std::string_view instance);
 
     std::vector<uint8_t> tds::bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
@@ -1634,10 +1634,10 @@ namespace tds {
         return buf;
     }
 
-    std::map<std::u16string, col_info> TDSCPP get_col_info(tds& tds, const std::u16string_view& table, const std::u16string_view& db);
-    std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, const std::u16string_view& collation);
+    std::map<std::u16string, col_info> TDSCPP get_col_info(tds& tds, std::u16string_view table, std::u16string_view db);
+    std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, std::u16string_view collation);
 
-    std::vector<col_info> tds::bcp_start(const std::u16string_view& table, const list_of_u16string auto& np, const std::u16string_view& db) {
+    std::vector<col_info> tds::bcp_start(std::u16string_view table, const list_of_u16string auto& np, std::u16string_view db) {
         if (np.empty())
             throw std::runtime_error("List of columns not supplied.");
 

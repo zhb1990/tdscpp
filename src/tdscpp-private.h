@@ -75,7 +75,7 @@ enum class tds_login_opt_type : uint8_t {
 };
 
 struct login_opt {
-    login_opt(enum tds_login_opt_type type, const std::string_view& payload) : type(type), payload(payload) { }
+    login_opt(enum tds_login_opt_type type, std::string_view payload) : type(type), payload(payload) { }
 
     template<typename T>
     requires std::is_integral_v<T> || std::is_enum_v<T>
@@ -414,7 +414,7 @@ typedef std::unique_ptr<HANDLE, handle_closer> unique_handle;
 
 class last_error : public std::exception {
 public:
-    last_error(const std::string_view& function, int le) {
+    last_error(std::string_view function, int le) {
         std::string nice_msg;
 
         {
@@ -488,43 +488,43 @@ namespace tds {
 
     class tds_impl {
     public:
-        tds_impl(const std::string& server, const std::string_view& user, const std::string_view& password,
-                 const std::string_view& app_name, const std::string_view& db,
+        tds_impl(const std::string& server, std::string_view user, std::string_view password,
+                 std::string_view app_name, std::string_view db,
                  const msg_handler& message_handler,
                  const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                  bool check_certificate);
         ~tds_impl();
-        void send_raw(const std::string_view& msg);
+        void send_raw(std::string_view msg);
         void recv_raw(uint8_t* ptr, size_t left);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        void send_msg(enum tds_msg type, const std::string_view& msg, bool do_ssl = true);
+        void send_msg(enum tds_msg type, std::string_view msg, bool do_ssl = true);
 #else
-        void send_msg(enum tds_msg type, const std::string_view& msg);
+        void send_msg(enum tds_msg type, std::string_view msg);
 #endif
         void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);
         void handle_info_msg(std::string_view sv, bool error);
-        void handle_envchange_msg(const std::string_view& sv);
+        void handle_envchange_msg(std::string_view sv);
 
         template<typename... Args>
-        void run(const std::string_view& s, Args&&... args);
+        void run(std::string_view s, Args&&... args);
 
-        void bcp(const std::u16string_view& table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp,
-                 const std::u16string_view& db);
+        void bcp(std::u16string_view table, const std::vector<std::u16string>& np, const std::vector<std::vector<value>>& vp,
+                 std::u16string_view db);
 
         void connect(const std::string& server, uint16_t port, bool get_fqdn);
         void send_prelogin_msg(enum encryption_type encrypt);
-        void send_login_msg(const std::string_view& user, const std::string_view& password, const std::string_view& server,
-                            const std::string_view& app_name, const std::string_view& db);
+        void send_login_msg(std::string_view user, std::string_view password, std::string_view server,
+                            std::string_view app_name, std::string_view db);
         void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
                             uint32_t connexion_id, uint8_t option_flags1, uint8_t option_flags2, uint8_t sql_type_flags,
-                            uint8_t option_flags3, uint32_t collation, const std::u16string_view& client_name,
-                            const std::u16string_view& username, const std::u16string_view& password, const std::u16string_view& app_name,
-                            const std::u16string_view& server_name, const std::u16string_view& interface_library,
-                            const std::u16string_view& locale, const std::u16string_view& database, const std::string& sspi,
-                            const std::u16string_view& attach_db, const std::u16string_view& new_password);
+                            uint8_t option_flags3, uint32_t collation, std::u16string_view client_name,
+                            std::u16string_view username, std::u16string_view password, std::u16string_view app_name,
+                            std::u16string_view server_name, std::u16string_view interface_library,
+                            std::u16string_view locale, std::u16string_view database, const std::string& sspi,
+                            std::u16string_view attach_db, std::u16string_view new_password);
         void handle_loginack_msg(std::string_view sv);
 #ifdef _WIN32
-        void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, const std::string_view& sspi);
+        void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, std::string_view sspi);
 #endif
 
 #ifdef _WIN32
@@ -554,7 +554,7 @@ namespace tds {
         tds_ssl(tds_impl& tds);
 #ifdef WITH_OPENSSL
         int ssl_read_cb(char* data, int len);
-        int ssl_write_cb(const std::string_view& sv);
+        int ssl_write_cb(std::string_view sv);
         long ssl_ctrl_cb(int cmd, long num, void* ptr);
         int ssl_verify_cb(int preverify, X509_STORE_CTX* x509_ctx);
 #else
@@ -585,7 +585,7 @@ namespace tds {
 
     class batch_impl {
     public:
-        batch_impl(tds& conn, const std::u16string_view& q);
+        batch_impl(tds& conn, std::u16string_view q);
         ~batch_impl();
 
         bool fetch_row();
@@ -1303,7 +1303,7 @@ static constexpr std::chrono::year_month_day num_to_ymd(int num) noexcept {
 static_assert(num_to_ymd(-693595) == std::chrono::year_month_day{std::chrono::year{1}, std::chrono::January, std::chrono::day{1}});
 static_assert(num_to_ymd(0) == std::chrono::year_month_day{std::chrono::year{1900}, std::chrono::January, std::chrono::day{1}});
 
-static __inline std::u16string_view extract_message(const std::string_view& sv) {
+static __inline std::u16string_view extract_message(std::string_view sv) {
     return std::u16string_view((char16_t*)&sv[8], *(uint16_t*)&sv[6]);
 }
 
@@ -1343,5 +1343,5 @@ static void buf_rshift(uint8_t* scratch) {
 unsigned int coll_to_cp(const tds::collation& coll);
 
 // ver80coll.cpp
-std::weak_ordering compare_strings_80(const std::u16string_view& val1, const std::u16string_view& val2,
+std::weak_ordering compare_strings_80(std::u16string_view val1, std::u16string_view val2,
                                       const tds::collation& coll);

@@ -829,7 +829,7 @@ namespace tds {
         }
     }
 
-    collation::collation(const std::string_view& s) {
+    collation::collation(std::string_view s) {
         static const struct {
             string_view name;
             uint32_t lcid;

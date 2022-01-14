@@ -263,7 +263,7 @@ static_assert(test_parse_time("01:23:45.6789012 +00:60", false, tds::time_t::zer
 static_assert(test_parse_time("01:23:45.6789012 -24:00", false, tds::time_t::zero(), 0));
 
 template<unsigned N>
-static constexpr bool __inline string_match(const string_view& sv, const char (&str)[N]) noexcept {
+static constexpr bool __inline string_match(string_view sv, const char (&str)[N]) noexcept {
     if (sv.length() < N - 1)
         return false;
 
@@ -905,7 +905,7 @@ static constexpr bool parse_datetime(string_view t, uint16_t& y, uint8_t& mon, u
     return true;
 }
 
-static constexpr bool test_parse_datetime(const string_view& t, bool exp_valid, uint16_t exp_y, uint8_t exp_mon,
+static constexpr bool test_parse_datetime(string_view t, bool exp_valid, uint16_t exp_y, uint8_t exp_mon,
                                           uint8_t exp_d, tds::time_t exp_dur) noexcept {
     bool valid;
     uint16_t y;
@@ -1089,7 +1089,7 @@ static constexpr bool parse_datetimeoffset(string_view t, uint16_t& y, uint8_t& 
     return true;
 }
 
-static constexpr bool test_parse_datetimeoffset(const string_view& t, bool exp_valid, uint16_t exp_y, uint8_t exp_mon,
+static constexpr bool test_parse_datetimeoffset(string_view t, bool exp_valid, uint16_t exp_y, uint8_t exp_mon,
                                                 uint8_t exp_d, tds::time_t exp_dur, int16_t exp_offset) noexcept {
     bool valid;
     uint16_t y;

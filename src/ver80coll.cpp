@@ -8246,7 +8246,7 @@ static uint32_t get_weight(char16_t cp) noexcept {
     return weights[cp];
 }
 
-static u16string normalize(const u16string_view& s) {
+static u16string normalize(u16string_view s) {
     u16string ret{s};
 
     // expansions
@@ -8381,7 +8381,7 @@ static weak_ordering compare_weights(u16string_view val1, u16string_view val2, e
     return weak_ordering::equivalent;
 }
 
-weak_ordering compare_strings_80(const u16string_view& val1, const u16string_view& val2, const tds::collation& coll) {
+weak_ordering compare_strings_80(u16string_view val1, u16string_view val2, const tds::collation& coll) {
     auto s1 = normalize(val1);
     auto s2 = normalize(val2);
 

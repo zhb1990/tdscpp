@@ -332,7 +332,7 @@ namespace tds {
         }
     }
 
-    int tds_ssl::ssl_write_cb(const string_view& sv) {
+    int tds_ssl::ssl_write_cb(string_view sv) {
         if (established)
             tds.send_raw(sv);
         else

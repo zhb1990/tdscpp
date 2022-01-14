@@ -52,7 +52,7 @@ static void double_to_int(double d, uint8_t* scratch) {
 }
 
 namespace tds {
-    string utf16_to_cp(const u16string_view& s, unsigned int codepage) {
+    string utf16_to_cp(u16string_view s, unsigned int codepage) {
         string ret;
 
         if (s.empty())
@@ -163,7 +163,7 @@ namespace tds {
         return ret;
     }
 
-    u16string cp_to_utf16(const string_view& s, unsigned int codepage) {
+    u16string cp_to_utf16(string_view s, unsigned int codepage) {
         if (s.empty())
             return u"";
 
@@ -551,7 +551,7 @@ namespace tds {
 
     static const auto jan1900 = -ymd_to_num({1y, chrono::January, 1d});
 
-    void tds::bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, const u16string_view& col_name) {
+    void tds::bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, u16string_view col_name) {
         switch (col.type) {
             case sql_type::INTN:
                 if (vv.is_null) {
@@ -1503,7 +1503,7 @@ namespace tds {
         }
     }
 
-    void tds::bcp_sendmsg(const string_view& data) {
+    void tds::bcp_sendmsg(string_view data) {
         impl->send_msg(tds_msg::bulk_load_data, data);
 
         enum tds_msg type;
@@ -1624,7 +1624,7 @@ namespace tds {
         }
     }
 
-    void bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, const u16string_view& name) {
+    void bcp_colmetadata_data(uint8_t*& ptr, const col_info& col, u16string_view name) {
         auto c = (tds_colmetadata_col*)ptr;
 
         c->user_type = 0;
