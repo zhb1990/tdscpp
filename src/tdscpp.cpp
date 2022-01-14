@@ -4288,12 +4288,8 @@ namespace tds {
         return info;
     }
 
-    batch::batch(tds& conn, u16string_view q) {
+    void batch::do_batch(tds& conn, u16string_view q) {
         impl = new batch_impl(conn, q);
-    }
-
-    batch::batch(tds& conn, string_view q) {
-        impl = new batch_impl(conn, utf8_to_utf16(q));
     }
 
     batch::~batch() {

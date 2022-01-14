@@ -1461,8 +1461,14 @@ namespace tds {
 
     class TDSCPP batch {
     public:
-        batch(tds& conn, std::u16string_view q);
-        batch(tds& conn, std::string_view q);
+        batch(tds& conn, std::u16string_view q) {
+            do_batch(conn, q);
+        }
+
+        batch(tds& conn, std::string_view q) {
+            do_batch(conn, utf8_to_utf16(q));
+        }
+
         ~batch();
 
         uint16_t num_columns() const;
@@ -1470,6 +1476,8 @@ namespace tds {
         bool fetch_row();
 
     private:
+        void do_batch(tds& conn, std::u16string_view q);
+
         batch_impl* impl;
     };
 
