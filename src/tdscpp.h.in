@@ -599,6 +599,55 @@ namespace tds {
         unsigned int codepage;
     };
 
+    template<typename T, size_t arg_count>
+    requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
+    struct checker {
+        consteval checker(const T* q) : sv(q) {
+            if (sv.empty())
+                throw;
+
+            bool in_quotes = false;
+            unsigned int brackets = 0, qm = 0;
+
+            for (auto c : sv) {
+                if (c == '\'')
+                    in_quotes = !in_quotes;
+                else if (!in_quotes) {
+                    if (c == '(')
+                        brackets++;
+                    else if (c == ')') {
+                        if (brackets == 0)
+                            throw;
+
+                        brackets--;
+                    } else if (c == '?')
+                        qm++;
+                }
+            }
+
+            if (brackets != 0)
+                throw;
+
+            if (in_quotes)
+                throw;
+
+            if (qm != arg_count)
+                throw;
+        }
+
+        std::basic_string_view<T> sv;
+    };
+
+    template<typename T>
+    requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
+    struct no_check {
+        no_check(const T* q) : sv(q) { }
+        no_check(std::basic_string_view<T> q) : sv(q) { }
+        no_check(const std::basic_string<T>& q) : sv(q) { }
+
+        std::basic_string_view<T> sv;
+    };
+
     class TDSCPP tds {
     public:
         tds(const options& opts);
@@ -614,14 +663,24 @@ namespace tds {
 
         ~tds();
 
-        void run(std::string_view s);
-        void run(std::u16string_view s);
+        void run(std::type_identity_t<checker<char, 0>> s);
+        void run(std::type_identity_t<checker<char16_t, 0>> s);
+        void run(std::type_identity_t<checker<char8_t, 0>> s);
+
+        template<typename T>
+        void run(no_check<T> s);
 
         template<typename... Args>
-        void run(std::string_view s, Args&&... args);
+        void run(std::type_identity_t<checker<char, sizeof...(Args)>> s, Args&&... args);
 
         template<typename... Args>
-        void run(std::u16string_view s, Args&&... args);
+        void run(std::type_identity_t<checker<char16_t, sizeof...(Args)>> s, Args&&... args);
+
+        template<typename... Args>
+        void run(std::type_identity_t<checker<char8_t, sizeof...(Args)>> s, Args&&... args);
+
+        template<typename T, typename... Args>
+        void run(no_check<T> s, Args&&... args);
 
         template<string_or_u16string T = std::u16string_view>
         void bcp(const string_or_u16string auto& table, const list_of_u16string auto& np,
@@ -1263,55 +1322,6 @@ namespace tds {
         std::u16string name;
     };
 
-    template<typename T, size_t arg_count>
-    requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
-    struct checker {
-        consteval checker(const T* q) : sv(q) {
-            if (sv.empty())
-                throw;
-
-            bool in_quotes = false;
-            unsigned int brackets = 0, qm = 0;
-
-            for (auto c : sv) {
-                if (c == '\'')
-                    in_quotes = !in_quotes;
-                else if (!in_quotes) {
-                    if (c == '(')
-                        brackets++;
-                    else if (c == ')') {
-                        if (brackets == 0)
-                            throw;
-
-                        brackets--;
-                    } else if (c == '?')
-                        qm++;
-                }
-            }
-
-            if (brackets != 0)
-                throw;
-
-            if (in_quotes)
-                throw;
-
-            if (qm != arg_count)
-                throw;
-        }
-
-        std::basic_string_view<T> sv;
-    };
-
-    template<typename T>
-    requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
-    struct no_check {
-        no_check(const T* q) : sv(q) { }
-        no_check(std::basic_string_view<T> q) : sv(q) { }
-        no_check(const std::basic_string<T>& q) : sv(q) { }
-
-        std::basic_string_view<T> sv;
-    };
-
     class TDSCPP query {
     public:
         query(tds& tds, std::type_identity_t<checker<char, 0>> q) : conn(tds) {
@@ -1442,15 +1452,31 @@ namespace tds {
     };
 
     template<typename... Args>
-    void tds::run(std::string_view s, Args&&... args) {
-        query q(*this, s, args...);
+    void tds::run(std::type_identity_t<checker<char, sizeof...(Args)>> s, Args&&... args) {
+        query q(*this, no_check(s.sv), args...);
 
         while (q.fetch_row()) {
         }
     }
 
     template<typename... Args>
-    void tds::run(std::u16string_view s, Args&&... args) {
+    void tds::run(std::type_identity_t<checker<char16_t, sizeof...(Args)>> s, Args&&... args) {
+        query q(*this, no_check(s.sv), args...);
+
+        while (q.fetch_row()) {
+        }
+    }
+
+    template<typename... Args>
+    void tds::run(std::type_identity_t<checker<char8_t, sizeof...(Args)>> s, Args&&... args) {
+        query q(*this, no_check(s.sv), args...);
+
+        while (q.fetch_row()) {
+        }
+    }
+
+    template<typename T, typename... Args>
+    void tds::run(no_check<T> s, Args&&... args) {
         query q(*this, s, args...);
 
         while (q.fetch_row()) {
@@ -1495,15 +1521,30 @@ namespace tds {
         batch_impl* impl;
     };
 
-    void __inline tds::run(std::string_view s) {
-        batch b(*this, no_check(s));
+    void __inline tds::run(std::type_identity_t<checker<char, 0>> s) {
+        batch b(*this, no_check(s.sv));
 
         while (b.fetch_row()) {
         }
     }
 
-    void __inline tds::run(std::u16string_view s) {
-        batch b(*this, no_check(s));
+    void __inline tds::run(std::type_identity_t<checker<char16_t, 0>> s) {
+        batch b(*this, no_check(s.sv));
+
+        while (b.fetch_row()) {
+        }
+    }
+
+    void __inline tds::run(std::type_identity_t<checker<char8_t, 0>> s) {
+        batch b(*this, no_check(s.sv));
+
+        while (b.fetch_row()) {
+        }
+    }
+
+    template<typename T>
+    void tds::run(no_check<T> s) {
+        batch b(*this, s);
 
         while (b.fetch_row()) {
         }
