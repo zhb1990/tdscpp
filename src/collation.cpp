@@ -737,7 +737,22 @@ namespace tds {
             }
 
             // FIXME - XML (collation?)
-            // FIXME - UNIQUEIDENTIFIER
+
+            case sql_type::UNIQUEIDENTIFIER:
+            {
+                if (v.type != sql_type::UNIQUEIDENTIFIER)
+                    throw formatted_error("Cannot compare UNIQUEIDENTIFIER with {}.", v.type);
+
+                for (unsigned int i = 0; i < val.size(); i++) {
+                    auto cmp = val[i] <=> v.val[i];
+
+                    if (!is_eq(cmp))
+                        return cmp;
+                }
+
+                return strong_ordering::equivalent;
+            }
+
             // FIXME - MONEY
             // FIXME - SQL_VARIANT
 
