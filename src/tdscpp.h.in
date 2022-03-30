@@ -782,6 +782,8 @@ namespace tds {
             return (*this <=> dt) == std::strong_ordering::equivalent;
         }
 
+        static datetime now();
+
         std::chrono::year_month_day d;
         time_t t;
     };

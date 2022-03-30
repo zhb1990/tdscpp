@@ -5408,6 +5408,29 @@ namespace tds {
         return port;
     }
 
+    datetime datetime::now() {
+        auto n = chrono::system_clock::now();
+        auto secs = chrono::duration_cast<chrono::seconds>(n.time_since_epoch()).count();
+        struct tm t;
+        int offset;
+
+        // FIXME - use zoned_time for this, when it's better supported?
+
+#ifdef WIN32
+        localtime_s(&t, &secs);
+
+        offset = (int)(_mkgmtime(&t) - secs);
+#else
+        localtime_r(&secs, &t);
+
+        offset = (int)t.tm_gmtoff;
+#endif
+
+        n += chrono::seconds(offset);
+
+        return n;
+    }
+
     datetimeoffset datetimeoffset::now() {
         auto n = chrono::system_clock::now();
         auto secs = chrono::duration_cast<chrono::seconds>(n.time_since_epoch()).count();
