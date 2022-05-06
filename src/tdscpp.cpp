@@ -4330,6 +4330,8 @@ namespace tds {
             return;
 
         try {
+            received_attn = false;
+
             conn.impl->send_msg(tds_msg::attention_signal, string_view());
 
             while (!finished) {
@@ -4338,9 +4340,9 @@ namespace tds {
 
             // wait for attention acknowledgement
 
-            bool ack = false;
+            bool ack = received_attn;
 
-            do {
+            while (!ack) {
                 enum tds_msg type;
                 string payload;
 
@@ -4376,7 +4378,7 @@ namespace tds {
                             break;
                     }
                 }
-            } while (!ack);
+            }
         } catch (...) {
             // can't throw in destructor
         }
@@ -4420,14 +4422,17 @@ namespace tds {
                 case token::DONE:
                 case token::DONEINPROC:
                 case token::DONEPROC:
-                    if (conn.impl->count_handler) {
-                        auto msg = (tds_done_msg*)sv.data();
+                {
+                    const auto& msg = *(tds_done_msg*)sv.data();
 
-                        if (msg->status & 0x10) // row count valid
-                            conn.impl->count_handler(msg->rowcount, msg->curcmd);
-                    }
+                    if (msg.status & 0x20) // attention
+                        received_attn = true;
+
+                    if (conn.impl->count_handler && msg.status & 0x10) // row count valid
+                        conn.impl->count_handler(msg.rowcount, msg.curcmd);
 
                     break;
+                }
 
                 case token::INFO:
                 case token::TDS_ERROR:

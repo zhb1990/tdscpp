@@ -592,7 +592,7 @@ namespace tds {
         void wait_for_packet();
 
         std::vector<column> cols;
-        bool finished = false;
+        bool finished = false, received_attn = false;
         std::list<std::vector<std::pair<value_data_t, bool>>> rows;
         tds& conn;
         std::list<std::string> tokens;
