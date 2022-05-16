@@ -1301,7 +1301,7 @@ namespace tds {
         }
 
         template<typename T>
-        void add_param(std::optional<T>& v) {
+        void add_param(const std::optional<T>& v) {
             if (!v.has_value()) {
                 params.emplace_back("");
                 params.back().is_null = true;
@@ -1436,7 +1436,7 @@ namespace tds {
         }
 
         template<typename T>
-        void add_param(std::optional<T>& v) {
+        void add_param(const std::optional<T>& v) {
             if (!v.has_value()) {
                 params.emplace_back("");
                 params.back().is_null = true;
