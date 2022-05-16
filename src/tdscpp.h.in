@@ -859,7 +859,7 @@ namespace tds {
 
     template<typename T>
     concept byte_list = requires(T t) {
-        { std::span<std::byte>{t} };
+        { std::span<const std::byte>{t} };
     };
 
     template<unsigned N>
