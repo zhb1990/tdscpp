@@ -1073,7 +1073,7 @@ namespace tds {
         value(const datetimeoffset& dt);
         value(const std::optional<datetimeoffset>& t);
 
-        value(const std::span<std::byte>& bin) {
+        value(std::span<const std::byte> bin) {
             type = sql_type::VARBINARY;
             val.resize(bin.size());
             memcpy(val.data(), bin.data(), bin.size());
