@@ -1128,15 +1128,6 @@ static_assert(test_parse_datetimeoffset("2021-07-02 10:05:34am +09:00", true, 20
 static_assert(test_parse_datetimeoffset("July 2, 2021 10:05:34 AM -10:15", true, 2021, 7, 2, 10h + 5min + 34s, -615));
 
 namespace tds {
-    value::value() {
-        type = (sql_type)0;
-    }
-
-    value::value(nullptr_t) {
-        type = sql_type::SQL_NULL;
-        is_null = true;
-    }
-
     value::value(uint32_t i) {
         type = sql_type::INTN;
 

@@ -23,6 +23,9 @@ constexpr bool value_test(const tds::value& v, enum tds::sql_type type, bool nul
     return true;
 }
 
+static_assert(value_test(tds::value{}, (enum tds::sql_type)0, false, { })); // default
+static_assert(value_test(tds::value{nullptr}, tds::sql_type::SQL_NULL, true, { })); // typeless NULL
+
 static_assert(value_test(tds::value{(int32_t)0x12345678}, tds::sql_type::INTN, false, { 0x78, 0x56, 0x34, 0x12 })); // int32_t
 static_assert(value_test(tds::value{optional<int32_t>(0x12345678)}, tds::sql_type::INTN, false, { 0x78, 0x56, 0x34, 0x12 })); // optional<int32_t>
 static_assert(value_test(tds::value{optional<int32_t>(nullopt)}, tds::sql_type::INTN, true, { })); // optional<int32_t>
