@@ -981,7 +981,7 @@ namespace tds {
                 if constexpr (std::is_same_v<T, char16_t>) {
                     for (auto c : sv.value()) {
                         val.push_back((uint8_t)(c & 0xff));
-                        val.push_back((uint8_t)(c >> 16));
+                        val.push_back((uint8_t)(c >> 8));
                     }
                 } else
                     std::copy(sv.value().begin(), sv.value().end(), std::back_inserter(val));
@@ -1045,7 +1045,7 @@ namespace tds {
                 if constexpr (std::is_same_v<T, char16_t>) {
                     for (auto c : s.value()) {
                         val.push_back((uint8_t)(c & 0xff));
-                        val.push_back((uint8_t)(c >> 16));
+                        val.push_back((uint8_t)(c >> 8));
                     }
                 } else
                     std::copy(s.value().begin(), s.value().end(), std::back_inserter(val));
@@ -1062,7 +1062,7 @@ namespace tds {
 
                 for (auto c : sv) {
                     val.push_back((uint8_t)(c & 0xff));
-                    val.push_back((uint8_t)(c >> 16));
+                    val.push_back((uint8_t)(c >> 8));
                 }
             } else {
                 type = sql_type::VARCHAR;
