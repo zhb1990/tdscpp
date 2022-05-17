@@ -994,6 +994,25 @@ namespace tds {
             }
         }
 
+        template<typename T, typename... Args>
+        requires ((std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>) && std::is_constructible_v<collation, Args...>)
+        value(const std::optional<std::basic_string<T>>& s, Args&&... args) : coll(args...) {
+            if constexpr (std::is_same_v<T, char16_t>)
+                type = sql_type::NVARCHAR;
+            else
+                type = sql_type::VARCHAR;
+
+            if constexpr (std::is_same_v<T, char8_t>)
+                coll.utf8 = true; // FIXME - rather than changing collation, should be changing string into codepage if not UTF-8?
+
+            if (!s.has_value())
+                is_null = true;
+            else {
+                val.resize(s.value().length() * sizeof(T));
+                memcpy(val.data(), s.value().data(), val.size());
+            }
+        }
+
         template<typename T>
         requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
         value(std::basic_string_view<T> sv) {
