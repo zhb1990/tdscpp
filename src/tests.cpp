@@ -79,3 +79,10 @@ static_assert(value_test(tds::value{optional<u16string_view>(u"h\u00e9llo")}, td
 static_assert(value_test(tds::value{optional<u16string_view>(u"h\U0001f525llo")}, tds::sql_type::NVARCHAR, false, { 0x68, 0x00, 0x3d, 0xd8, 0x25, 0xdd, 0x6c, 0x00, 0x6c, 0x00, 0x6f, 0x00 })); // optional<u16string>
 static_assert(value_test(tds::value{optional<u16string_view>(nullopt)}, tds::sql_type::NVARCHAR, true, { })); // optional<u16string>
 // FIXME - optional<char16_t*>?
+
+static_assert(value_test(tds::value{1.0f}, tds::sql_type::FLTN, false, { 0x00, 0x00, 0x80, 0x3f })); // float
+static_assert(value_test(tds::value{optional<float>(1.0f)}, tds::sql_type::FLTN, false, { 0x00, 0x00, 0x80, 0x3f })); // optional<float>
+static_assert(value_test(tds::value{optional<float>(nullopt)}, tds::sql_type::FLTN, true, { })); // optional<float>
+static_assert(value_test(tds::value{1.0}, tds::sql_type::FLTN, false, { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f })); // double
+static_assert(value_test(tds::value{optional<double>(1.0)}, tds::sql_type::FLTN, false, { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f })); // optional<double>
+static_assert(value_test(tds::value{optional<double>(nullopt)}, tds::sql_type::FLTN, true, { })); // optional<double>

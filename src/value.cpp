@@ -1146,46 +1146,6 @@ namespace tds {
             is_null = true;
     }
 
-    value::value(float f) {
-        type = sql_type::FLTN;
-
-        val.resize(sizeof(float));
-        memcpy(val.data(), &f, sizeof(float));
-    }
-
-    value::value(const optional<float>& f) {
-        type = sql_type::FLTN;
-        val.resize(sizeof(float));
-
-        if (!f.has_value())
-            is_null = true;
-        else {
-            auto v = f.value();
-
-            memcpy(val.data(), &v, sizeof(float));
-        }
-    }
-
-    value::value(double d) {
-        type = sql_type::FLTN;
-
-        val.resize(sizeof(double));
-        memcpy(val.data(), &d, sizeof(double));
-    }
-
-    value::value(const optional<double>& d) {
-        type = sql_type::FLTN;
-        val.resize(sizeof(double));
-
-        if (!d.has_value())
-            is_null = true;
-        else {
-            auto v = d.value();
-
-            memcpy(val.data(), &v, sizeof(double));
-        }
-    }
-
     static const auto jan1900 = -ymd_to_num({1y, chrono::January, 1d});
 
     value::value(const chrono::year_month_day& d) {

@@ -932,9 +932,12 @@ namespace tds {
         }
 
         template<typename T>
-        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t>
+        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>
         constexpr value(T i) {
-            type = sql_type::INTN;
+            if constexpr (std::is_floating_point_v<T>)
+                type = sql_type::FLTN;
+            else
+                type = sql_type::INTN;
 
             auto arr = std::bit_cast<std::array<uint8_t, sizeof(T)>>(i);
 
@@ -943,9 +946,12 @@ namespace tds {
         }
 
         template<typename T>
-        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t>
+        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>
         constexpr value(const std::optional<T>& i) {
-            type = sql_type::INTN;
+            if constexpr (std::is_floating_point_v<T>)
+                type = sql_type::FLTN;
+            else
+                type = sql_type::INTN;
 
             if (!i.has_value())
                 is_null = true;
@@ -1130,10 +1136,6 @@ namespace tds {
         constexpr value(const char8_t* sv, Args&&... args) : value(std::u8string_view(sv), args...) {
         }
 
-        value(float f);
-        value(const std::optional<float>& f);
-        value(double d);
-        value(const std::optional<double>& d);
         value(const std::chrono::year_month_day& d);
         value(const std::optional<std::chrono::year_month_day>& d);
         value(time_t t);
