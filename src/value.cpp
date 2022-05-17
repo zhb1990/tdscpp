@@ -1128,24 +1128,6 @@ static_assert(test_parse_datetimeoffset("2021-07-02 10:05:34am +09:00", true, 20
 static_assert(test_parse_datetimeoffset("July 2, 2021 10:05:34 AM -10:15", true, 2021, 7, 2, 10h + 5min + 34s, -615));
 
 namespace tds {
-    value::value(uint32_t i) {
-        type = sql_type::INTN;
-
-        val.resize(sizeof(int64_t));
-        *(int64_t*)val.data() = i;
-    }
-
-    value::value(const optional<uint32_t>& i) {
-        type = sql_type::INTN;
-
-        val.resize(sizeof(int64_t));
-
-        if (i.has_value())
-            *(int64_t*)val.data() = i.value();
-        else
-            is_null = true;
-    }
-
     static const auto jan1900 = -ymd_to_num({1y, chrono::January, 1d});
 
     value::value(const chrono::year_month_day& d) {

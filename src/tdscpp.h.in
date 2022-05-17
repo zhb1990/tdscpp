@@ -922,6 +922,8 @@ namespace tds {
         template<typename T>
         value(T*) = delete;
 
+        value(wchar_t) = delete;
+
         constexpr value() {
             type = (sql_type)0;
         }
@@ -963,9 +965,11 @@ namespace tds {
             }
         }
 
-        value(uint32_t i);
-        value(const std::optional<uint32_t>& i);
-        value(wchar_t) = delete;
+        constexpr value(uint32_t i) : value((int64_t)i) {
+        }
+
+        constexpr value(const std::optional<uint32_t>& i) : value(i.has_value() ? std::optional<int64_t>(i.value()) : std::optional<int64_t>(std::nullopt)) {
+        }
 
         template<typename... Args>
         requires std::is_constructible_v<collation, Args...>
