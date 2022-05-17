@@ -924,10 +924,33 @@ namespace tds {
 
         value();
         value(std::nullptr_t);
-        value(int32_t i);
-        value(const std::optional<int32_t>& i);
-        value(int64_t i);
-        value(const std::optional<int64_t>& i);
+
+        template<typename T>
+        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t>
+        constexpr value(T i) {
+            type = sql_type::INTN;
+
+            auto arr = std::bit_cast<std::array<uint8_t, sizeof(T)>>(i);
+
+            val.reserve(sizeof(T));
+            std::copy(arr.begin(), arr.end(), std::back_inserter(val));
+        }
+
+        template<typename T>
+        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t>
+        constexpr value(const std::optional<T>& i) {
+            type = sql_type::INTN;
+
+            if (!i.has_value())
+                is_null = true;
+            else {
+                auto arr = std::bit_cast<std::array<uint8_t, sizeof(T)>>(i.value());
+
+                val.reserve(sizeof(T));
+                std::copy(arr.begin(), arr.end(), std::back_inserter(val));
+            }
+        }
+
         value(uint32_t i);
         value(const std::optional<uint32_t>& i);
         value(wchar_t) = delete;

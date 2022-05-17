@@ -23,6 +23,13 @@ constexpr bool value_test(const tds::value& v, enum tds::sql_type type, bool nul
     return true;
 }
 
+static_assert(value_test(tds::value{(int32_t)0x12345678}, tds::sql_type::INTN, false, { 0x78, 0x56, 0x34, 0x12 })); // int32_t
+static_assert(value_test(tds::value{optional<int32_t>(0x12345678)}, tds::sql_type::INTN, false, { 0x78, 0x56, 0x34, 0x12 })); // optional<int32_t>
+static_assert(value_test(tds::value{optional<int32_t>(nullopt)}, tds::sql_type::INTN, true, { })); // optional<int32_t>
+static_assert(value_test(tds::value{(int64_t)0x123456789abcdef0}, tds::sql_type::INTN, false, { 0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12 })); // int64_t
+static_assert(value_test(tds::value{optional<int64_t>(0x123456789abcdef0)}, tds::sql_type::INTN, false, { 0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12 })); // optional<int64_t>
+static_assert(value_test(tds::value{optional<int64_t>(nullopt)}, tds::sql_type::INTN, true, { })); // optional<int64_t>
+
 static_assert(value_test(tds::value{"hello"s}, tds::sql_type::VARCHAR, false, { 0x68, 0x65, 0x6c, 0x6c, 0x6f })); // string
 static_assert(value_test(tds::value{"hello"sv}, tds::sql_type::VARCHAR, false, { 0x68, 0x65, 0x6c, 0x6c, 0x6f })); // string_view
 static_assert(value_test(tds::value{"hello"}, tds::sql_type::VARCHAR, false, { 0x68, 0x65, 0x6c, 0x6c, 0x6f })); // const char*
