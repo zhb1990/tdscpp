@@ -889,6 +889,7 @@ namespace tds {
 
 #pragma pack(pop)
 
+#if 0
     template<typename T, typename A = std::allocator<T>>
     class default_init_allocator : public A {
     public:
@@ -911,8 +912,9 @@ namespace tds {
             a_t::construct(static_cast<A&>(*this), ptr, std::forward<Args>(args)...);
         }
     };
+#endif
 
-    using value_data_t = std::vector<uint8_t, default_init_allocator<uint8_t>>;
+    using value_data_t = std::vector<uint8_t>;
 
     class TDSCPP WARN_UNUSED value {
     public:
@@ -932,17 +934,17 @@ namespace tds {
 
         template<typename... Args>
         requires std::is_constructible_v<collation, Args...>
-        value(const std::u16string& sv, Args&&... args) : value(std::u16string_view(sv), args...) {
+        constexpr value(const std::u16string& sv, Args&&... args) : value(std::u16string_view(sv), args...) {
         }
 
         template<typename... Args>
         requires std::is_constructible_v<collation, Args...>
-        value(const char16_t* sv, Args&&... args) : value(std::u16string_view(sv), args...) {
+        constexpr value(const char16_t* sv, Args&&... args) : value(std::u16string_view(sv), args...) {
         }
 
         template<typename T>
         requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
-        value(const std::optional<std::basic_string_view<T>>& sv) {
+        constexpr value(const std::optional<std::basic_string_view<T>>& sv) {
             if constexpr (std::is_same_v<T, char16_t>)
                 type = sql_type::NVARCHAR;
             else
@@ -951,8 +953,15 @@ namespace tds {
             if (!sv.has_value())
                 is_null = true;
             else {
-                val.resize(sv.value().length() * sizeof(T));
-                memcpy(val.data(), sv.value().data(), val.size());
+                val.reserve(sv.value().length() * sizeof(T));
+
+                if constexpr (std::is_same_v<T, char16_t>) {
+                    for (auto c : sv.value()) {
+                        val.push_back((uint8_t)(c & 0xff));
+                        val.push_back((uint8_t)(c >> 16));
+                    }
+                } else
+                    std::copy(sv.value().begin(), sv.value().end(), std::back_inserter(val));
             }
 
             // Latin1_General_CI_AS
@@ -977,7 +986,7 @@ namespace tds {
 
         template<typename T, typename... Args>
         requires ((std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>) && std::is_constructible_v<collation, Args...>)
-        value(const std::optional<std::basic_string_view<T>>& sv, Args&&... args) : coll(args...) {
+        constexpr value(const std::optional<std::basic_string_view<T>>& sv, Args&&... args) : coll(args...) {
             if constexpr (std::is_same_v<T, char16_t>)
                 type = sql_type::NVARCHAR;
             else
@@ -996,7 +1005,7 @@ namespace tds {
 
         template<typename T, typename... Args>
         requires ((std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>) && std::is_constructible_v<collation, Args...>)
-        value(const std::optional<std::basic_string<T>>& s, Args&&... args) : coll(args...) {
+        constexpr value(const std::optional<std::basic_string<T>>& s, Args&&... args) : coll(args...) {
             if constexpr (std::is_same_v<T, char16_t>)
                 type = sql_type::NVARCHAR;
             else
@@ -1008,21 +1017,34 @@ namespace tds {
             if (!s.has_value())
                 is_null = true;
             else {
-                val.resize(s.value().length() * sizeof(T));
-                memcpy(val.data(), s.value().data(), val.size());
+                val.reserve(s.value().length() * sizeof(T));
+
+                if constexpr (std::is_same_v<T, char16_t>) {
+                    for (auto c : s.value()) {
+                        val.push_back((uint8_t)(c & 0xff));
+                        val.push_back((uint8_t)(c >> 16));
+                    }
+                } else
+                    std::copy(s.value().begin(), s.value().end(), std::back_inserter(val));
             }
         }
 
         template<typename T>
         requires (std::is_same_v<T, char> || std::is_same_v<T, char8_t> || std::is_same_v<T, char16_t>)
-        value(std::basic_string_view<T> sv) {
-            if constexpr (std::is_same_v<T, char16_t>)
-                type = sql_type::NVARCHAR;
-            else
-                type = sql_type::VARCHAR;
+        constexpr value(std::basic_string_view<T> sv) {
+            val.reserve(sv.length() * sizeof(T));
 
-            val.resize(sv.length() * sizeof(T));
-            memcpy(val.data(), sv.data(), val.size());
+            if constexpr (std::is_same_v<T, char16_t>) {
+                type = sql_type::NVARCHAR;
+
+                for (auto c : sv) {
+                    val.push_back((uint8_t)(c & 0xff));
+                    val.push_back((uint8_t)(c >> 16));
+                }
+            } else {
+                type = sql_type::VARCHAR;
+                std::copy(sv.begin(), sv.end(), std::back_inserter(val));
+            }
 
             // Latin1_General_CI_AS
 
@@ -1061,22 +1083,22 @@ namespace tds {
 
         template<typename... Args>
         requires std::is_constructible_v<collation, Args...>
-        value(const std::string& sv, Args&&... args) : value(std::string_view(sv), args...) {
+        constexpr value(const std::string& sv, Args&&... args) : value(std::string_view(sv), args...) {
         }
 
         template<typename... Args>
         requires std::is_constructible_v<collation, Args...>
-        value(const char* sv, Args&&... args) : value(std::string_view(sv), args...) {
+        constexpr value(const char* sv, Args&&... args) : value(std::string_view(sv), args...) {
         }
 
         template<typename... Args>
         requires std::is_constructible_v<collation, Args...>
-        value(const std::u8string& sv, Args&&... args) : value(std::u8string_view(sv), args...) {
+        constexpr value(const std::u8string& sv, Args&&... args) : value(std::u8string_view(sv), args...) {
         }
 
         template<typename... Args>
         requires std::is_constructible_v<collation, Args...>
-        value(const char8_t* sv, Args&&... args) : value(std::u8string_view(sv), args...) {
+        constexpr value(const char8_t* sv, Args&&... args) : value(std::u8string_view(sv), args...) {
         }
 
         value(float f);
