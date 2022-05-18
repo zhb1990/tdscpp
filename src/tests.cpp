@@ -120,10 +120,13 @@ static_assert(value_test(tds::value{optional<array<std::byte, 4>>{array{(std::by
 static_assert(value_test(tds::value{optional<array<std::byte, 4>>{nullopt}}, tds::sql_type::VARBINARY, true, { })); // optional<array<byte>>
 static_assert(value_test(tds::value{optional<vector<std::byte>>{vector{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<vector<byte>>
 static_assert(value_test(tds::value{optional<vector<std::byte>>{nullopt}}, tds::sql_type::VARBINARY, true, { })); // optional<vector<byte>>
-static_assert(value_test(tds::value{optional<span<const std::byte>>{array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<span<const byte>>
 static_assert(value_test(tds::value{optional<span<const std::byte>>{nullopt}}, tds::sql_type::VARBINARY, true, { })); // optional<span<const byte>>
-static_assert(optional_span_byte_test(array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<span<byte>>
 static_assert(value_test(tds::value{optional<span<std::byte>>{nullopt}}, tds::sql_type::VARBINARY, true, { })); // optional<span<byte>>
+
+#ifndef _MSC_VER
+static_assert(value_test(tds::value{optional<span<const std::byte>>{array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<span<const byte>>
+static_assert(optional_span_byte_test(array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<span<byte>>
+#endif
 
 static_assert(value_test(tds::value{true}, tds::sql_type::BITN, false, { 0x01 })); // bool
 static_assert(value_test(tds::value{false}, tds::sql_type::BITN, false, { 0x00 })); // bool
