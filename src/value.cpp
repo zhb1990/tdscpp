@@ -1293,30 +1293,30 @@ namespace tds {
 
         switch (type2) {
             case sql_type::TINYINT:
-                return fmt::format(FMT_STRING("{}"), *(uint8_t*)d.data());
+                return fmt::format("{}", *(uint8_t*)d.data());
 
             case sql_type::SMALLINT:
-                return fmt::format(FMT_STRING("{}"), *(int16_t*)d.data());
+                return fmt::format("{}", *(int16_t*)d.data());
 
             case sql_type::INT:
-                return fmt::format(FMT_STRING("{}"), *(int32_t*)d.data());
+                return fmt::format("{}", *(int32_t*)d.data());
 
             case sql_type::BIGINT:
-                return fmt::format(FMT_STRING("{}"), *(int64_t*)d.data());
+                return fmt::format("{}", *(int64_t*)d.data());
 
             case sql_type::INTN:
                 switch (d.length()) {
                     case 1:
-                        return fmt::format(FMT_STRING("{}"), *(uint8_t*)d.data());
+                        return fmt::format("{}", *(uint8_t*)d.data());
 
                     case 2:
-                        return fmt::format(FMT_STRING("{}"), *(int16_t*)d.data());
+                        return fmt::format("{}", *(int16_t*)d.data());
 
                     case 4:
-                        return fmt::format(FMT_STRING("{}"), *(int32_t*)d.data());
+                        return fmt::format("{}", *(int32_t*)d.data());
 
                     case 8:
-                        return fmt::format(FMT_STRING("{}"), *(int64_t*)d.data());
+                        return fmt::format("{}", *(int64_t*)d.data());
 
                     default:
                         throw formatted_error("INTN has unexpected length {}.", d.length());
@@ -1341,18 +1341,18 @@ namespace tds {
                 return string{d};
 
             case sql_type::REAL:
-                return fmt::format(FMT_STRING("{}"), *(float*)d.data());
+                return fmt::format("{}", *(float*)d.data());
 
             case sql_type::FLOAT:
-                return fmt::format(FMT_STRING("{}"), *(double*)d.data());
+                return fmt::format("{}", *(double*)d.data());
 
             case sql_type::FLTN:
                 switch (d.length()) {
                     case sizeof(float):
-                        return fmt::format(FMT_STRING("{}"), *(float*)d.data());
+                        return fmt::format("{}", *(float*)d.data());
 
                     case sizeof(double):
-                        return fmt::format(FMT_STRING("{}"), *(double*)d.data());
+                        return fmt::format("{}", *(double*)d.data());
 
                     default:
                         throw formatted_error("FLTN has unexpected length {}.", d.length());
@@ -1367,7 +1367,7 @@ namespace tds {
 
                 auto d = num_to_ymd(v - jan1900);
 
-                return fmt::format(FMT_STRING("{:04}-{:02}-{:02}"), (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day());
+                return fmt::format("{:04}-{:02}-{:02}", (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day());
             }
 
             case sql_type::TIME: {
@@ -1383,11 +1383,11 @@ namespace tds {
                 chrono::hh_mm_ss hms(t);
 
                 if (max_length2 == 0)
-                    return fmt::format(FMT_STRING("{:02}:{:02}:{:02}"), hms.hours().count(), hms.minutes().count(), hms.seconds().count());
+                    return fmt::format("{:02}:{:02}:{:02}", hms.hours().count(), hms.minutes().count(), hms.seconds().count());
                 else {
                     double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() / 10000000.0);
 
-                    return fmt::format(FMT_STRING("{:02}:{:02}:{:0{}.{}f}"), hms.hours().count(), hms.minutes().count(), s,
+                    return fmt::format("{:02}:{:02}:{:0{}.{}f}", hms.hours().count(), hms.minutes().count(), s,
                                        max_length2 + 3, max_length2);
                 }
             }
@@ -1407,7 +1407,7 @@ namespace tds {
 
                 datetime dt(num_to_ymd(v - jan1900), time_t(ticks));
 
-                return fmt::format(FMT_STRING("{:{}}"), dt, max_length2);
+                return fmt::format("{:{}}", dt, max_length2);
             }
 
             case sql_type::DATETIME: {
@@ -1417,7 +1417,7 @@ namespace tds {
 
                 datetime dt(num_to_ymd(v), dur);
 
-                return fmt::format(FMT_STRING("{}"), dt);
+                return fmt::format("{}", dt);
             }
 
             case sql_type::DATETIMN:
@@ -1429,7 +1429,7 @@ namespace tds {
 
                         datetime dt(num_to_ymd(v), dur);
 
-                        return fmt::format(FMT_STRING("{:0}"), dt);
+                        return fmt::format("{:0}", dt);
                     }
 
                     case 8: {
@@ -1439,7 +1439,7 @@ namespace tds {
 
                         datetime dt(num_to_ymd(v), dur);
 
-                        return fmt::format(FMT_STRING("{}"), dt);
+                        return fmt::format("{}", dt);
                     }
 
                     default:
@@ -1453,7 +1453,7 @@ namespace tds {
 
                 datetime dt(num_to_ymd(v), dur);
 
-                return fmt::format(FMT_STRING("{:0}"), dt);
+                return fmt::format("{:0}", dt);
             }
 
             case sql_type::DATETIMEOFFSET: {
@@ -1474,12 +1474,12 @@ namespace tds {
                 dto.t = time_t{ticks};
                 dto.offset = *(int16_t*)(d.data() + d.length() - sizeof(int16_t));
 
-                return fmt::format(FMT_STRING("{:{}}"), dto, max_length2);
+                return fmt::format("{:{}}", dto, max_length2);
             }
 
             case sql_type::BITN:
             case sql_type::BIT:
-                return fmt::format(FMT_STRING("{}"), d[0] != 0);
+                return fmt::format("{}", d[0] != 0);
 
             case sql_type::NUMERIC:
             case sql_type::DECIMAL: {
@@ -1550,7 +1550,7 @@ namespace tds {
                 if (scale2 == 0) // remove trailing dot
                     p[strlen(p) - 1] = 0;
 
-                return fmt::format(FMT_STRING("{}{}"), d[0] == 0 ? "-" : "", p);
+                return fmt::format("{}{}", d[0] == 0 ? "-" : "", p);
             }
 
             case sql_type::MONEYN:
@@ -1565,7 +1565,7 @@ namespace tds {
                         if (p < 0)
                             p = -p;
 
-                        return fmt::format(FMT_STRING("{}.{:04}"), v / 10000, p);
+                        return fmt::format("{}.{:04}", v / 10000, p);
                     }
 
                     case sizeof(int32_t): {
@@ -1576,7 +1576,7 @@ namespace tds {
                         if (p < 0)
                             p = -p;
 
-                        return fmt::format(FMT_STRING("{}.{:02}"), v / 10000, p);
+                        return fmt::format("{}.{:02}", v / 10000, p);
                     }
 
                     default:
@@ -1593,7 +1593,7 @@ namespace tds {
                 if (p < 0)
                     p = -p;
 
-                return fmt::format(FMT_STRING("{}.{:04}"), v / 10000, p);
+                return fmt::format("{}.{:04}", v / 10000, p);
             }
 
             case sql_type::SMALLMONEY: {
@@ -1604,11 +1604,11 @@ namespace tds {
                 if (p < 0)
                     p = -p;
 
-                return fmt::format(FMT_STRING("{}.{:02}"), v / 10000, p);
+                return fmt::format("{}.{:02}", v / 10000, p);
             }
 
             case sql_type::UNIQUEIDENTIFIER:
-                return fmt::format(FMT_STRING("{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}"),
+                return fmt::format("{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
                                    *(uint32_t*)d.data(), *(uint16_t*)(d.data() + 4), *(uint16_t*)(d.data() + 6),
                                    (uint8_t)d[8], (uint8_t)d[9], (uint8_t)d[10], (uint8_t)d[11], (uint8_t)d[12],
                                    (uint8_t)d[13], (uint8_t)d[14], (uint8_t)d[15]);

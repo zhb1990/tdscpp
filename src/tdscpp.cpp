@@ -1849,7 +1849,7 @@ public:
         gss_buffer_desc status_string;
         bool first = true;
 
-        msg = fmt::format(FMT_STRING("{} failed (minor {}): "), func, (enum krb5_minor)minor);
+        msg = fmt::format("{} failed (minor {}): ", func, (enum krb5_minor)minor);
 
         do {
             gss_display_status(&min_status, major, GSS_C_GSS_CODE, GSS_C_NO_OID,
