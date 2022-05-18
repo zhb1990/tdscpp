@@ -1149,22 +1149,28 @@ namespace tds {
         value(const datetimeoffset& dt);
         value(const std::optional<datetimeoffset>& t);
 
-        value(std::span<const std::byte> bin) {
+        constexpr value(std::span<const std::byte> bin) {
             type = sql_type::VARBINARY;
-            val.resize(bin.size());
-            memcpy(val.data(), bin.data(), bin.size());
+            val.reserve(bin.size());
+
+            for (auto c : bin) {
+                val.push_back((uint8_t)c);
+            }
         }
 
         template<typename T> requires byte_list<T>
-        value(const std::optional<T>& bin) {
+        constexpr value(const std::optional<T>& bin) {
             type = sql_type::VARBINARY;
 
             if (!bin.has_value())
                 is_null = true;
             else {
                 const auto& s = std::span{bin.value()};
-                val.resize(s.size());
-                memcpy(val.data(), s.data(), s.size());
+                val.reserve(s.size());
+
+                for (auto c : s) {
+                    val.push_back((uint8_t)c);
+                }
             }
         }
 

@@ -89,3 +89,13 @@ static_assert(value_test(tds::value{optional<float>(nullopt)}, tds::sql_type::FL
 static_assert(value_test(tds::value{1.0}, tds::sql_type::FLTN, false, { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f })); // double
 static_assert(value_test(tds::value{optional<double>(1.0)}, tds::sql_type::FLTN, false, { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f })); // optional<double>
 static_assert(value_test(tds::value{optional<double>(nullopt)}, tds::sql_type::FLTN, true, { })); // optional<double>
+
+static_assert(value_test(tds::value{array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // array<byte>
+static_assert(value_test(tds::value{vector{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // vector<byte>
+static_assert(value_test(tds::value{span<const std::byte>{array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // span<const byte>
+static_assert(value_test(tds::value{optional<array<std::byte, 4>>{array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<array<byte>>
+static_assert(value_test(tds::value{optional<array<std::byte, 4>>{nullopt}}, tds::sql_type::VARBINARY, true, { })); // optional<array<byte>>
+static_assert(value_test(tds::value{optional<vector<std::byte>>{vector{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<vector<byte>>
+static_assert(value_test(tds::value{optional<vector<std::byte>>{nullopt}}, tds::sql_type::VARBINARY, true, { })); // optional<vector<byte>>
+static_assert(value_test(tds::value{optional<span<const std::byte>>{array{(std::byte)0x12, (std::byte)0x34, (std::byte)0x56, (std::byte)0x78}}}, tds::sql_type::VARBINARY, false, { 0x12, 0x34, 0x56, 0x78 })); // optional<span<const byte>>
+static_assert(value_test(tds::value{optional<span<const std::byte>>{nullopt}}, tds::sql_type::VARBINARY, true, { })); // optional<span<const byte>>
