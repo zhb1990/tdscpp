@@ -1174,8 +1174,22 @@ namespace tds {
             }
         }
 
-        value(bool b);
-        value(const std::optional<bool>& b);
+        constexpr value(bool b) {
+            type = sql_type::BITN;
+            val.resize(sizeof(uint8_t));
+            val[0] = b ? 1 : 0;
+        }
+
+        constexpr value(const std::optional<bool>& b) {
+            type = sql_type::BITN;
+            val.resize(sizeof(uint8_t));
+
+            if (b.has_value())
+                val[0] = b ? 1 : 0;
+            else
+                is_null = true;
+        }
+
         value(const std::chrono::time_point<std::chrono::system_clock>& chr) : value((datetime)chr) { }
 
         template<typename T, typename U>

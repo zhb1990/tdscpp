@@ -1253,22 +1253,6 @@ namespace tds {
         }
     }
 
-    value::value(bool b) {
-        type = sql_type::BITN;
-        val.resize(sizeof(uint8_t));
-        *(uint8_t*)val.data() = b ? 1 : 0;
-    }
-
-    value::value(const optional<bool>& b) {
-        type = sql_type::BITN;
-        val.resize(sizeof(uint8_t));
-
-        if (b.has_value())
-            *(uint8_t*)val.data() = b ? 1 : 0;
-        else
-            is_null = true;
-    }
-
     value::operator string() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
