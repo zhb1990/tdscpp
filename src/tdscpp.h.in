@@ -955,9 +955,10 @@ namespace tds {
             else
                 type = sql_type::INTN;
 
-            if (!i.has_value())
+            if (!i.has_value()) {
                 is_null = true;
-            else {
+                val.resize(sizeof(T));
+            } else {
                 auto arr = std::bit_cast<std::array<uint8_t, sizeof(T)>>(i.value());
 
                 val.reserve(sizeof(T));
