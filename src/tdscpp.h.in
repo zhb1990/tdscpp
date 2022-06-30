@@ -934,7 +934,7 @@ namespace tds {
         }
 
         template<typename T>
-        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>
+        requires std::is_same_v<T, int16_t> || std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>
         constexpr value(T i) {
             if constexpr (std::is_floating_point_v<T>)
                 type = sql_type::FLTN;
@@ -948,7 +948,7 @@ namespace tds {
         }
 
         template<typename T>
-        requires std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>
+        requires std::is_same_v<T, int16_t> || std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>
         constexpr value(const std::optional<T>& i) {
             if constexpr (std::is_floating_point_v<T>)
                 type = sql_type::FLTN;
