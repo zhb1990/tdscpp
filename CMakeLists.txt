@@ -70,7 +70,7 @@ target_compile_options(tdscpp PRIVATE
      $<$<CXX_COMPILER_ID:MSVC>:
           /W4>)
 
-set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_BINARY_DIR}/tdscpp.h)
+set_target_properties(tdscpp PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/src/tdscpp.h)
 
 if(WIN32)
     set_target_properties(tdscpp PROPERTIES PREFIX "")
