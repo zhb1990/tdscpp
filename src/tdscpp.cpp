@@ -11,6 +11,7 @@
 #include <map>
 #include <charconv>
 #include <sys/types.h>
+#include <nlohmann/json.hpp>
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -5132,7 +5133,6 @@ namespace tds {
         committed = true;
     }
 
-#ifdef TDSCPP_JSON
     void TDSCPP to_json(nlohmann::json& j, const value& v) {
         auto type2 = v.type;
         auto val = string_view{(char*)v.val.data(), v.val.size()};
@@ -5180,7 +5180,6 @@ namespace tds {
                 j = nlohmann::json((string)v);
         }
     }
-#endif
 
     uint16_t rpc::num_columns() const {
         return (uint16_t)cols.size();

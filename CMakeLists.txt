@@ -5,7 +5,6 @@ project(tdscpp VERSION 1.0)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-option(WITH_JSON           "Include JSON support" ON)
 option(BUILD_SAMPLE        "Build sample program" ON)
 option(WITH_OPENSSL        "Use OpenSSL for encryption" ON)
 
@@ -13,9 +12,7 @@ if(NOT WIN32)
     option(ENABLE_KRB5         "Enable Kerberos support" ON)
 endif()
 
-if(WITH_JSON)
-    find_package(nlohmann_json REQUIRED)
-endif()
+find_package(nlohmann_json REQUIRED)
 
 if(ENABLE_KRB5)
     set(HAVE_GSSAPI 1)
@@ -58,6 +55,7 @@ if(WIN32)
 endif()
 
 target_link_libraries(tdscpp fmt::fmt-header-only)
+target_link_libraries(tdscpp nlohmann_json::nlohmann_json)
 
 if(WITH_OPENSSL)
     target_link_libraries(tdscpp OpenSSL::Crypto OpenSSL::SSL)
@@ -65,10 +63,6 @@ endif()
 
 if(NOT WIN32)
     target_link_libraries(tdscpp ICU::uc)
-endif()
-
-if(WITH_JSON)
-    target_link_libraries(tdscpp nlohmann_json::nlohmann_json)
 endif()
 
 target_compile_options(tdscpp PRIVATE
