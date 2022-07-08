@@ -1,6 +1,10 @@
 #pragma once
 
 #include <fmt/format.h>
+#ifdef _MSC_VER
+#include <fmt/compile.h>
+#endif
+
 #include <string>
 #include <stdint.h>
 #include "config.h"
@@ -19,6 +23,28 @@
 #include <openssl/x509v3.h>
 #endif
 
+#ifdef _MSC_VER
+
+class _formatted_error : public std::exception {
+public:
+    template<typename T, typename... Args>
+    _formatted_error(const T& s, Args&&... args) : msg(fmt::format(s, std::forward<Args>(args)...)) {
+    }
+
+    const char* what() const noexcept {
+        return msg.c_str();
+    }
+
+private:
+    std::string msg;
+};
+
+#define formatted_error(s, ...) _formatted_error(FMT_COMPILE(s), ##__VA_ARGS__)
+
+#else
+
+// This causes an ICE in MSVC 19.32
+
 class formatted_error : public std::exception {
 public:
     template<typename... Args>
@@ -32,6 +58,8 @@ public:
 private:
     std::string msg;
 };
+
+#endif
 
 enum class tds_msg : uint8_t {
     sql_batch = 1,
