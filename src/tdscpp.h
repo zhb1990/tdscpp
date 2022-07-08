@@ -17,6 +17,7 @@
 #include <span>
 #include <ranges>
 #include <chrono>
+#include <array>
 #include <time.h>
 #include <nlohmann/json_fwd.hpp>
 
