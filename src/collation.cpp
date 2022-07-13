@@ -78,7 +78,7 @@ static weak_ordering compare_strings(u16string_view val1, u16string_view val2, c
             return compare_strings_80(val1, val2, coll);
 
         case 1:
-            throw runtime_error("String comparison not implemented for version 90 collations."); // FIXME
+            return compare_strings_90(val1, val2, coll);
 
         case 2:
             throw runtime_error("String comparison not implemented for version 100 collations."); // FIXME

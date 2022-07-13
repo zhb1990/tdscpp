@@ -45,6 +45,7 @@ set(SRC_FILES src/tdscpp.cpp
     src/ssl.cpp
     src/collation.cpp
     src/ver80coll.cpp
+    src/ver90coll.cpp
     src/tests.cpp)
 
 add_library(tdscpp SHARED ${SRC_FILES})
