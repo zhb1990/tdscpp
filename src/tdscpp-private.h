@@ -1377,3 +1377,7 @@ std::weak_ordering compare_strings_90(std::u16string_view val1, std::u16string_v
 // ver100coll.cpp
 std::weak_ordering compare_strings_100(std::u16string_view val1, std::u16string_view val2,
                                        const tds::collation& coll);
+
+// ver140coll.cpp
+std::weak_ordering compare_strings_140(std::u16string_view val1, std::u16string_view val2,
+                                       const tds::collation& coll);
