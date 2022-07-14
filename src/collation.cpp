@@ -70,8 +70,9 @@ static weak_ordering compare_strings(u16string_view val1, u16string_view val2, c
             return weak_ordering::greater;
     }
 
+    // old-style collations seem to be same as version 80
     if (coll.sort_id != 0)
-        throw runtime_error("String comparison not implemented for SQL collations.");
+        return compare_strings_80(val1, val2, coll);
 
     switch (coll.version) {
         case 0:
