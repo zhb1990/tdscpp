@@ -337,23 +337,21 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
 
                 cols.reserve(num_columns);
 
-                auto sv2 = string_view((char*)sp.data(), sp.size()); // FIXME
-
-                sv2 = sv2.substr(1 + sizeof(uint16_t));
+                auto sp2 = sp.subspan(1 + sizeof(uint16_t));
 
                 for (unsigned int i = 0; i < num_columns; i++) {
-                    if (sv2.length() < sizeof(tds::tds_colmetadata_col))
+                    if (sp2.size() < sizeof(tds::tds_colmetadata_col))
                         return sp;
 
                     cols.emplace_back();
 
                     auto& col = cols.back();
 
-                    auto& c = *(tds::tds_colmetadata_col*)&sv2[0];
+                    auto& c = *(tds::tds_colmetadata_col*)&sp2[0];
 
                     col.type = c.type;
 
-                    sv2 = sv2.substr(sizeof(tds::tds_colmetadata_col));
+                    sp2 = sp2.subspan(sizeof(tds::tds_colmetadata_col));
 
                     switch (c.type) {
                         case tds::sql_type::SQL_NULL:
@@ -381,104 +379,104 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                         case tds::sql_type::BITN:
                         case tds::sql_type::MONEYN:
                         case tds::sql_type::UNIQUEIDENTIFIER:
-                            if (sv2.length() < sizeof(uint8_t))
+                            if (sp2.size() < sizeof(uint8_t))
                                 return sp;
 
-                            col.max_length = *(uint8_t*)sv2.data();
+                            col.max_length = *(uint8_t*)sp2.data();
 
-                            sv2 = sv2.substr(1);
+                            sp2 = sp2.subspan(1);
                         break;
 
                         case tds::sql_type::VARCHAR:
                         case tds::sql_type::NVARCHAR:
                         case tds::sql_type::CHAR:
                         case tds::sql_type::NCHAR:
-                            if (sv2.length() < sizeof(uint16_t) + sizeof(tds::collation))
+                            if (sp2.size() < sizeof(uint16_t) + sizeof(tds::collation))
                                 return sp;
 
-                            col.max_length = *(uint16_t*)sv2.data();
+                            col.max_length = *(uint16_t*)sp2.data();
 
-                            sv2 = sv2.substr(sizeof(uint16_t) + sizeof(tds::collation));
+                            sp2 = sp2.subspan(sizeof(uint16_t) + sizeof(tds::collation));
                         break;
 
                         case tds::sql_type::VARBINARY:
                         case tds::sql_type::BINARY:
-                            if (sv2.length() < sizeof(uint16_t))
+                            if (sp2.size() < sizeof(uint16_t))
                                 return sp;
 
-                            col.max_length = *(uint16_t*)sv2.data();
+                            col.max_length = *(uint16_t*)sp2.data();
 
-                            sv2 = sv2.substr(sizeof(uint16_t));
+                            sp2 = sp2.subspan(sizeof(uint16_t));
                         break;
 
                         case tds::sql_type::XML:
-                            if (sv2.length() < sizeof(uint8_t))
+                            if (sp2.size() < sizeof(uint8_t))
                                 return sp;
 
-                            sv2 = sv2.substr(sizeof(uint8_t));
+                            sp2 = sp2.subspan(sizeof(uint8_t));
                         break;
 
                         case tds::sql_type::DECIMAL:
                         case tds::sql_type::NUMERIC:
-                            if (sv2.length() < 1)
+                            if (sp2.size() < 1)
                                 return sp;
 
-                            col.max_length = *(uint8_t*)sv2.data();
+                            col.max_length = *(uint8_t*)sp2.data();
 
-                            sv2 = sv2.substr(1);
+                            sp2 = sp2.subspan(1);
 
-                            if (sv2.length() < 2)
+                            if (sp2.size() < 2)
                                 return sp;
 
-                            sv2 = sv2.substr(2);
+                            sp2 = sp2.subspan(2);
                         break;
 
                         case tds::sql_type::SQL_VARIANT:
-                            if (sv2.length() < sizeof(uint32_t))
+                            if (sp2.size() < sizeof(uint32_t))
                                 return sp;
 
-                            col.max_length = *(uint32_t*)sv2.data();
+                            col.max_length = *(uint32_t*)sp2.data();
 
-                            sv2 = sv2.substr(sizeof(uint32_t));
+                            sp2 = sp2.subspan(sizeof(uint32_t));
                         break;
 
                         case tds::sql_type::IMAGE:
                         case tds::sql_type::NTEXT:
                         case tds::sql_type::TEXT:
                         {
-                            if (sv2.length() < sizeof(uint32_t))
+                            if (sp2.size() < sizeof(uint32_t))
                                 return sp;
 
-                            col.max_length = *(uint32_t*)sv2.data();
+                            col.max_length = *(uint32_t*)sp2.data();
 
-                            sv2 = sv2.substr(sizeof(uint32_t));
+                            sp2 = sp2.subspan(sizeof(uint32_t));
 
                             if (c.type == tds::sql_type::TEXT || c.type == tds::sql_type::NTEXT) {
-                                if (sv2.length() < sizeof(tds::collation))
+                                if (sp2.size() < sizeof(tds::collation))
                                     return sp;
 
-                                sv2 = sv2.substr(sizeof(tds::collation));
+                                sp2 = sp2.subspan(sizeof(tds::collation));
                             }
 
-                            if (sv2.length() < 1)
+                            if (sp2.size() < 1)
                                 return sp;
 
-                            auto num_parts = (uint8_t)sv2[0];
+                            auto num_parts = (uint8_t)sp2[0];
 
-                            sv2 = sv2.substr(1);
+                            sp2 = sp2.subspan(1);
 
                             for (uint8_t j = 0; j < num_parts; j++) {
-                                if (sv2.length() < sizeof(uint16_t))
+                                if (sp2.size() < sizeof(uint16_t))
                                     return sp;
 
-                                auto partlen = *(uint16_t*)sv2.data();
+                                auto partlen = *(uint16_t*)sp2.data();
 
-                                sv2 = sv2.substr(sizeof(uint16_t));
+                                sp2 = sp2.subspan(sizeof(uint16_t));
 
-                                if (sv2.length() < partlen * sizeof(char16_t))
+                                if (sp2.size() < partlen * sizeof(char16_t))
                                     return sp;
 
-                                sv2 = sv2.substr(partlen * sizeof(char16_t));
+                                sp2 = sp2.subspan(partlen * sizeof(char16_t));
                             }
 
                             break;
@@ -488,20 +486,20 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                             throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
                     }
 
-                    if (sv2.length() < 1)
+                    if (sp2.size() < 1)
                         return sp;
 
-                    auto name_len = (uint8_t)sv2[0];
+                    auto name_len = (uint8_t)sp2[0];
 
-                    sv2 = sv2.substr(1);
+                    sp2 = sp2.subspan(1);
 
-                    if (sv2.length() < name_len * sizeof(char16_t))
+                    if (sp2.size() < name_len * sizeof(char16_t))
                         return sp;
 
-                    sv2 = sv2.substr(name_len * sizeof(char16_t));
+                    sp2 = sp2.subspan(name_len * sizeof(char16_t));
                 }
 
-                auto len = (size_t)((uint8_t*)sv2.data() - sp.data());
+                auto len = (size_t)(sp2.data() - sp.data());
 
                 tokens.emplace_back(string_view((char*)sp.data(), len));
                 sp = sp.subspan(len);
