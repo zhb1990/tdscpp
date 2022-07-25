@@ -646,6 +646,14 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
     }
 }
 
+static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& tokens, vector<tds::column>& buf_columns) {
+    auto sv = string_view((char*)sp.data(), sp.size());
+
+    parse_tokens(sv, tokens, buf_columns);
+
+    return span((uint8_t*)sv.data(), sv.size());
+}
+
 unsigned int coll_to_cp(const tds::collation& coll) {
     if (coll.sort_id == 0) { // Windows collations
         switch (coll.lcid & 0xffff) {
@@ -4349,8 +4357,7 @@ namespace tds {
                 if (type != tds_msg::tabular_result)
                     continue;
 
-                auto sv = string_view((char*)payload.data(), payload.size());
-                parse_tokens(sv, tokens, buf_columns);
+                parse_tokens(payload, tokens, buf_columns);
 
                 while (!tokens.empty()) {
                     auto t = move(tokens.front());
@@ -4395,11 +4402,9 @@ namespace tds {
         buf.insert(buf.end(), payload.begin(), payload.end());
 
         {
-            auto sv = string_view((char*)buf.data(), buf.size());
+            auto sp = parse_tokens(buf, tokens, buf_columns);
 
-            parse_tokens(sv, tokens, buf_columns);
-
-            buf.assign((uint8_t*)sv.data(), (uint8_t*)sv.data() + sv.size());
+            buf.assign((uint8_t*)sp.data(), (uint8_t*)sp.data() + sp.size());
         }
 
         if (last_packet && !buf.empty())
