@@ -1408,7 +1408,7 @@ namespace tds {
         bool finished = false, received_attn = false;
         std::list<std::vector<std::pair<value_data_t, bool>>> rows;
         std::list<std::string> tokens;
-        std::string buf;
+        std::vector<uint8_t> buf;
         std::vector<column> buf_columns;
         std::u16string name;
     };

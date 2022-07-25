@@ -3504,8 +3504,7 @@ namespace tds {
                 if (type != tds_msg::tabular_result)
                     continue;
 
-                auto sv = string_view((char*)payload.data(), payload.size());
-                parse_tokens(sv, tokens, buf_columns);
+                parse_tokens(payload, tokens, buf_columns);
 
                 while (!tokens.empty()) {
                     auto t = move(tokens.front());
@@ -3547,14 +3546,12 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        buf.append(string_view((char*)payload.data(), payload.size()));
+        buf.insert(buf.end(), payload.begin(), payload.end());
 
         {
-            string_view sv = buf;
+            auto sp = parse_tokens(payload, tokens, buf_columns);
 
-            parse_tokens(sv, tokens, buf_columns);
-
-            buf = sv;
+            buf.assign(sp.begin(), sp.begin() + sp.size());
         }
 
         if (last_packet && !buf.empty())
