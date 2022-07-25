@@ -699,7 +699,7 @@ namespace tds {
                 memcpy(&buf[oldlen], buf2.data(), buf2.size());
             }
 
-            bcp_sendmsg(std::string_view((char*)buf.data(), buf.size()));
+            bcp_sendmsg(buf);
         }
 
         template<string_or_u16string T = std::u16string_view>
@@ -725,7 +725,7 @@ namespace tds {
                                         std::u16string_view db);
         std::vector<uint8_t> bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols);
         std::vector<uint8_t> bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols);
-        void bcp_sendmsg(std::string_view msg);
+        void bcp_sendmsg(std::span<const uint8_t> msg);
         size_t bcp_row_size(const col_info& col, const value& vv);
         void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, std::u16string_view col_name);
     };
