@@ -2578,51 +2578,51 @@ namespace tds {
 
         payload.resize(length);
 
-        auto msg = (tds_login_msg*)payload.data();
+        auto& msg = *(tds_login_msg*)payload.data();
 
-        msg->length = length;
-        msg->tds_version = tds_version;
-        msg->packet_size = packet_size;
-        msg->client_version = client_version;
-        msg->client_pid = client_pid;
-        msg->connexion_id = connexion_id;
-        msg->option_flags1 = option_flags1;
-        msg->option_flags2 = option_flags2 | (uint8_t)(!sspi.empty() ? 0x80 : 0);
-        msg->sql_type_flags = sql_type_flags;
-        msg->option_flags3 = option_flags3 | 0x10;
-        msg->timezone = 0;
-        msg->collation = collation;
+        msg.length = length;
+        msg.tds_version = tds_version;
+        msg.packet_size = packet_size;
+        msg.client_version = client_version;
+        msg.client_pid = client_pid;
+        msg.connexion_id = connexion_id;
+        msg.option_flags1 = option_flags1;
+        msg.option_flags2 = option_flags2 | (uint8_t)(!sspi.empty() ? 0x80 : 0);
+        msg.sql_type_flags = sql_type_flags;
+        msg.option_flags3 = option_flags3 | 0x10;
+        msg.timezone = 0;
+        msg.collation = collation;
 
         off = sizeof(tds_login_msg);
 
-        msg->client_name_offset = off;
+        msg.client_name_offset = off;
 
         if (!client_name.empty()) {
-            msg->client_name_length = (uint16_t)client_name.length();
-            memcpy((uint8_t*)msg + msg->client_name_offset, client_name.data(),
+            msg.client_name_length = (uint16_t)client_name.length();
+            memcpy((uint8_t*)&msg + msg.client_name_offset, client_name.data(),
                     client_name.length() * sizeof(char16_t));
 
             off += (uint16_t)(client_name.length() * sizeof(char16_t));
         } else
-            msg->client_name_length = 0;
+            msg.client_name_length = 0;
 
-        msg->username_offset = off;
+        msg.username_offset = off;
 
         if (!username.empty()) {
-            msg->username_length = (uint16_t)username.length();
-            memcpy((uint8_t*)msg + msg->username_offset, username.data(),
+            msg.username_length = (uint16_t)username.length();
+            memcpy((uint8_t*)&msg + msg.username_offset, username.data(),
                     username.length() * sizeof(char16_t));
 
             off += (uint16_t)(username.length() * sizeof(char16_t));
         } else
-            msg->username_length = 0;
+            msg.username_length = 0;
 
-        msg->password_offset = off;
+        msg.password_offset = off;
 
         if (!password.empty()) {
-            msg->password_length = (uint16_t)password.length();
+            msg.password_length = (uint16_t)password.length();
 
-            auto pw_dest = (uint8_t*)msg + msg->password_offset;
+            auto pw_dest = (uint8_t*)&msg + msg.password_offset;
             auto pw_src = (uint8_t*)password.data();
 
             for (unsigned int i = 0; i < password.length() * sizeof(char16_t); i++) {
@@ -2639,120 +2639,120 @@ namespace tds {
 
             off += (uint16_t)(password.length() * sizeof(char16_t));
         } else
-            msg->password_length = 0;
+            msg.password_length = 0;
 
-        msg->app_name_offset = off;
+        msg.app_name_offset = off;
 
         if (!app_name.empty()) {
-            msg->app_name_length = (uint16_t)app_name.length();
-            memcpy((uint8_t*)msg + msg->app_name_offset, app_name.data(),
+            msg.app_name_length = (uint16_t)app_name.length();
+            memcpy((uint8_t*)&msg + msg.app_name_offset, app_name.data(),
                     app_name.length() * sizeof(char16_t));
 
             off += (uint16_t)(app_name.length() * sizeof(char16_t));
         } else
-            msg->app_name_length = 0;
+            msg.app_name_length = 0;
 
-        msg->server_name_offset = off;
+        msg.server_name_offset = off;
 
         if (!server_name.empty()) {
-            msg->server_name_length = (uint16_t)server_name.length();
-            memcpy((uint8_t*)msg + msg->server_name_offset, server_name.data(),
+            msg.server_name_length = (uint16_t)server_name.length();
+            memcpy((uint8_t*)&msg + msg.server_name_offset, server_name.data(),
                     server_name.length() * sizeof(char16_t));
 
             off += (uint16_t)(server_name.length() * sizeof(char16_t));
         } else
-            msg->server_name_length = 0;
+            msg.server_name_length = 0;
 
-        msg->interface_library_offset = off;
+        msg.interface_library_offset = off;
 
         if (!interface_library.empty()) {
-            msg->interface_library_length = (uint16_t)interface_library.length();
-            memcpy((uint8_t*)msg + msg->interface_library_offset, interface_library.data(),
+            msg.interface_library_length = (uint16_t)interface_library.length();
+            memcpy((uint8_t*)&msg + msg.interface_library_offset, interface_library.data(),
                     interface_library.length() * sizeof(char16_t));
 
             off += (uint16_t)(interface_library.length() * sizeof(char16_t));
         } else
-            msg->interface_library_length = 0;
+            msg.interface_library_length = 0;
 
-        msg->locale_offset = off;
+        msg.locale_offset = off;
 
         if (!locale.empty()) {
-            msg->locale_length = (uint16_t)locale.length();
-            memcpy((uint8_t*)msg + msg->locale_offset, locale.data(),
+            msg.locale_length = (uint16_t)locale.length();
+            memcpy((uint8_t*)&msg + msg.locale_offset, locale.data(),
                     locale.length() * sizeof(char16_t));
 
             off += (uint16_t)(locale.length() * sizeof(char16_t));
         } else
-            msg->locale_length = 0;
+            msg.locale_length = 0;
 
-        msg->database_offset = off;
+        msg.database_offset = off;
 
         if (!database.empty()) {
-            msg->database_length = (uint16_t)database.length();
-            memcpy((uint8_t*)msg + msg->database_offset, database.data(),
+            msg.database_length = (uint16_t)database.length();
+            memcpy((uint8_t*)&msg + msg.database_offset, database.data(),
                     database.length() * sizeof(char16_t));
 
             off += (uint16_t)(database.length() * sizeof(char16_t));
         } else
-            msg->database_length = 0;
+            msg.database_length = 0;
 
         // FIXME - set MAC address properly?
-        memset(msg->mac_address, 0, 6);
+        memset(msg.mac_address, 0, 6);
 
-        msg->attach_db_offset = off;
+        msg.attach_db_offset = off;
 
         if (!attach_db.empty()) {
-            msg->attach_db_length = (uint16_t)attach_db.length();
-            memcpy((uint8_t*)msg + msg->attach_db_offset, attach_db.data(),
+            msg.attach_db_length = (uint16_t)attach_db.length();
+            memcpy((uint8_t*)&msg + msg.attach_db_offset, attach_db.data(),
                     attach_db.length() * sizeof(char16_t));
 
             off += (uint16_t)(attach_db.length() * sizeof(char16_t));
         } else
-            msg->attach_db_length = 0;
+            msg.attach_db_length = 0;
 
-        msg->new_password_offset = off;
+        msg.new_password_offset = off;
 
         if (!new_password.empty()) {
-            msg->new_password_length = (uint16_t)new_password.length();
-            memcpy((uint8_t*)msg + msg->new_password_offset, new_password.data(),
+            msg.new_password_length = (uint16_t)new_password.length();
+            memcpy((uint8_t*)&msg + msg.new_password_offset, new_password.data(),
                     new_password.length() * sizeof(char16_t));
 
             off += (uint16_t)(new_password.length() * sizeof(char16_t));
         } else
-            msg->new_password_length = 0;
+            msg.new_password_length = 0;
 
         if (sspi.empty()) {
-            msg->sspi_offset = 0;
-            msg->sspi_length = 0;
-            msg->sspi_long = 0;
+            msg.sspi_offset = 0;
+            msg.sspi_length = 0;
+            msg.sspi_long = 0;
         } else {
-            msg->sspi_offset = off;
+            msg.sspi_offset = off;
 
             if (sspi.length() >= numeric_limits<uint16_t>::max()) {
-                msg->sspi_length = numeric_limits<uint16_t>::max();
-                msg->sspi_long = (uint32_t)sspi.length();
+                msg.sspi_length = numeric_limits<uint16_t>::max();
+                msg.sspi_long = (uint32_t)sspi.length();
             } else {
-                msg->sspi_length = (uint16_t)sspi.length();
-                msg->sspi_long = 0;
+                msg.sspi_length = (uint16_t)sspi.length();
+                msg.sspi_long = 0;
             }
 
-            memcpy((uint8_t*)msg + msg->sspi_offset, sspi.data(), sspi.length());
+            memcpy((uint8_t*)&msg + msg.sspi_offset, sspi.data(), sspi.length());
 
             off += (uint16_t)sspi.length();
         }
 
-        msg->extension_offset = off;
-        msg->extension_length = sizeof(uint32_t);
+        msg.extension_offset = off;
+        msg.extension_length = sizeof(uint32_t);
 
-        *(uint32_t*)((uint8_t*)msg + msg->extension_offset) = off + sizeof(uint32_t);
+        *(uint32_t*)((uint8_t*)&msg + msg.extension_offset) = off + sizeof(uint32_t);
         off += sizeof(uint32_t);
 
         for (const auto& f : features) {
-            memcpy((uint8_t*)msg + off, f.data(), f.length());
+            memcpy((uint8_t*)&msg + off, f.data(), f.length());
             off += (uint16_t)f.length();
         }
 
-        *(enum tds_feature*)((uint8_t*)msg + off) = tds_feature::TERMINATOR;
+        *(enum tds_feature*)((uint8_t*)&msg + off) = tds_feature::TERMINATOR;
 
         send_msg(tds_msg::tds7_login, payload);
     }
