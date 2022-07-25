@@ -4392,14 +4392,14 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        buf.append(string_view((char*)payload.data(), payload.size()));
+        buf.insert(buf.end(), payload.begin(), payload.end());
 
         {
-            string_view sv = buf;
+            auto sv = string_view((char*)buf.data(), buf.size());
 
             parse_tokens(sv, tokens, buf_columns);
 
-            buf = sv;
+            buf.assign((uint8_t*)sv.data(), (uint8_t*)sv.data() + sv.size());
         }
 
         if (last_packet && !buf.empty())
