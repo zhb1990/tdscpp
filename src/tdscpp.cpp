@@ -283,9 +283,9 @@ static constexpr bool is_byte_len_type(enum tds::sql_type type) noexcept {
     }
 }
 
-static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::column>& buf_columns) {
-    while (!sv.empty()) {
-        auto type = (tds::token)sv[0];
+static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& tokens, vector<tds::column>& buf_columns) {
+    while (!sp.empty()) {
+        auto type = (tds::token)sp[0];
 
         switch (type) {
             case tds::token::TABNAME:
@@ -296,16 +296,16 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
             case tds::token::LOGINACK:
             case tds::token::ENVCHANGE:
             case tds::token::SSPI: {
-                if (sv.length() < 1 + sizeof(uint16_t))
-                    return;
+                if (sp.size() < 1 + sizeof(uint16_t))
+                    return sp;
 
-                auto len = *(uint16_t*)&sv[1];
+                auto len = *(uint16_t*)&sp[1];
 
-                if (sv.length() < (size_t)(1 + sizeof(uint16_t) + len))
-                    return;
+                if (sp.size() < (size_t)(1 + sizeof(uint16_t) + len))
+                    return sp;
 
-                tokens.emplace_back(sv.substr(0, 1 + sizeof(uint16_t) + len));
-                sv = sv.substr(1 + sizeof(uint16_t) + len);
+                tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(uint16_t) + len));
+                sp = sp.subspan(1 + sizeof(uint16_t) + len);
 
                 break;
             }
@@ -313,23 +313,23 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
             case tds::token::DONE:
             case tds::token::DONEPROC:
             case tds::token::DONEINPROC:
-                if (sv.length() < 1 + sizeof(tds_done_msg))
-                    return;
+                if (sp.size() < 1 + sizeof(tds_done_msg))
+                    return sp;
 
-                tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_done_msg)));
-                sv = sv.substr(1 + sizeof(tds_done_msg));
+                tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(tds_done_msg)));
+                sp = sp.subspan(1 + sizeof(tds_done_msg));
             break;
 
             case tds::token::COLMETADATA: {
-                if (sv.length() < 5)
-                    return;
+                if (sp.size() < 5)
+                    return sp;
 
-                auto num_columns = *(uint16_t*)&sv[1];
+                auto num_columns = *(uint16_t*)&sp[1];
 
                 if (num_columns == 0) {
                     buf_columns.clear();
-                    tokens.emplace_back(sv.substr(0, 5));
-                    sv = sv.substr(5);
+                    tokens.emplace_back(string_view((char*)sp.data(), 5));
+                    sp = sp.subspan(5);
                     continue;
                 }
 
@@ -337,13 +337,13 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
 
                 cols.reserve(num_columns);
 
-                string_view sv2 = sv;
+                auto sv2 = string_view((char*)sp.data(), sp.size()); // FIXME
 
                 sv2 = sv2.substr(1 + sizeof(uint16_t));
 
                 for (unsigned int i = 0; i < num_columns; i++) {
                     if (sv2.length() < sizeof(tds::tds_colmetadata_col))
-                        return;
+                        return sp;
 
                     cols.emplace_back();
 
@@ -382,7 +382,7 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                         case tds::sql_type::MONEYN:
                         case tds::sql_type::UNIQUEIDENTIFIER:
                             if (sv2.length() < sizeof(uint8_t))
-                                return;
+                                return sp;
 
                             col.max_length = *(uint8_t*)sv2.data();
 
@@ -394,7 +394,7 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                         case tds::sql_type::CHAR:
                         case tds::sql_type::NCHAR:
                             if (sv2.length() < sizeof(uint16_t) + sizeof(tds::collation))
-                                return;
+                                return sp;
 
                             col.max_length = *(uint16_t*)sv2.data();
 
@@ -404,7 +404,7 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                         case tds::sql_type::VARBINARY:
                         case tds::sql_type::BINARY:
                             if (sv2.length() < sizeof(uint16_t))
-                                return;
+                                return sp;
 
                             col.max_length = *(uint16_t*)sv2.data();
 
@@ -413,7 +413,7 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
 
                         case tds::sql_type::XML:
                             if (sv2.length() < sizeof(uint8_t))
-                                return;
+                                return sp;
 
                             sv2 = sv2.substr(sizeof(uint8_t));
                         break;
@@ -421,21 +421,21 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                         case tds::sql_type::DECIMAL:
                         case tds::sql_type::NUMERIC:
                             if (sv2.length() < 1)
-                                return;
+                                return sp;
 
                             col.max_length = *(uint8_t*)sv2.data();
 
                             sv2 = sv2.substr(1);
 
                             if (sv2.length() < 2)
-                                return;
+                                return sp;
 
                             sv2 = sv2.substr(2);
                         break;
 
                         case tds::sql_type::SQL_VARIANT:
                             if (sv2.length() < sizeof(uint32_t))
-                                return;
+                                return sp;
 
                             col.max_length = *(uint32_t*)sv2.data();
 
@@ -447,7 +447,7 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                         case tds::sql_type::TEXT:
                         {
                             if (sv2.length() < sizeof(uint32_t))
-                                return;
+                                return sp;
 
                             col.max_length = *(uint32_t*)sv2.data();
 
@@ -455,13 +455,13 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
 
                             if (c.type == tds::sql_type::TEXT || c.type == tds::sql_type::NTEXT) {
                                 if (sv2.length() < sizeof(tds::collation))
-                                    return;
+                                    return sp;
 
                                 sv2 = sv2.substr(sizeof(tds::collation));
                             }
 
                             if (sv2.length() < 1)
-                                return;
+                                return sp;
 
                             auto num_parts = (uint8_t)sv2[0];
 
@@ -469,14 +469,14 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
 
                             for (uint8_t j = 0; j < num_parts; j++) {
                                 if (sv2.length() < sizeof(uint16_t))
-                                    return;
+                                    return sp;
 
                                 auto partlen = *(uint16_t*)sv2.data();
 
                                 sv2 = sv2.substr(sizeof(uint16_t));
 
                                 if (sv2.length() < partlen * sizeof(char16_t))
-                                    return;
+                                    return sp;
 
                                 sv2 = sv2.substr(partlen * sizeof(char16_t));
                             }
@@ -489,22 +489,22 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                     }
 
                     if (sv2.length() < 1)
-                        return;
+                        return sp;
 
                     auto name_len = (uint8_t)sv2[0];
 
                     sv2 = sv2.substr(1);
 
                     if (sv2.length() < name_len * sizeof(char16_t))
-                        return;
+                        return sp;
 
                     sv2 = sv2.substr(name_len * sizeof(char16_t));
                 }
 
-                auto len = (size_t)(sv2.data() - sv.data());
+                auto len = (size_t)((uint8_t*)sv2.data() - sp.data());
 
-                tokens.emplace_back(sv.substr(0, len));
-                sv = sv.substr(len);
+                tokens.emplace_back(string_view((char*)sp.data(), len));
+                sp = sp.subspan(len);
 
                 buf_columns = cols;
 
@@ -512,18 +512,17 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
             }
 
             case tds::token::ROW: {
-                auto sp = span((const uint8_t*)sv.data(), sv.size());
                 auto sp2 = sp.subspan(1);
 
                 for (unsigned int i = 0; i < buf_columns.size(); i++) {
                     if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sp2))
-                        return;
+                        return sp;
                 }
 
-                auto len = (size_t)(sp2.data() - (uint8_t*)sv.data());
+                auto len = (size_t)(sp2.data() - sp.data());
 
-                tokens.emplace_back(sv.substr(0, len));
-                sv = sv.substr(len);
+                tokens.emplace_back(string_view((char*)sp.data(), len));
+                sp = sp.subspan(len);
 
                 break;
             }
@@ -533,13 +532,12 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                 if (buf_columns.empty())
                     break;
 
-                auto sp = span((const uint8_t*)sv.data(), sv.size());
                 auto sp2 = sp.subspan(1);
 
                 auto bitset_length = (buf_columns.size() + 7) / 8;
 
                 if (sp2.size() < bitset_length)
-                    return;
+                    return sp;
 
                 string_view bitset((char*)sp2.data(), bitset_length);
                 auto bsv = (uint8_t)bitset[0];
@@ -557,51 +555,51 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
 
                     if (!(bsv & 1)) { // not NULL
                         if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sp2))
-                            return;
+                            return sp;
                     }
                 }
 
-                auto len = (size_t)(sp2.data() - (uint8_t*)sv.data());
+                auto len = (size_t)(sp2.data() - sp.data());
 
-                tokens.emplace_back(sv.substr(0, len));
-                sv = sv.substr(len);
+                tokens.emplace_back(string_view((char*)sp.data(), len));
+                sp = sp.subspan(len);
 
                 break;
             }
 
             case tds::token::RETURNSTATUS:
             {
-                if (sv.length() < 1 + sizeof(int32_t))
-                    return;
+                if (sp.size() < 1 + sizeof(int32_t))
+                    return sp;
 
-                tokens.emplace_back(sv.substr(0, 1 + sizeof(int32_t)));
-                sv = sv.substr(1 + sizeof(int32_t));
+                tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(int32_t)));
+                sp = sp.subspan(1 + sizeof(int32_t));
 
                 break;
             }
 
             case tds::token::RETURNVALUE:
             {
-                auto h = (tds_return_value*)&sv[1];
+                auto h = (tds_return_value*)&sp[1];
 
-                if (sv.length() < 1 + sizeof(tds_return_value))
-                    return;
+                if (sp.size() < 1 + sizeof(tds_return_value))
+                    return sp;
 
                 // FIXME - param name
 
                 if (is_byte_len_type(h->type)) {
                     uint8_t len;
 
-                    if (sv.length() < 1 + sizeof(tds_return_value) + 2)
-                        return;
+                    if (sp.size() < 1 + sizeof(tds_return_value) + 2)
+                        return sp;
 
-                    len = *((uint8_t*)&sv[1] + sizeof(tds_return_value) + 1);
+                    len = *(&sp[1] + sizeof(tds_return_value) + 1);
 
-                    if (sv.length() < 1 + sizeof(tds_return_value) + 2 + len)
-                        return;
+                    if (sp.size() < 1 + sizeof(tds_return_value) + 2 + len)
+                        return sp;
 
-                    tokens.emplace_back(sv.substr(0, 1 + sizeof(tds_return_value) + 2 + len));
-                    sv = sv.substr(1 + sizeof(tds_return_value) + 2 + len);
+                    tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(tds_return_value) + 2 + len));
+                    sp = sp.subspan(1 + sizeof(tds_return_value) + 2 + len);
                 } else
                     throw formatted_error("Unhandled type {} in RETURNVALUE message.", h->type);
 
@@ -610,34 +608,34 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
 
             case tds::token::FEATUREEXTACK:
             {
-                auto sv2 = sv.substr(1);
+                auto sp2 = sp.subspan(1);
 
                 while (true) {
-                    if (sv2.length() < 1)
-                        return;
+                    if (sp2.size() < 1)
+                        return sp;
 
-                    if ((uint8_t)sv2[0] == 0xff) {
-                        sv2 = sv2.substr(1);
+                    if ((uint8_t)sp2[0] == 0xff) {
+                        sp2 = sp2.subspan(1);
                         break;
                     }
 
-                    if (sv2.length() < 1 + sizeof(uint32_t))
-                        return;
+                    if (sp2.size() < 1 + sizeof(uint32_t))
+                        return sp;
 
-                    auto len = *(uint32_t*)&sv2[1];
+                    auto len = *(uint32_t*)&sp2[1];
 
-                    sv2 = sv2.substr(1 + sizeof(uint32_t));
+                    sp2 = sp2.subspan(1 + sizeof(uint32_t));
 
-                    if (sv2.length() < len)
-                        return;
+                    if (sp2.size() < len)
+                        return sp;
 
-                    sv2 = sv2.substr(len);
+                    sp2 = sp2.subspan(len);
                 }
 
-                auto token_len = (size_t)(sv2.data() - sv.data());
+                auto token_len = (size_t)(sp2.data() - sp.data());
 
-                tokens.emplace_back(sv.substr(0, token_len));
-                sv = sv.substr(token_len);
+                tokens.emplace_back(string_view((char*)sp.data(), token_len));
+                sp = sp.subspan(token_len);
 
                 break;
             }
@@ -646,14 +644,8 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                 throw formatted_error("Unhandled token type {} while parsing tokens.", type);
         }
     }
-}
 
-static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& tokens, vector<tds::column>& buf_columns) {
-    auto sv = string_view((char*)sp.data(), sp.size());
-
-    parse_tokens(sv, tokens, buf_columns);
-
-    return span((uint8_t*)sv.data(), sv.size());
+    return sp;
 }
 
 unsigned int coll_to_cp(const tds::collation& coll) {
