@@ -2073,7 +2073,7 @@ namespace tds {
     }
 
     void tds_impl::send_prelogin_msg(enum encryption_type encrypt) {
-        string msg;
+        vector<uint8_t> msg;
         vector<login_opt> opts;
         login_opt_version lov;
         size_t size, off;
@@ -2537,12 +2537,8 @@ namespace tds {
             FreeContextBuffer(outbuf.pvBuffer);
 
         if (!ret.empty()) {
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-            send_msg(tds_msg::sspi, ret,
+            send_msg(tds_msg::sspi, span((uint8_t*)ret.data(), ret.size()),
                      server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
-#else
-            send_msg(tds_msg::sspi, ret);
-#endif
         }
     }
 #endif
@@ -2578,7 +2574,7 @@ namespace tds {
         }
         length += sizeof(uint8_t);
 
-        string payload;
+        vector<uint8_t> payload;
 
         payload.resize(length);
 
@@ -2802,30 +2798,30 @@ namespace tds {
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-    void tds_impl::send_msg(enum tds_msg type, string_view msg, bool do_ssl)
+    void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg, bool do_ssl)
 #else
-    void tds_impl::send_msg(enum tds_msg type, string_view msg)
+    void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
         string payload;
         const size_t size = packet_size - sizeof(tds_header);
-        string_view sv = msg;
+        auto sv = msg;
 
         while (true) {
-            string_view sv2;
+            span<const uint8_t> sv2;
 
-            if (sv.length() > size)
-                sv2 = sv.substr(0, size);
+            if (sv.size() > size)
+                sv2 = sv.subspan(0, size);
             else
                 sv2 = sv;
 
-            payload.resize(sv2.length() + sizeof(tds_header));
+            payload.resize(sv2.size() + sizeof(tds_header));
 
             auto h = (tds_header*)payload.data();
 
             h->type = type;
-            h->status = sv2.length() == sv.length() ? 1 : 0; // 1 == last message
-            h->length = htons((uint16_t)(sv2.length() + sizeof(tds_header)));
+            h->status = sv2.size() == sv.size() ? 1 : 0; // 1 == last message
+            h->length = htons((uint16_t)(sv2.size() + sizeof(tds_header)));
             h->spid = 0;
             h->packet_id = 0; // FIXME? "Currently ignored" according to spec
             h->window = 0;
@@ -2840,10 +2836,10 @@ namespace tds {
 #endif
                 send_raw(payload);
 
-            if (sv2.length() == sv.length())
+            if (sv2.size() == sv.size())
                 return;
 
-            sv = sv.substr(size);
+            sv = sv.subspan(size);
         }
     }
 
@@ -3468,7 +3464,7 @@ namespace tds {
             }
         }
 
-        conn.impl->send_msg(tds_msg::rpc, string_view((char*)buf.data(), buf.size()));
+        conn.impl->send_msg(tds_msg::rpc, buf);
 
         wait_for_packet();
     }
@@ -3480,7 +3476,7 @@ namespace tds {
         try {
             received_attn = false;
 
-            conn.impl->send_msg(tds_msg::attention_signal, string_view());
+            conn.impl->send_msg(tds_msg::attention_signal, span<uint8_t>());
 
             while (!finished) {
                 wait_for_packet();
@@ -4321,7 +4317,7 @@ namespace tds {
 
         memcpy(ptr, q.data(), q.length() * sizeof(char16_t));
 
-        conn.impl->send_msg(tds_msg::sql_batch, string_view((char*)buf.data(), buf.size()));
+        conn.impl->send_msg(tds_msg::sql_batch, buf);
 
         wait_for_packet();
     }
@@ -4333,7 +4329,7 @@ namespace tds {
         try {
             received_attn = false;
 
-            conn.impl->send_msg(tds_msg::attention_signal, string_view());
+            conn.impl->send_msg(tds_msg::attention_signal, span<uint8_t>());
 
             while (!finished) {
                 wait_for_packet();
@@ -4899,7 +4895,7 @@ namespace tds {
         msg.isolation_level = 0;
         msg.name_len = 0;
 
-        conn.impl->send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
+        conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         string payload;
@@ -4981,7 +4977,7 @@ namespace tds {
             msg.name_len = 0;
             msg.flags = 0;
 
-            conn.impl->send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
+            conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
             enum tds_msg type;
             string payload;
@@ -5068,7 +5064,7 @@ namespace tds {
         msg.name_len = 0;
         msg.flags = 0;
 
-        conn.impl->send_msg(tds_msg::trans_man_req, string_view((char*)&msg, sizeof(msg)));
+        conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         string payload;

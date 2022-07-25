@@ -1504,7 +1504,7 @@ namespace tds {
     }
 
     void tds::bcp_sendmsg(span<const uint8_t> data) {
-        impl->send_msg(tds_msg::bulk_load_data, string_view((char*)data.data(), data.size()));
+        impl->send_msg(tds_msg::bulk_load_data, data);
 
         enum tds_msg type;
         string payload;

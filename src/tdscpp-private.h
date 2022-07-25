@@ -521,9 +521,9 @@ namespace tds {
         void send_raw(std::string_view msg);
         void recv_raw(uint8_t* ptr, size_t left);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        void send_msg(enum tds_msg type, std::string_view msg, bool do_ssl = true);
+        void send_msg(enum tds_msg type, std::span<const uint8_t> msg, bool do_ssl = true);
 #else
-        void send_msg(enum tds_msg type, std::string_view msg);
+        void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
 #endif
         void wait_for_msg(enum tds_msg& type, std::string& payload, bool* last_packet = nullptr);
         void handle_info_msg(std::string_view sv, bool error);

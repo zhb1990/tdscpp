@@ -336,7 +336,7 @@ namespace tds {
         if (established)
             tds.send_raw(sv);
         else
-            tds.send_msg(tds_msg::prelogin, sv, false);
+            tds.send_msg(tds_msg::prelogin, span((uint8_t*)sv.data(), sv.size()), false);
 
         return (int)sv.length();
     }
