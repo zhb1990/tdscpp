@@ -85,7 +85,7 @@ static size_t fixed_len_size(enum tds::sql_type type) {
     }
 }
 
-static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, string_view& sv) {
+static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, span<const uint8_t>& sp) {
     switch (type) {
         case tds::sql_type::SQL_NULL:
         case tds::sql_type::TINYINT:
@@ -102,10 +102,10 @@ static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, stri
         {
             auto len = fixed_len_size(type);
 
-            if (sv.length() < len)
+            if (sp.size() < len)
                 return false;
 
-            sv = sv.substr(len);
+            sp = sp.subspan(len);
 
             break;
         }
@@ -123,17 +123,17 @@ static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, stri
         case tds::sql_type::DATETIME2:
         case tds::sql_type::DATETIMEOFFSET:
         {
-            if (sv.length() < sizeof(uint8_t))
+            if (sp.size() < sizeof(uint8_t))
                 return false;
 
-            auto len = *(uint8_t*)sv.data();
+            auto len = *(uint8_t*)sp.data();
 
-            sv = sv.substr(1);
+            sp = sp.subspan(1);
 
-            if (sv.length() < len)
+            if (sp.size() < len)
                 return false;
 
-            sv = sv.substr(len);
+            sp = sp.subspan(len);
 
             break;
         }
@@ -146,67 +146,67 @@ static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, stri
         case tds::sql_type::BINARY:
         case tds::sql_type::XML:
             if (max_length == 0xffff || type == tds::sql_type::XML) {
-                if (sv.length() < sizeof(uint64_t))
+                if (sp.size() < sizeof(uint64_t))
                     return false;
 
-                auto len = *(uint64_t*)sv.data();
+                auto len = *(uint64_t*)sp.data();
 
-                sv = sv.substr(sizeof(uint64_t));
+                sp = sp.subspan(sizeof(uint64_t));
 
                 if (len == 0xffffffffffffffff)
                     return true;
 
                 do {
-                    if (sv.length() < sizeof(uint32_t))
+                    if (sp.size() < sizeof(uint32_t))
                         return false;
 
-                    auto chunk_len = *(uint32_t*)sv.data();
+                    auto chunk_len = *(uint32_t*)sp.data();
 
-                    sv = sv.substr(sizeof(uint32_t));
+                    sp = sp.subspan(sizeof(uint32_t));
 
                     if (chunk_len == 0)
                         break;
 
-                    if (sv.length() < chunk_len)
+                    if (sp.size() < chunk_len)
                         return false;
 
-                    sv = sv.substr(chunk_len);
+                    sp = sp.subspan(chunk_len);
                 } while (true);
             } else {
-                if (sv.length() < sizeof(uint16_t))
+                if (sp.size() < sizeof(uint16_t))
                     return false;
 
-                auto len = *(uint16_t*)sv.data();
+                auto len = *(uint16_t*)sp.data();
 
-                sv = sv.substr(sizeof(uint16_t));
+                sp = sp.subspan(sizeof(uint16_t));
 
                 if (len == 0xffff)
                     return true;
 
-                if (sv.length() < len)
+                if (sp.size() < len)
                     return false;
 
-                sv = sv.substr(len);
+                sp = sp.subspan(len);
             }
 
             break;
 
         case tds::sql_type::SQL_VARIANT:
         {
-            if (sv.length() < sizeof(uint32_t))
+            if (sp.size() < sizeof(uint32_t))
                 return false;
 
-            auto len = *(uint32_t*)sv.data();
+            auto len = *(uint32_t*)sp.data();
 
-            sv = sv.substr(sizeof(uint32_t));
+            sp = sp.subspan(sizeof(uint32_t));
 
             if (len == 0xffffffff)
                 return true;
 
-            if (sv.length() < len)
+            if (sp.size() < len)
                 return false;
 
-            sv = sv.substr(len);
+            sp = sp.subspan(len);
 
             break;
         }
@@ -217,39 +217,39 @@ static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, stri
         {
             // text pointer
 
-            if (sv.length() < sizeof(uint8_t))
+            if (sp.size() < sizeof(uint8_t))
                 return false;
 
-            auto textptrlen = (uint8_t)sv[0];
+            auto textptrlen = (uint8_t)sp[0];
 
-            sv = sv.substr(1);
+            sp = sp.subspan(1);
 
-            if (sv.length() < textptrlen)
+            if (sp.size() < textptrlen)
                 return false;
 
-            sv = sv.substr(textptrlen);
+            sp = sp.subspan(textptrlen);
 
             if (textptrlen != 0) {
                 // timestamp
 
-                if (sv.length() < 8)
+                if (sp.size() < 8)
                     return false;
 
-                sv = sv.substr(8);
+                sp = sp.subspan(8);
 
                 // data
 
-                if (sv.length() < sizeof(uint32_t))
+                if (sp.size() < sizeof(uint32_t))
                     return false;
 
-                auto len = *(uint32_t*)sv.data();
+                auto len = *(uint32_t*)sp.data();
 
-                sv = sv.substr(sizeof(uint32_t));
+                sp = sp.subspan(sizeof(uint32_t));
 
-                if (sv.length() < len)
+                if (sp.size() < len)
                     return false;
 
-                sv = sv.substr(len);
+                sp = sp.subspan(len);
             }
 
             break;
@@ -512,14 +512,15 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
             }
 
             case tds::token::ROW: {
-                auto sv2 = sv.substr(1);
+                auto sp = span((const uint8_t*)sv.data(), sv.size());
+                auto sp2 = sp.subspan(1);
 
                 for (unsigned int i = 0; i < buf_columns.size(); i++) {
-                    if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
+                    if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sp2))
                         return;
                 }
 
-                auto len = (size_t)(sv2.data() - sv.data());
+                auto len = (size_t)(sp2.data() - (uint8_t*)sv.data());
 
                 tokens.emplace_back(sv.substr(0, len));
                 sv = sv.substr(len);
@@ -532,17 +533,18 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                 if (buf_columns.empty())
                     break;
 
-                auto sv2 = sv.substr(1);
+                auto sp = span((const uint8_t*)sv.data(), sv.size());
+                auto sp2 = sp.subspan(1);
 
                 auto bitset_length = (buf_columns.size() + 7) / 8;
 
-                if (sv2.length() < bitset_length)
+                if (sp2.size() < bitset_length)
                     return;
 
-                string_view bitset(sv2.data(), bitset_length);
+                string_view bitset((char*)sp2.data(), bitset_length);
                 auto bsv = (uint8_t)bitset[0];
 
-                sv2 = sv2.substr(bitset_length);
+                sp2 = sp2.subspan(bitset_length);
 
                 for (unsigned int i = 0; i < buf_columns.size(); i++) {
                     if (i != 0) {
@@ -554,12 +556,12 @@ static void parse_tokens(string_view& sv, list<string>& tokens, vector<tds::colu
                     }
 
                     if (!(bsv & 1)) { // not NULL
-                        if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sv2))
+                        if (!parse_row_col(buf_columns[i].type, buf_columns[i].max_length, sp2))
                             return;
                     }
                 }
 
-                auto len = (size_t)(sv2.data() - sv.data());
+                auto len = (size_t)(sp2.data() - (uint8_t*)sv.data());
 
                 tokens.emplace_back(sv.substr(0, len));
                 sv = sv.substr(len);
