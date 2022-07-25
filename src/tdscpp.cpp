@@ -2142,7 +2142,7 @@ namespace tds {
         send_msg(tds_msg::prelogin, msg);
 
         enum tds_msg type;
-        string payload;
+        vector<uint8_t> payload;
 
         wait_for_msg(type, payload);
         // FIXME - timeout
@@ -2150,7 +2150,7 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        string_view sv = payload;
+        auto sv = string_view((char*)payload.data(), payload.size());
 
         while (sv.length() > sizeof(tds_login_opt)) {
             tlo = (tds_login_opt*)sv.data();
@@ -2162,7 +2162,7 @@ namespace tds {
                 auto off = htons(tlo->offset);
                 auto len = htons(tlo->length);
 
-                if (payload.length() < off + len)
+                if (payload.size() < off + len)
                     throw runtime_error("Malformed PRELOGIN response.");
 
                 if (len < sizeof(enum encryption_type))
@@ -2226,7 +2226,8 @@ namespace tds {
     void tds_impl::send_login_msg(string_view user, string_view password, string_view server,
                                   string_view app_name, string_view db) {
         enum tds_msg type;
-        string payload, sspi;
+        vector<uint8_t> payload;
+        string sspi;
 #ifdef _WIN32
         u16string spn;
         unique_ptr<sspi_handle> sspih;
@@ -2374,7 +2375,7 @@ namespace tds {
                 if (type != tds_msg::tabular_result)
                     throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-                buf += payload;
+                buf.append(string_view((char*)payload.data(), payload.size()));
 
                 {
                     string_view sv = buf;
@@ -2883,7 +2884,7 @@ namespace tds {
         } while (true);
     }
 
-    void tds_impl::wait_for_msg(enum tds_msg& type, string& payload, bool* last_packet) {
+    void tds_impl::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
         tds_header h;
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
@@ -2910,10 +2911,10 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
             if (do_ssl)
-                ssl->recv((uint8_t*)&payload[0], left);
+                ssl->recv(&payload[0], left);
             else
 #endif
-                recv_raw((uint8_t*)&payload[0], left);
+                recv_raw(&payload[0], left);
         } else
             payload.clear();
 
@@ -3488,7 +3489,7 @@ namespace tds {
 
             while (!ack) {
                 enum tds_msg type;
-                string payload;
+                vector<uint8_t> payload;
 
                 conn.impl->wait_for_msg(type, payload);
                 // FIXME - timeout
@@ -3496,7 +3497,7 @@ namespace tds {
                 if (type != tds_msg::tabular_result)
                     continue;
 
-                auto sv = string_view(payload);
+                auto sv = string_view((char*)payload.data(), payload.size());
                 parse_tokens(sv, tokens, buf_columns);
 
                 while (!tokens.empty()) {
@@ -3530,7 +3531,7 @@ namespace tds {
 
     void rpc::wait_for_packet() {
         enum tds_msg type;
-        string payload;
+        vector<uint8_t> payload;
         bool last_packet;
 
         conn.impl->wait_for_msg(type, payload, &last_packet);
@@ -3539,7 +3540,7 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        buf += payload;
+        buf.append(string_view((char*)payload.data(), payload.size()));
 
         {
             string_view sv = buf;
@@ -4341,7 +4342,7 @@ namespace tds {
 
             while (!ack) {
                 enum tds_msg type;
-                string payload;
+                vector<uint8_t> payload;
 
                 conn.impl->wait_for_msg(type, payload);
                 // FIXME - timeout
@@ -4349,7 +4350,7 @@ namespace tds {
                 if (type != tds_msg::tabular_result)
                     continue;
 
-                auto sv = string_view(payload);
+                auto sv = string_view((char*)payload.data(), payload.size());
                 parse_tokens(sv, tokens, buf_columns);
 
                 while (!tokens.empty()) {
@@ -4383,7 +4384,7 @@ namespace tds {
 
     void batch_impl::wait_for_packet() {
         enum tds_msg type;
-        string payload;
+        vector<uint8_t> payload;
         bool last_packet;
 
         conn.impl->wait_for_msg(type, payload, &last_packet);
@@ -4392,7 +4393,7 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        buf += payload;
+        buf.append(string_view((char*)payload.data(), payload.size()));
 
         {
             string_view sv = buf;
@@ -4898,7 +4899,7 @@ namespace tds {
         conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
-        string payload;
+        vector<uint8_t> payload;
 
         // FIXME - timeout
         conn.impl->wait_for_msg(type, payload);
@@ -4906,7 +4907,7 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        string_view sv = payload;
+        auto sv = string_view((char*)payload.data(), payload.size());
 
         while (!sv.empty()) {
             auto type = (token)sv[0];
@@ -4980,7 +4981,7 @@ namespace tds {
             conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
             enum tds_msg type;
-            string payload;
+            vector<uint8_t> payload;
 
             // FIXME - timeout
             conn.impl->wait_for_msg(type, payload);
@@ -4988,7 +4989,7 @@ namespace tds {
             if (type != tds_msg::tabular_result)
                 throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-            string_view sv = payload;
+            auto sv = string_view((char*)payload.data(), payload.size());
 
             while (!sv.empty()) {
                 auto type = (token)sv[0];
@@ -5067,7 +5068,7 @@ namespace tds {
         conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
-        string payload;
+        vector<uint8_t> payload;
 
         // FIXME - timeout
         conn.impl->wait_for_msg(type, payload);
@@ -5075,7 +5076,7 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        string_view sv = payload;
+        auto sv = string_view((char*)payload.data(), payload.size());
 
         while (!sv.empty()) {
             auto type = (token)sv[0];

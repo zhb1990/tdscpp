@@ -313,20 +313,20 @@ namespace tds {
             return copied;
         } else {
             enum tds_msg type;
-            string payload;
+            vector<uint8_t> payload;
 
             tds.wait_for_msg(type, payload);
 
             if (type != tds_msg::prelogin)
                 throw formatted_error("Received message type {}, expected prelogin", (int)type);
 
-            auto to_copy = min(len, (int)payload.length());
+            auto to_copy = min(len, (int)payload.size());
 
             memcpy(data, payload.data(), to_copy);
             copied += to_copy;
 
-            if (payload.length() > (size_t)to_copy)
-                ssl_recv_buf.append(payload.substr(to_copy));
+            if (payload.size() > (size_t)to_copy)
+                ssl_recv_buf.append(string_view((char*)payload.data(), payload.size()).substr(to_copy));
 
             return copied;
         }

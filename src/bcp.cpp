@@ -1507,7 +1507,7 @@ namespace tds {
         impl->send_msg(tds_msg::bulk_load_data, data);
 
         enum tds_msg type;
-        string payload;
+        vector<uint8_t> payload;
 
         impl->wait_for_msg(type, payload);
         // FIXME - timeout
@@ -1515,7 +1515,7 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        string_view sv = payload;
+        auto sv = string_view((char*)payload.data(), payload.size());
 
         while (!sv.empty()) {
             auto type = (token)sv[0];
