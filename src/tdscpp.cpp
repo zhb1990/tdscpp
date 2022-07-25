@@ -2226,8 +2226,7 @@ namespace tds {
     void tds_impl::send_login_msg(string_view user, string_view password, string_view server,
                                   string_view app_name, string_view db) {
         enum tds_msg type;
-        vector<uint8_t> payload;
-        string sspi;
+        vector<uint8_t> payload, sspi;
 #ifdef _WIN32
         u16string spn;
         unique_ptr<sspi_handle> sspih;
@@ -2270,7 +2269,7 @@ namespace tds {
             sec_status = sspih->init_security_context(spn.c_str(), ISC_REQ_ALLOCATE_MEMORY, SECURITY_NATIVE_DREP,
                                                       nullptr, &out, &context_attr, &timestamp);
 
-            sspi = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+            sspi.assign((uint8_t*)outbuf.pvBuffer, (uint8_t*)outbuf.pvBuffer + outbuf.cbBuffer);
 
             if (outbuf.pvBuffer)
                 FreeContextBuffer(outbuf.pvBuffer);
@@ -2314,7 +2313,7 @@ namespace tds {
             }
 
             if (send_tok.length != 0) {
-                sspi = string((char*)send_tok.value, send_tok.length);
+                sspi.assign((uint8_t*)send_tok.value, (uint8_t*)send_tok.value + send_tok.length);
 
                 gss_release_buffer(&minor_status, &send_tok);
             }
@@ -2549,7 +2548,7 @@ namespace tds {
                                    uint8_t option_flags3, uint32_t collation, u16string_view client_name,
                                    u16string_view username, u16string_view password, u16string_view app_name,
                                    u16string_view server_name, u16string_view interface_library,
-                                   u16string_view locale, u16string_view database, const string& sspi,
+                                   u16string_view locale, u16string_view database, span<const uint8_t> sspi,
                                    u16string_view attach_db, u16string_view new_password) {
         uint32_t length;
         uint16_t off;
@@ -2567,7 +2566,7 @@ namespace tds {
         length += (uint32_t)(interface_library.length() * sizeof(char16_t));
         length += (uint32_t)(locale.length() * sizeof(char16_t));
         length += (uint32_t)(database.length() * sizeof(char16_t));
-        length += (uint32_t)sspi.length();
+        length += (uint32_t)sspi.size();
 
         length += sizeof(uint32_t);
         for (const auto& f : features) {
@@ -2729,17 +2728,17 @@ namespace tds {
         } else {
             msg.sspi_offset = off;
 
-            if (sspi.length() >= numeric_limits<uint16_t>::max()) {
+            if (sspi.size() >= numeric_limits<uint16_t>::max()) {
                 msg.sspi_length = numeric_limits<uint16_t>::max();
-                msg.sspi_long = (uint32_t)sspi.length();
+                msg.sspi_long = (uint32_t)sspi.size();
             } else {
-                msg.sspi_length = (uint16_t)sspi.length();
+                msg.sspi_length = (uint16_t)sspi.size();
                 msg.sspi_long = 0;
             }
 
-            memcpy((uint8_t*)&msg + msg.sspi_offset, sspi.data(), sspi.length());
+            memcpy((uint8_t*)&msg + msg.sspi_offset, sspi.data(), sspi.size());
 
-            off += (uint16_t)sspi.length();
+            off += (uint16_t)sspi.size();
         }
 
         msg.extension_offset = off;

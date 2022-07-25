@@ -544,7 +544,7 @@ namespace tds {
                             uint8_t option_flags3, uint32_t collation, std::u16string_view client_name,
                             std::u16string_view username, std::u16string_view password, std::u16string_view app_name,
                             std::u16string_view server_name, std::u16string_view interface_library,
-                            std::u16string_view locale, std::u16string_view database, const std::string& sspi,
+                            std::u16string_view locale, std::u16string_view database, std::span<const uint8_t> sspi,
                             std::u16string_view attach_db, std::u16string_view new_password);
         void handle_loginack_msg(std::string_view sv);
 #ifdef _WIN32
