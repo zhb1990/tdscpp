@@ -6,7 +6,7 @@
 #endif
 
 #include <string>
-#include <stdint.h>
+#include <cstdint>
 #include "config.h"
 
 #ifdef _WIN32
