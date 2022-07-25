@@ -537,7 +537,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                 if (sp2.size() < bitset_length)
                     return sp;
 
-                string_view bitset((char*)sp2.data(), bitset_length);
+                auto bitset = sp2.subspan(0, bitset_length);
                 auto bsv = (uint8_t)bitset[0];
 
                 sp2 = sp2.subspan(bitset_length);
@@ -545,7 +545,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                 for (unsigned int i = 0; i < buf_columns.size(); i++) {
                     if (i != 0) {
                         if ((i & 7) == 0) {
-                            bitset = bitset.substr(1);
+                            bitset = bitset.subspan(1);
                             bsv = (uint8_t)bitset[0];
                         } else
                             bsv >>= 1;
