@@ -646,6 +646,18 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
     return sp;
 }
 
+static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<vector<uint8_t>>& tokens, vector<tds::column>& buf_columns) {
+    list<string> tmp;
+
+    sp = parse_tokens(sp, tmp, buf_columns);
+
+    for (const auto& t : tmp) {
+        tokens.emplace_back((uint8_t*)t.data(), (uint8_t*)t.data() + t.size());
+    }
+
+    return sp;
+}
+
 unsigned int coll_to_cp(const tds::collation& coll) {
     if (coll.sort_id == 0) { // Windows collations
         switch (coll.lcid & 0xffff) {
