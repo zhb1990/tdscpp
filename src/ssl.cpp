@@ -41,7 +41,7 @@ static int ssl_bio_write(BIO* bio, const char* data, int len) noexcept {
     auto& t = *(tds::tds_ssl*)BIO_get_data(bio);
 
     try {
-        return t.ssl_write_cb(string_view{data, (size_t)len});
+        return t.ssl_write_cb(span{(uint8_t*)data, (size_t)len});
     } catch (...) {
         t.exception = current_exception();
         return -1;
@@ -332,13 +332,13 @@ namespace tds {
         }
     }
 
-    int tds_ssl::ssl_write_cb(string_view sv) {
+    int tds_ssl::ssl_write_cb(span<const uint8_t> sp) {
         if (established)
-            tds.send_raw(span((uint8_t*)sv.data(), sv.size()));
+            tds.send_raw(sp);
         else
-            tds.send_msg(tds_msg::prelogin, span((uint8_t*)sv.data(), sv.size()), false);
+            tds.send_msg(tds_msg::prelogin, sp, false);
 
-        return (int)sv.length();
+        return (int)sp.size();
     }
 
     long tds_ssl::ssl_ctrl_cb(int cmd, long, void*) {
