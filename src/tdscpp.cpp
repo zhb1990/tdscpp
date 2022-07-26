@@ -5118,7 +5118,7 @@ namespace tds {
 
     nlohmann::json TDSCPP to_json(const value& v) {
         auto type2 = v.type;
-        auto val = string_view{(char*)v.val.data(), v.val.size()};
+        auto val = span(v.val);
 
         if (v.is_null)
             return nlohmann::json(nullptr);
@@ -5126,11 +5126,11 @@ namespace tds {
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)val[0];
 
-            val = val.substr(1);
+            val = val.subspan(1);
 
-            auto propbytes = (uint8_t)val[0];
+            auto propbytes = val[0];
 
-            val = val.substr(1 + propbytes);
+            val = val.subspan(1 + propbytes);
         }
 
         switch (type2) {
