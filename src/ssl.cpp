@@ -30,7 +30,7 @@ static int ssl_bio_read(BIO* bio, char* data, int len) noexcept {
     auto& t = *(tds::tds_ssl*)BIO_get_data(bio);
 
     try {
-        return t.ssl_read_cb(data, len);
+        return t.ssl_read_cb(span{(uint8_t*)data, (size_t)len});
     } catch (...) {
         t.exception = current_exception();
         return -1;
@@ -286,29 +286,28 @@ static void add_certs_to_store(X509_STORE* store) {
 #endif
 
 namespace tds {
-    int tds_ssl::ssl_read_cb(char* data, int len) {
+    int tds_ssl::ssl_read_cb(span<uint8_t> sp) {
         int copied = 0;
 
-        if (len == 0)
+        if (sp.empty())
             return 0;
 
         if (!ssl_recv_buf.empty()) {
-            auto to_copy = min(len, (int)ssl_recv_buf.length());
+            auto to_copy = min(sp.size(), ssl_recv_buf.length());
 
-            memcpy(data, ssl_recv_buf.data(), to_copy);
+            memcpy(sp.data(), ssl_recv_buf.data(), to_copy);
             ssl_recv_buf = ssl_recv_buf.substr(to_copy);
 
-            if (len == to_copy)
-                return len;
+            if (sp.size() == to_copy)
+                return (int)sp.size();
 
-            len -= to_copy;
-            copied = to_copy;
-            data += to_copy;
+            sp = sp.subspan(to_copy);
+            copied = (int)to_copy;
         }
 
         if (established) {
-            tds.recv_raw(span((uint8_t*)data, len));
-            copied += len;
+            tds.recv_raw(sp);
+            copied += (int)sp.size();
 
             return copied;
         } else {
@@ -320,12 +319,12 @@ namespace tds {
             if (type != tds_msg::prelogin)
                 throw formatted_error("Received message type {}, expected prelogin", (int)type);
 
-            auto to_copy = min(len, (int)payload.size());
+            auto to_copy = min(sp.size(), payload.size());
 
-            memcpy(data, payload.data(), to_copy);
-            copied += to_copy;
+            memcpy(sp.data(), payload.data(), to_copy);
+            copied += (int)to_copy;
 
-            if (payload.size() > (size_t)to_copy)
+            if (payload.size() > to_copy)
                 ssl_recv_buf.append(string_view((char*)payload.data(), payload.size()).substr(to_copy));
 
             return copied;
