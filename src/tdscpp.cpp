@@ -283,7 +283,7 @@ static constexpr bool is_byte_len_type(enum tds::sql_type type) noexcept {
     }
 }
 
-static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& tokens, vector<tds::column>& buf_columns) {
+static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<vector<uint8_t>>& tokens, vector<tds::column>& buf_columns) {
     while (!sp.empty()) {
         auto type = (tds::token)sp[0];
 
@@ -304,7 +304,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                 if (sp.size() < (size_t)(1 + sizeof(uint16_t) + len))
                     return sp;
 
-                tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(uint16_t) + len));
+                tokens.emplace_back(sp.data(), sp.data() + 1 + sizeof(uint16_t) + len);
                 sp = sp.subspan(1 + sizeof(uint16_t) + len);
 
                 break;
@@ -316,7 +316,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                 if (sp.size() < 1 + sizeof(tds_done_msg))
                     return sp;
 
-                tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(tds_done_msg)));
+                tokens.emplace_back(sp.data(), sp.data() + 1 + sizeof(tds_done_msg));
                 sp = sp.subspan(1 + sizeof(tds_done_msg));
             break;
 
@@ -328,7 +328,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
 
                 if (num_columns == 0) {
                     buf_columns.clear();
-                    tokens.emplace_back(string_view((char*)sp.data(), 5));
+                    tokens.emplace_back(sp.data(), sp.data() + 5);
                     sp = sp.subspan(5);
                     continue;
                 }
@@ -501,7 +501,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
 
                 auto len = (size_t)(sp2.data() - sp.data());
 
-                tokens.emplace_back(string_view((char*)sp.data(), len));
+                tokens.emplace_back(sp.data(), sp.data() + len);
                 sp = sp.subspan(len);
 
                 buf_columns = cols;
@@ -519,7 +519,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
 
                 auto len = (size_t)(sp2.data() - sp.data());
 
-                tokens.emplace_back(string_view((char*)sp.data(), len));
+                tokens.emplace_back(sp.data(), sp.data() + len);
                 sp = sp.subspan(len);
 
                 break;
@@ -559,7 +559,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
 
                 auto len = (size_t)(sp2.data() - sp.data());
 
-                tokens.emplace_back(string_view((char*)sp.data(), len));
+                tokens.emplace_back(sp.data(), sp.data() + len);
                 sp = sp.subspan(len);
 
                 break;
@@ -570,7 +570,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                 if (sp.size() < 1 + sizeof(int32_t))
                     return sp;
 
-                tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(int32_t)));
+                tokens.emplace_back(sp.data(), sp.data() + 1 + sizeof(int32_t));
                 sp = sp.subspan(1 + sizeof(int32_t));
 
                 break;
@@ -596,7 +596,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
                     if (sp.size() < 1 + sizeof(tds_return_value) + 2 + len)
                         return sp;
 
-                    tokens.emplace_back(string_view((char*)sp.data(), 1 + sizeof(tds_return_value) + 2 + len));
+                    tokens.emplace_back(sp.data(), sp.data() + 1 + sizeof(tds_return_value) + 2 + len);
                     sp = sp.subspan(1 + sizeof(tds_return_value) + 2 + len);
                 } else
                     throw formatted_error("Unhandled type {} in RETURNVALUE message.", h->type);
@@ -632,7 +632,7 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
 
                 auto token_len = (size_t)(sp2.data() - sp.data());
 
-                tokens.emplace_back(string_view((char*)sp.data(), token_len));
+                tokens.emplace_back(sp.data(), sp.data() + token_len);
                 sp = sp.subspan(token_len);
 
                 break;
@@ -641,18 +641,6 @@ static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<string>& to
             default:
                 throw formatted_error("Unhandled token type {} while parsing tokens.", type);
         }
-    }
-
-    return sp;
-}
-
-static span<const uint8_t> parse_tokens(span<const uint8_t> sp, list<vector<uint8_t>>& tokens, vector<tds::column>& buf_columns) {
-    list<string> tmp;
-
-    sp = parse_tokens(sp, tmp, buf_columns);
-
-    for (const auto& t : tmp) {
-        tokens.emplace_back((uint8_t*)t.data(), (uint8_t*)t.data() + t.size());
     }
 
     return sp;
