@@ -584,7 +584,7 @@ namespace tds {
 #else
         ~tds_ssl();
 #endif
-        void send(std::string_view sv);
+        void send(std::span<const uint8_t> sp);
         void recv(uint8_t* ptr, size_t left);
 
         std::exception_ptr exception;

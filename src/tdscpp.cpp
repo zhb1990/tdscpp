@@ -2826,7 +2826,7 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
             if (do_ssl && ssl)
-                ssl->send(string_view((char*)payload.data(), payload.size()));
+                ssl->send(payload);
             else
 #endif
                 send_raw(payload);

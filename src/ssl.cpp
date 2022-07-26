@@ -451,9 +451,9 @@ namespace tds {
         established = true;
     }
 
-    void tds_ssl::send(std::string_view sv) {
-        while (!sv.empty()) {
-            auto ret = SSL_write(ssl.get(), sv.data(), (int)sv.length());
+    void tds_ssl::send(std::span<const uint8_t> sp) {
+        while (!sp.empty()) {
+            auto ret = SSL_write(ssl.get(), sp.data(), (int)sp.size());
 
             if (ret <= 0) {
                 if (exception)
@@ -462,7 +462,7 @@ namespace tds {
                 throw formatted_error("SSL_write failed (error {})", SSL_get_error(ssl.get(), ret));
             }
 
-            sv = sv.substr(ret);
+            sp = sp.subspan(ret);
         }
     }
 
@@ -589,7 +589,7 @@ namespace tds {
         FreeCredentialsHandle(&cred_handle);
     }
 
-    void tds_ssl::send(std::string_view sv) {
+    void tds_ssl::send(std::span<const uint8_t> sp) {
         SECURITY_STATUS sec_status;
         array<SecBuffer, 4> buf;
         SecBufferDesc bufdesc;
@@ -597,23 +597,23 @@ namespace tds {
 
         memset(buf.data(), 0, sizeof(SecBuffer) * buf.size());
 
-        payload.resize(stream_sizes.cbHeader + sv.length() + stream_sizes.cbTrailer);
+        payload.resize(stream_sizes.cbHeader + sp.size() + stream_sizes.cbTrailer);
 
         buf[0].BufferType = SECBUFFER_STREAM_HEADER;
         buf[0].pvBuffer = payload.data();
         buf[0].cbBuffer = stream_sizes.cbHeader;
 
-        buf[1].cbBuffer = (long)sv.length();
+        buf[1].cbBuffer = (long)sp.size();
         buf[1].BufferType = SECBUFFER_DATA;
         buf[1].pvBuffer = payload.data() + stream_sizes.cbHeader;
 
         buf[2].BufferType = SECBUFFER_STREAM_TRAILER;
-        buf[2].pvBuffer = payload.data() + stream_sizes.cbHeader + sv.length();
+        buf[2].pvBuffer = payload.data() + stream_sizes.cbHeader + sp.size();
         buf[2].cbBuffer = stream_sizes.cbTrailer;
 
         buf[3].BufferType = SECBUFFER_EMPTY;
 
-        memcpy(buf[1].pvBuffer, sv.data(), sv.length());
+        memcpy(buf[1].pvBuffer, sp.data(), sp.size());
 
         bufdesc.ulVersion = SECBUFFER_VERSION;
         bufdesc.cBuffers = buf.size();
