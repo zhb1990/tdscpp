@@ -842,7 +842,7 @@ unsigned int coll_to_cp(const tds::collation& coll) {
 }
 
 static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_type type,
-                           unsigned int max_length, string_view& sv) {
+                           unsigned int max_length, span<const uint8_t>& sp) {
     switch (type) {
         case tds::sql_type::SQL_NULL:
         case tds::sql_type::TINYINT:
@@ -859,14 +859,14 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
         {
             auto len = fixed_len_size(type);
 
-            if (sv.length() < len)
-                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+            if (sp.size() < len)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), len);
 
             val.resize(len);
 
-            memcpy(val.data(), sv.data(), len);
+            memcpy(val.data(), sp.data(), len);
 
-            sv = sv.substr(len);
+            sp = sp.subspan(len);
 
             break;
         }
@@ -884,21 +884,21 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
         case tds::sql_type::DATETIME2:
         case tds::sql_type::DATETIMEOFFSET:
         {
-            if (sv.length() < sizeof(uint8_t))
-                throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
+            if (sp.size() < sizeof(uint8_t))
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sp.size());
 
-            auto len = *(uint8_t*)sv.data();
+            auto len = *(uint8_t*)sp.data();
 
-            sv = sv.substr(1);
+            sp = sp.subspan(1);
 
-            if (sv.length() < len)
-                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+            if (sp.size() < len)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), len);
 
             val.resize(len);
             is_null = len == 0;
 
-            memcpy(val.data(), sv.data(), len);
-            sv = sv.substr(len);
+            memcpy(val.data(), sp.data(), len);
+            sp = sp.subspan(len);
 
             break;
         }
@@ -911,12 +911,12 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
         case tds::sql_type::BINARY:
         case tds::sql_type::XML:
             if (max_length == 0xffff || type == tds::sql_type::XML) {
-                if (sv.length() < sizeof(uint64_t))
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
+                if (sp.size() < sizeof(uint64_t))
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sp.size());
 
-                auto len = *(uint64_t*)sv.data();
+                auto len = *(uint64_t*)sp.data();
 
-                sv = sv.substr(sizeof(uint64_t));
+                sp = sp.subspan(sizeof(uint64_t));
 
                 val.clear();
 
@@ -931,30 +931,30 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
                     val.reserve(len);
 
                 do {
-                    if (sv.length() < sizeof(uint32_t))
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
+                    if (sp.size() < sizeof(uint32_t))
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sp.size());
 
-                    auto chunk_len = *(uint32_t*)sv.data();
+                    auto chunk_len = *(uint32_t*)sp.data();
 
-                    sv = sv.substr(sizeof(uint32_t));
+                    sp = sp.subspan(sizeof(uint32_t));
 
                     if (chunk_len == 0)
                         break;
 
-                    if (sv.length() < chunk_len)
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), chunk_len);
+                    if (sp.size() < chunk_len)
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), chunk_len);
 
                     val.resize(val.size() + chunk_len);
-                    memcpy(val.data() + val.size() - chunk_len, sv.data(), chunk_len);
-                    sv = sv.substr(chunk_len);
+                    memcpy(val.data() + val.size() - chunk_len, sp.data(), chunk_len);
+                    sp = sp.subspan(chunk_len);
                 } while (true);
             } else {
-                if (sv.length() < sizeof(uint16_t))
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least 2).", sv.length());
+                if (sp.size() < sizeof(uint16_t))
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 2).", sp.size());
 
-                auto len = *(uint16_t*)sv.data();
+                auto len = *(uint16_t*)sp.data();
 
-                sv = sv.substr(sizeof(uint16_t));
+                sp = sp.subspan(sizeof(uint16_t));
 
                 if (len == 0xffff) {
                     is_null = true;
@@ -964,33 +964,33 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
                 val.resize(len);
                 is_null = false;
 
-                if (sv.length() < len)
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+                if (sp.size() < len)
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), len);
 
-                memcpy(val.data(), sv.data(), len);
-                sv = sv.substr(len);
+                memcpy(val.data(), sp.data(), len);
+                sp = sp.subspan(len);
             }
 
             break;
 
         case tds::sql_type::SQL_VARIANT:
         {
-            if (sv.length() < sizeof(uint32_t))
-                throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
+            if (sp.size() < sizeof(uint32_t))
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sp.size());
 
-            auto len = *(uint32_t*)sv.data();
+            auto len = *(uint32_t*)sp.data();
 
-            sv = sv.substr(sizeof(uint32_t));
+            sp = sp.subspan(sizeof(uint32_t));
 
             val.resize(len);
             is_null = len == 0xffffffff;
 
             if (!is_null) {
-                if (sv.length() < len)
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+                if (sp.size() < len)
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), len);
 
-                memcpy(val.data(), sv.data(), len);
-                sv = sv.substr(len);
+                memcpy(val.data(), sp.data(), len);
+                sp = sp.subspan(len);
             }
 
             break;
@@ -1002,46 +1002,46 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
         {
             // text pointer
 
-            if (sv.length() < sizeof(uint8_t))
-                throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sv.length());
+            if (sp.size() < sizeof(uint8_t))
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sp.size());
 
-            auto textptrlen = (uint8_t)sv[0];
+            auto textptrlen = (uint8_t)sp[0];
 
-            sv = sv.substr(1);
+            sp = sp.subspan(1);
 
-            if (sv.length() < textptrlen)
-                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), textptrlen);
+            if (sp.size() < textptrlen)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), textptrlen);
 
-            sv = sv.substr(textptrlen);
+            sp = sp.subspan(textptrlen);
 
             is_null = textptrlen == 0;
 
             if (!is_null) {
                 // timestamp
 
-                if (sv.length() < 8)
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sv.length());
+                if (sp.size() < 8)
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sp.size());
 
-                sv = sv.substr(8);
+                sp = sp.subspan(8);
 
                 // data
 
-                if (sv.length() < sizeof(uint32_t))
-                    throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sv.length());
+                if (sp.size() < sizeof(uint32_t))
+                    throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sp.size());
 
-                auto len = *(uint32_t*)sv.data();
+                auto len = *(uint32_t*)sp.data();
 
-                sv = sv.substr(sizeof(uint32_t));
+                sp = sp.subspan(sizeof(uint32_t));
 
                 val.resize(len);
                 is_null = len == 0xffffffff;
 
                 if (!is_null) {
-                    if (sv.length() < len)
-                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sv.length(), len);
+                    if (sp.size() < len)
+                        throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), len);
 
-                    memcpy(val.data(), sv.data(), len);
-                    sv = sv.substr(len);
+                    memcpy(val.data(), sp.data(), len);
+                    sp = sp.subspan(len);
                 }
             }
 
@@ -1051,15 +1051,6 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
         default:
             throw formatted_error("Unhandled type {} in ROW message.", type);
     }
-}
-
-static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_type type,
-                           unsigned int max_length, span<const uint8_t>& sp) {
-    auto sv = string_view((char*)sp.data(), sp.size());
-
-    handle_row_col(val, is_null, type, max_length, sv);
-
-    sp = span((uint8_t*)sv.data(), sv.size());
 }
 
 #ifdef HAVE_GSSAPI
