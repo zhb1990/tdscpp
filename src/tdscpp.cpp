@@ -2884,7 +2884,7 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         if (do_ssl)
-            ssl->recv((uint8_t*)&h, sizeof(tds_header));
+            ssl->recv(span((uint8_t*)&h, sizeof(tds_header)));
         else
 #endif
             recv_raw(span((uint8_t*)&h, sizeof(tds_header)));
@@ -2903,7 +2903,7 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
             if (do_ssl)
-                ssl->recv(&payload[0], left);
+                ssl->recv(span(payload.data(), left));
             else
 #endif
                 recv_raw(span(payload.data(), left));

@@ -451,7 +451,7 @@ namespace tds {
         established = true;
     }
 
-    void tds_ssl::send(std::span<const uint8_t> sp) {
+    void tds_ssl::send(span<const uint8_t> sp) {
         while (!sp.empty()) {
             auto ret = SSL_write(ssl.get(), sp.data(), (int)sp.size());
 
@@ -466,9 +466,9 @@ namespace tds {
         }
     }
 
-    void tds_ssl::recv(uint8_t* ptr, size_t left) {
-        while (left > 0) {
-            auto ret = SSL_read(ssl.get(), ptr, (int)left);
+    void tds_ssl::recv(span<uint8_t> sp) {
+        while (!sp.empty()) {
+            auto ret = SSL_read(ssl.get(), sp.data(), (int)sp.size());
 
             if (ret <= 0) {
                 if (exception)
@@ -477,8 +477,7 @@ namespace tds {
                 throw formatted_error("SSL_read failed (error {})", SSL_get_error(ssl.get(), ret));
             }
 
-            ptr += ret;
-            left -= ret;
+            sp = sp.subspan(ret);
         }
     }
 };
@@ -589,7 +588,7 @@ namespace tds {
         FreeCredentialsHandle(&cred_handle);
     }
 
-    void tds_ssl::send(std::span<const uint8_t> sp) {
+    void tds_ssl::send(span<const uint8_t> sp) {
         SECURITY_STATUS sec_status;
         array<SecBuffer, 4> buf;
         SecBufferDesc bufdesc;
@@ -629,32 +628,31 @@ namespace tds {
         tds.send_raw(payload);
     }
 
-    void tds_ssl::recv(uint8_t* ptr, size_t left) {
+    void tds_ssl::recv(span<uint8_t> sp) {
         SECURITY_STATUS sec_status;
         array<SecBuffer, 4> buf;
         SecBufferDesc bufdesc;
         vector<uint8_t> recvbuf;
 
-        if (left == 0)
+        if (sp.empty())
             return;
 
         if (!ssl_recv_buf.empty()) {
-            auto to_copy = min(left, ssl_recv_buf.length());
+            auto to_copy = min(sp.size(), ssl_recv_buf.length());
 
-            memcpy(ptr, ssl_recv_buf.data(), to_copy);
+            memcpy(sp.data(), ssl_recv_buf.data(), to_copy);
             ssl_recv_buf = ssl_recv_buf.substr(to_copy);
 
-            if (left == to_copy)
+            if (sp.size() == to_copy)
                 return;
 
-            left -= to_copy;
-            ptr += to_copy;
+            sp = sp.subspan(to_copy);
         }
 
         recvbuf.resize(stream_sizes.cbHeader);
         tds.recv_raw(recvbuf);
 
-        while (left > 0) {
+        while (!sp.empty()) {
             bool found = false;
 
             memset(buf.data(), 0, sizeof(SecBuffer) * buf.size());
@@ -682,12 +680,11 @@ namespace tds {
 
             for (const auto& b : buf) {
                 if (b.BufferType == SECBUFFER_DATA) {
-                    auto to_copy = min(left, (size_t)b.cbBuffer);
+                    auto to_copy = min(sp.size(), (size_t)b.cbBuffer);
 
-                    memcpy(ptr, b.pvBuffer, to_copy);
+                    memcpy(sp.data(), b.pvBuffer, to_copy);
 
-                    ptr += to_copy;
-                    left -= to_copy;
+                    sp = sp.subspan(to_copy);
 
                     ssl_recv_buf += string_view((char*)b.pvBuffer + to_copy, b.cbBuffer - to_copy);
 
@@ -699,7 +696,7 @@ namespace tds {
             if (!found)
                 throw runtime_error("DecryptMessage did not return a SECBUFFER_DATA buffer.");
 
-            if (left == 0)
+            if (sp.empty())
                 break;
 
             recvbuf.resize(stream_sizes.cbHeader);
