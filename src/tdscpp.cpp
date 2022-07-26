@@ -1065,6 +1065,15 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
     }
 }
 
+static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_type type,
+                           unsigned int max_length, span<const uint8_t>& sp) {
+    auto sv = string_view((char*)sp.data(), sp.size());
+
+    handle_row_col(val, is_null, type, max_length, sv);
+
+    sp = span((uint8_t*)sv.data(), sv.size());
+}
+
 #ifdef HAVE_GSSAPI
 template<>
 struct fmt::formatter<enum krb5_minor> {
@@ -4410,21 +4419,21 @@ namespace tds {
             throw formatted_error("Data remaining in buffer");
 
         while (!tokens.empty()) {
-            auto t = move(tokens.front());
+            const auto t = move(tokens.front());
 
             tokens.pop_front();
 
-            string_view sv = t;
+            span sp = t;
 
-            auto type = (token)sv[0];
-            sv = sv.substr(1);
+            auto type = (token)sp[0];
+            sp = sp.subspan(1);
 
             switch (type) {
                 case token::DONE:
                 case token::DONEINPROC:
                 case token::DONEPROC:
                 {
-                    const auto& msg = *(tds_done_msg*)sv.data();
+                    const auto& msg = *(tds_done_msg*)sp.data();
 
                     if (msg.status & 0x20) // attention
                         received_attn = true;
@@ -4439,36 +4448,36 @@ namespace tds {
                 case token::TDS_ERROR:
                 case token::ENVCHANGE:
                 {
-                    if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
+                    if (sp.size() < sizeof(uint16_t))
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sp.size());
 
-                    auto len = *(uint16_t*)&sv[0];
+                    auto len = *(uint16_t*)&sp[0];
 
-                    sv = sv.substr(sizeof(uint16_t));
+                    sp = sp.subspan(sizeof(uint16_t));
 
-                    if (sv.length() < len)
-                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
+                    if (sp.size() < len)
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), len);
 
                     if (type == token::INFO) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(sv.substr(0, len), false);
+                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), false);
                     } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(sv.substr(0, len), true);
+                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), true);
                         else
-                            throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
+                            throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sv.substr(0, len));
+                        conn.impl->handle_envchange_msg(string_view((char*)sp.data(), len));
 
                     break;
                 }
 
                 case token::COLMETADATA:
                 {
-                    if (sv.length() < 4)
-                        throw formatted_error("Short COLMETADATA message ({} bytes, expected at least 4).", sv.length());
+                    if (sp.size() < 4)
+                        throw formatted_error("Short COLMETADATA message ({} bytes, expected at least 4).", sp.size());
 
-                    auto num_columns = *(uint16_t*)&sv[0];
+                    auto num_columns = *(uint16_t*)&sp[0];
 
                     cols.clear();
                     cols.reserve(num_columns);
@@ -4477,18 +4486,18 @@ namespace tds {
                         break;
 
                     size_t len = sizeof(uint16_t);
-                    string_view sv2 = sv;
+                    auto sp2 = sp;
 
-                    sv2 = sv2.substr(sizeof(uint16_t));
+                    sp2 = sp2.subspan(sizeof(uint16_t));
 
                     for (unsigned int i = 0; i < num_columns; i++) {
-                        if (sv2.length() < sizeof(tds_colmetadata_col))
-                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(tds_colmetadata_col));
+                        if (sp2.size() < sizeof(tds_colmetadata_col))
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), sizeof(tds_colmetadata_col));
 
-                        auto& c = *(tds_colmetadata_col*)&sv2[0];
+                        auto& c = *(tds_colmetadata_col*)&sp2[0];
 
                         len += sizeof(tds_colmetadata_col);
-                        sv2 = sv2.substr(sizeof(tds_colmetadata_col));
+                        sp2 = sp2.subspan(sizeof(tds_colmetadata_col));
 
                         cols.emplace_back();
 
@@ -4522,110 +4531,110 @@ namespace tds {
                             case sql_type::BITN:
                             case sql_type::MONEYN:
                             case sql_type::UNIQUEIDENTIFIER:
-                                if (sv2.length() < sizeof(uint8_t))
-                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
+                                if (sp2.size() < sizeof(uint8_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sp2.size());
 
-                                col.max_length = *(uint8_t*)sv2.data();
+                                col.max_length = *(uint8_t*)sp2.data();
 
                                 len++;
-                                sv2 = sv2.substr(1);
+                                sp2 = sp2.subspan(1);
                                 break;
 
                             case sql_type::VARCHAR:
                             case sql_type::NVARCHAR:
                             case sql_type::CHAR:
                             case sql_type::NCHAR: {
-                                if (sv2.length() < sizeof(uint16_t) + sizeof(collation))
-                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(uint16_t) + sizeof(collation));
+                                if (sp2.size() < sizeof(uint16_t) + sizeof(collation))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), sizeof(uint16_t) + sizeof(collation));
 
-                                col.max_length = *(uint16_t*)sv2.data();
+                                col.max_length = *(uint16_t*)sp2.data();
 
-                                col.coll = *(collation*)(sv2.data() + sizeof(uint16_t));
+                                col.coll = *(collation*)(sp2.data() + sizeof(uint16_t));
 
                                 len += sizeof(uint16_t) + sizeof(collation);
-                                sv2 = sv2.substr(sizeof(uint16_t) + sizeof(collation));
+                                sp2 = sp2.subspan(sizeof(uint16_t) + sizeof(collation));
                                 break;
                             }
 
                             case sql_type::VARBINARY:
                             case sql_type::BINARY:
-                                if (sv2.length() < sizeof(uint16_t))
-                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), sizeof(uint16_t));
+                                if (sp2.size() < sizeof(uint16_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), sizeof(uint16_t));
 
-                                col.max_length = *(uint16_t*)sv2.data();
+                                col.max_length = *(uint16_t*)sp2.data();
 
                                 len += sizeof(uint16_t);
-                                sv2 = sv2.substr(sizeof(uint16_t));
+                                sp2 = sp2.subspan(sizeof(uint16_t));
                                 break;
 
                             case sql_type::XML:
-                                if (sv2.length() < sizeof(uint8_t))
-                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
+                                if (sp2.size() < sizeof(uint8_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sp2.size());
 
                                 len += sizeof(uint8_t);
-                                sv2 = sv2.substr(sizeof(uint8_t));
+                                sp2 = sp2.subspan(sizeof(uint8_t));
                                 break;
 
                             case sql_type::DECIMAL:
                             case sql_type::NUMERIC:
-                                if (sv2.length() < 3)
-                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 3).", sv2.length());
+                                if (sp2.size() < 3)
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 3).", sp2.size());
 
-                                col.max_length = (uint8_t)sv2[0];
-                                col.precision = (uint8_t)sv2[1];
-                                col.scale = (uint8_t)sv2[2];
+                                col.max_length = (uint8_t)sp2[0];
+                                col.precision = (uint8_t)sp2[1];
+                                col.scale = (uint8_t)sp2[2];
 
                                 len += 3;
-                                sv2 = sv2.substr(3);
+                                sp2 = sp2.subspan(3);
 
                                 break;
 
                             case sql_type::SQL_VARIANT:
-                                if (sv2.length() < sizeof(uint32_t))
-                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 4).", sv2.length());
+                                if (sp2.size() < sizeof(uint32_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 4).", sp2.size());
 
-                                col.max_length = *(uint32_t*)sv2.data();
+                                col.max_length = *(uint32_t*)sp2.data();
 
-                                sv2 = sv2.substr(sizeof(uint32_t));
+                                sp2 = sp2.subspan(sizeof(uint32_t));
                                 break;
 
                             case sql_type::IMAGE:
                             case sql_type::NTEXT:
                             case sql_type::TEXT:
                             {
-                                if (sv2.length() < sizeof(uint32_t))
-                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 4).", sv2.length());
+                                if (sp2.size() < sizeof(uint32_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 4).", sp2.size());
 
-                                col.max_length = *(uint32_t*)sv2.data();
+                                col.max_length = *(uint32_t*)sp2.data();
 
-                                sv2 = sv2.substr(sizeof(uint32_t));
+                                sp2 = sp2.subspan(sizeof(uint32_t));
 
                                 if (c.type == sql_type::TEXT || c.type == sql_type::NTEXT) {
-                                    if (sv2.length() < sizeof(collation))
-                                        throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 5).", sv2.length());
+                                    if (sp2.size() < sizeof(collation))
+                                        throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 5).", sp2.size());
 
-                                    sv2 = sv2.substr(sizeof(collation));
+                                    sp2 = sp2.subspan(sizeof(collation));
                                 }
 
-                                if (sv2.length() < 1)
+                                if (sp2.size() < 1)
                                     return;
 
-                                auto num_parts = (uint8_t)sv2[0];
+                                auto num_parts = (uint8_t)sp2[0];
 
-                                sv2 = sv2.substr(1);
+                                sp2 = sp2.subspan(1);
 
                                 for (uint8_t j = 0; j < num_parts; j++) {
-                                    if (sv2.length() < sizeof(uint16_t))
+                                    if (sp2.size() < sizeof(uint16_t))
                                         return;
 
-                                    auto partlen = *(uint16_t*)sv2.data();
+                                    auto partlen = *(uint16_t*)sp2.data();
 
-                                    sv2 = sv2.substr(sizeof(uint16_t));
+                                    sp2 = sp2.subspan(sizeof(uint16_t));
 
-                                    if (sv2.length() < partlen * sizeof(char16_t))
+                                    if (sp2.size() < partlen * sizeof(char16_t))
                                         return;
 
-                                    sv2 = sv2.substr(partlen * sizeof(char16_t));
+                                    sp2 = sp2.subspan(partlen * sizeof(char16_t));
                                 }
 
                                 break;
@@ -4635,20 +4644,20 @@ namespace tds {
                                 throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
                         }
 
-                        if (sv2.length() < 1)
-                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sv2.length());
+                        if (sp2.size() < 1)
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sp2.size());
 
-                        auto name_len = *(uint8_t*)&sv2[0];
+                        auto name_len = *(uint8_t*)&sp2[0];
 
-                        sv2 = sv2.substr(1);
+                        sp2 = sp2.subspan(1);
                         len++;
 
-                        if (sv2.length() < name_len * sizeof(char16_t))
-                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sv2.length(), name_len * sizeof(char16_t));
+                        if (sp2.size() < name_len * sizeof(char16_t))
+                            throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), name_len * sizeof(char16_t));
 
-                        col.name = u16string_view((char16_t*)sv2.data(), name_len);
+                        col.name = u16string_view((char16_t*)sp2.data(), name_len);
 
-                        sv2 = sv2.substr(name_len * sizeof(char16_t));
+                        sp2 = sp2.subspan(name_len * sizeof(char16_t));
                         len += name_len * sizeof(char16_t);
                     }
 
@@ -4665,7 +4674,7 @@ namespace tds {
                     for (unsigned int i = 0; i < row.size(); i++) {
                         auto& col = row[i];
 
-                        handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sv);
+                        handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sp);
                     }
 
                     break;
@@ -4683,13 +4692,13 @@ namespace tds {
 
                     auto bitset_length = (cols.size() + 7) / 8;
 
-                    if (sv.length() < bitset_length)
-                        throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sv.length(), bitset_length);
+                    if (sp.size() < bitset_length)
+                        throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sp.size(), bitset_length);
 
-                    string_view bitset(sv.data(), bitset_length);
+                    string_view bitset((char*)sp.data(), bitset_length);
                     auto bsv = (uint8_t)bitset[0];
 
-                    sv = sv.substr(bitset_length);
+                    sp = sp.subspan(bitset_length);
 
                     for (unsigned int i = 0; i < row.size(); i++) {
                         auto& col = row[i];
@@ -4705,7 +4714,7 @@ namespace tds {
                         if (bsv & 1) // NULL
                             get<1>(col) = true;
                         else
-                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sv);
+                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sp);
                     }
 
                     break;
@@ -4713,22 +4722,22 @@ namespace tds {
 
                 case token::ORDER:
                 {
-                    if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error("Short ORDER message ({} bytes, expected at least {}).", sv.length(), sizeof(uint16_t));
+                    if (sp.size() < sizeof(uint16_t))
+                        throw formatted_error("Short ORDER message ({} bytes, expected at least {}).", sp.size(), sizeof(uint16_t));
 
-                    auto len = *(uint16_t*)sv.data();
-                    sv = sv.substr(sizeof(uint16_t));
+                    auto len = *(uint16_t*)sp.data();
+                    sp = sp.subspan(sizeof(uint16_t));
 
-                    if (sv.length() < len)
-                        throw formatted_error("Short ORDER message ({} bytes, expected {}).", sv.length(), len);
+                    if (sp.size() < len)
+                        throw formatted_error("Short ORDER message ({} bytes, expected {}).", sp.size(), len);
 
                     break;
                 }
 
                 case token::RETURNSTATUS:
                 {
-                    if (sv.length() < sizeof(int32_t))
-                        throw formatted_error("Short RETURNSTATUS message ({} bytes, expected 4).", sv.length());
+                    if (sp.size() < sizeof(int32_t))
+                        throw formatted_error("Short RETURNSTATUS message ({} bytes, expected 4).", sp.size());
 
                     break;
                 }
