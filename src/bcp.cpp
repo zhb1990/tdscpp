@@ -1227,16 +1227,16 @@ namespace tds {
                     auto type = vv.type;
                     auto precision = vv.precision;
                     auto scale = vv.scale;
-                    string_view data{(char*)vv.val.data(), vv.val.size()};
+                    span data = vv.val;
 
                     if (type == sql_type::SQL_VARIANT) {
                         type = (sql_type)data[0];
 
-                        data = data.substr(1);
+                        data = data.subspan(1);
 
                         auto propbytes = (uint8_t)data[0];
 
-                        data = data.substr(1);
+                        data = data.subspan(1);
 
                         switch (type) {
                             case sql_type::NUMERIC:
@@ -1249,7 +1249,7 @@ namespace tds {
                                 break;
                         }
 
-                        data = data.substr(propbytes);
+                        data = data.subspan(propbytes);
                     }
 
                     switch (type) {
@@ -1258,14 +1258,14 @@ namespace tds {
                             const auto& lim = numeric_limit_vals[col.precision - 1];
                             numeric<0> n;
 
-                            if (data.length() >= 9)
+                            if (data.size() >= 9)
                                 n.low_part = *(uint64_t*)&data[1];
                             else
                                 n.low_part = *(uint32_t*)&data[1];
 
-                            if (data.length() >= 17)
+                            if (data.size() >= 17)
                                 n.high_part = *(uint64_t*)&data[1 + sizeof(uint64_t)];
-                            else if (data.length() >= 13)
+                            else if (data.size() >= 13)
                                 n.high_part = *(uint32_t*)&data[1 + sizeof(uint64_t)];
                             else
                                 n.high_part = 0;
@@ -1283,10 +1283,10 @@ namespace tds {
                             }
 
                             if (precision == col.precision && scale == col.scale) {
-                                *ptr = (uint8_t)data.length();
+                                *ptr = (uint8_t)data.size();
                                 ptr++;
-                                memcpy(ptr, data.data(), data.length());
-                                ptr += data.length();
+                                memcpy(ptr, data.data(), data.size());
+                                ptr += data.size();
                                 break;
                             }
 
