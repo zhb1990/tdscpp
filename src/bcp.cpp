@@ -1515,11 +1515,11 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        auto sv = string_view((char*)payload.data(), payload.size());
+        span sp = payload;
 
-        while (!sv.empty()) {
-            auto type = (token)sv[0];
-            sv = sv.substr(1);
+        while (!sp.empty()) {
+            auto type = (token)sp[0];
+            sp = sp.subspan(1);
 
             // FIXME - parse unknowns according to numeric value of type
 
@@ -1527,17 +1527,17 @@ namespace tds {
                 case token::DONE:
                 case token::DONEINPROC:
                 case token::DONEPROC:
-                    if (sv.length() < sizeof(tds_done_msg))
-                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
+                    if (sp.size() < sizeof(tds_done_msg))
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), sizeof(tds_done_msg));
 
                     if (impl->count_handler) {
-                        auto msg = (tds_done_msg*)sv.data();
+                        auto msg = (tds_done_msg*)sp.data();
 
                         if (msg->status & 0x10) // row count valid
                             impl->count_handler(msg->rowcount, msg->curcmd);
                     }
 
-                    sv = sv.substr(sizeof(tds_done_msg));
+                    sp = sp.subspan(sizeof(tds_done_msg));
 
                     break;
 
@@ -1545,28 +1545,28 @@ namespace tds {
                 case token::TDS_ERROR:
                 case token::ENVCHANGE:
                 {
-                    if (sv.length() < sizeof(uint16_t))
-                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
+                    if (sp.size() < sizeof(uint16_t))
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sp.size());
 
-                    auto len = *(uint16_t*)&sv[0];
+                    auto len = *(uint16_t*)&sp[0];
 
-                    sv = sv.substr(sizeof(uint16_t));
+                    sp = sp.subspan(sizeof(uint16_t));
 
-                    if (sv.length() < len)
-                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
+                    if (sp.size() < len)
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), len);
 
                     if (type == token::INFO) {
                         if (impl->message_handler)
-                            impl->handle_info_msg(sv.substr(0, len), false);
+                            impl->handle_info_msg(string_view((char*)sp.data(), len), false);
                     } else if (type == token::TDS_ERROR) {
                         if (impl->message_handler)
-                            impl->handle_info_msg(sv.substr(0, len), true);
+                            impl->handle_info_msg(string_view((char*)sp.data(), len), true);
 
-                        throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
+                        throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
-                        impl->handle_envchange_msg(sv.substr(0, len));
+                        impl->handle_envchange_msg(string_view((char*)sp.data(), len));
 
-                    sv = sv.substr(len);
+                    sp = sp.subspan(len);
 
                     break;
                 }
