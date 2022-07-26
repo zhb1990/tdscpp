@@ -2803,7 +2803,7 @@ namespace tds {
     void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
-        string payload;
+        vector<uint8_t> payload;
         const size_t size = packet_size - sizeof(tds_header);
         auto sv = msg;
 
@@ -2831,10 +2831,10 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
             if (do_ssl && ssl)
-                ssl->send(payload);
+                ssl->send(string_view((char*)payload.data(), payload.size()));
             else
 #endif
-                send_raw(payload);
+                send_raw(string_view((char*)payload.data(), payload.size()));
 
             if (sv2.size() == sv.size())
                 return;
