@@ -334,7 +334,7 @@ namespace tds {
 
     int tds_ssl::ssl_write_cb(string_view sv) {
         if (established)
-            tds.send_raw(sv);
+            tds.send_raw(span((uint8_t*)sv.data(), sv.size()));
         else
             tds.send_msg(tds_msg::prelogin, span((uint8_t*)sv.data(), sv.size()), false);
 

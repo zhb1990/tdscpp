@@ -518,7 +518,7 @@ namespace tds {
                  const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                  bool check_certificate);
         ~tds_impl();
-        void send_raw(std::string_view msg);
+        void send_raw(std::span<const uint8_t> msg);
         void recv_raw(uint8_t* ptr, size_t left);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg, bool do_ssl = true);

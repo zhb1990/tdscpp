@@ -2757,26 +2757,22 @@ namespace tds {
         send_msg(tds_msg::tds7_login, payload);
     }
 
-    void tds_impl::send_raw(string_view msg) {
-        auto ptr = (uint8_t*)msg.data();
-        auto left = (int)msg.length();
-
+    void tds_impl::send_raw(span<const uint8_t> msg) {
         do {
 #ifdef _WIN32
             if (pipe.get() != INVALID_HANDLE_VALUE) {
                 DWORD written;
 
-                if (!WriteFile(pipe.get(), ptr, left, &written, nullptr))
+                if (!WriteFile(pipe.get(), msg.data(), (DWORD)msg.size(), &written, nullptr))
                     throw last_error("WriteFile", GetLastError());
 
-                if (written == (DWORD)left)
+                if (written == (DWORD)msg.size())
                     break;
 
-                ptr += written;
-                left -= (int)written;
+                msg = msg.subspan(written);
             } else {
 #endif
-                auto ret = send(sock, (char*)ptr, left, 0);
+                auto ret = send(sock, (char*)msg.data(), (int)msg.size(), 0);
 
 #ifdef _WIN32
                 if (ret < 0)
@@ -2786,11 +2782,10 @@ namespace tds {
                     throw formatted_error("send failed (error {})", errno);
 #endif
 
-                if (ret == left)
+                if (ret == (int)msg.size())
                     break;
 
-                ptr += ret;
-                left -= (int)ret;
+                msg = msg.subspan(ret);
 #ifdef _WIN32
             }
 #endif
@@ -2834,7 +2829,7 @@ namespace tds {
                 ssl->send(string_view((char*)payload.data(), payload.size()));
             else
 #endif
-                send_raw(string_view((char*)payload.data(), payload.size()));
+                send_raw(payload);
 
             if (sv2.size() == sv.size())
                 return;
