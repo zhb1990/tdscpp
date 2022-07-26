@@ -49,22 +49,22 @@ static weak_ordering compare_strings(u16string_view val1, u16string_view val2, c
         else if (val1.front() > val2.front())
             return weak_ordering::greater;
 
-        auto sv1 = basic_string_view<uint8_t>{(uint8_t*)&val1[1], (val1.length() * sizeof(char16_t)) - 1};
-        auto sv2 = basic_string_view<uint8_t>{(uint8_t*)&val2[1], (val2.length() * sizeof(char16_t)) - 1};
+        auto sp1 = span((uint8_t*)&val1[1], (val1.length() * sizeof(char16_t)) - 1);
+        auto sp2 = span((uint8_t*)&val2[1], (val2.length() * sizeof(char16_t)) - 1);
 
-        while (!sv1.empty() && !sv2.empty()) {
-            if (sv1.front() < sv2.front())
+        while (!sp1.empty() && !sp2.empty()) {
+            if (sp1.front() < sp2.front())
                 return weak_ordering::less;
-            else if (sv1.front() > sv2.front())
+            else if (sp1.front() > sp2.front())
                 return weak_ordering::greater;
 
-            sv1.remove_prefix(1);
-            sv2.remove_prefix(1);
+            sp1 = sp1.subspan(1);
+            sp2 = sp2.subspan(1);
         }
 
-        if (sv1.empty() && sv2.empty())
+        if (sp1.empty() && sp2.empty())
             return weak_ordering::equivalent;
-        else if (sv1.empty())
+        else if (sp1.empty())
             return weak_ordering::less;
         else
             return weak_ordering::greater;
