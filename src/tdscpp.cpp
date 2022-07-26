@@ -2088,7 +2088,7 @@ namespace tds {
         lov.build = 0;
         lov.subbuild = 0;
 
-        opts.emplace_back(tds_login_opt_type::version, string_view{(char*)&lov, sizeof(lov)});
+        opts.emplace_back(tds_login_opt_type::version, span{(uint8_t*)&lov, sizeof(lov)});
 
         // encryption
 
@@ -2096,7 +2096,7 @@ namespace tds {
 
         // instopt
 
-        opts.emplace_back(tds_login_opt_type::instopt, instance);
+        opts.emplace_back(tds_login_opt_type::instopt, span((uint8_t*)instance.begin(), instance.size()));
 
         // MARS
 

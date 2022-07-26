@@ -99,14 +99,14 @@ enum class tds_login_opt_type : uint8_t {
 };
 
 struct login_opt {
-    login_opt(enum tds_login_opt_type type, std::string_view payload) : type(type), payload(payload) { }
+    login_opt(enum tds_login_opt_type type, std::span<const uint8_t> payload) : type(type), payload(payload.data(), payload.data() + payload.size()) { }
 
     template<typename T>
     requires std::is_integral_v<T> || std::is_enum_v<T>
-    login_opt(enum tds_login_opt_type type, T payload) : type(type), payload(std::string_view{(char*)&payload, sizeof(payload)}) { }
+    login_opt(enum tds_login_opt_type type, T payload) : login_opt(type, std::span{(const uint8_t*)&payload, sizeof(payload)}) { }
 
     enum tds_login_opt_type type;
-    std::string payload;
+    std::vector<uint8_t> payload;
 };
 
 struct login_opt_version {
