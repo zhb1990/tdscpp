@@ -1407,7 +1407,7 @@ namespace tds {
         std::map<unsigned int, value*> output_params;
         bool finished = false, received_attn = false;
         std::list<std::vector<std::pair<value_data_t, bool>>> rows;
-        std::list<std::string> tokens;
+        std::list<std::vector<uint8_t>> tokens;
         std::vector<uint8_t> buf;
         std::vector<column> buf_columns;
         std::u16string name;
