@@ -2817,14 +2817,14 @@ namespace tds {
 
             payload.resize(sv2.size() + sizeof(tds_header));
 
-            auto h = (tds_header*)payload.data();
+            auto& h = *(tds_header*)payload.data();
 
-            h->type = type;
-            h->status = sv2.size() == sv.size() ? 1 : 0; // 1 == last message
-            h->length = htons((uint16_t)(sv2.size() + sizeof(tds_header)));
-            h->spid = 0;
-            h->packet_id = 0; // FIXME? "Currently ignored" according to spec
-            h->window = 0;
+            h.type = type;
+            h.status = sv2.size() == sv.size() ? 1 : 0; // 1 == last message
+            h.length = htons((uint16_t)(sv2.size() + sizeof(tds_header)));
+            h.spid = 0;
+            h.packet_id = 0; // FIXME? "Currently ignored" according to spec
+            h.window = 0;
 
             if (!sv2.empty())
                 memcpy(payload.data() + sizeof(tds_header), sv2.data(), sv2.size());
