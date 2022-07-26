@@ -2150,10 +2150,10 @@ namespace tds {
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
 
-        auto sv = string_view((char*)payload.data(), payload.size());
+        span sp = payload;
 
-        while (sv.length() > sizeof(tds_login_opt)) {
-            tlo = (tds_login_opt*)sv.data();
+        while (sp.size() > sizeof(tds_login_opt)) {
+            tlo = (tds_login_opt*)sp.data();
 
             if (tlo->type == tds_login_opt_type::terminator)
                 break;
@@ -2171,7 +2171,7 @@ namespace tds {
                 server_enc = *(enum encryption_type*)(payload.data() + off);
             }
 
-            sv.remove_prefix(sizeof(tds_login_opt));
+            sp = sp.subspan(sizeof(tds_login_opt));
         }
 
 #if !defined(WITH_OPENSSL) && !defined(_WIN32)
