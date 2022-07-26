@@ -5116,14 +5116,12 @@ namespace tds {
         committed = true;
     }
 
-    void TDSCPP to_json(nlohmann::json& j, const value& v) {
+    nlohmann::json TDSCPP to_json(const value& v) {
         auto type2 = v.type;
         auto val = string_view{(char*)v.val.data(), v.val.size()};
 
-        if (v.is_null) {
-            j = nlohmann::json(nullptr);
-            return;
-        }
+        if (v.is_null)
+            return nlohmann::json(nullptr);
 
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)val[0];
@@ -5141,8 +5139,7 @@ namespace tds {
             case sql_type::SMALLINT:
             case sql_type::INT:
             case sql_type::BIGINT:
-                j = nlohmann::json((int64_t)v);
-                break;
+                return nlohmann::json((int64_t)v);
 
             case sql_type::NUMERIC:
             case sql_type::DECIMAL:
@@ -5151,16 +5148,14 @@ namespace tds {
             case sql_type::MONEYN:
             case sql_type::MONEY:
             case sql_type::SMALLMONEY:
-                j = nlohmann::json((double)v);
-                break;
+                return nlohmann::json((double)v);
 
             case sql_type::BITN:
             case sql_type::BIT:
-                j = nlohmann::json(val[0] != 0);
-                break;
+                return nlohmann::json(val[0] != 0);
 
             default:
-                j = nlohmann::json((string)v);
+                return nlohmann::json((string)v);
         }
     }
 
