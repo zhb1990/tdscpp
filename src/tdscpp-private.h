@@ -591,7 +591,7 @@ namespace tds {
 
     private:
         tds_impl& tds;
-        std::string ssl_recv_buf;
+        std::vector<uint8_t> ssl_recv_buf;
 #ifdef WITH_OPENSSL
         bool established = false;
         BIO* bio;

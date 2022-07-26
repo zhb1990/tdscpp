@@ -293,15 +293,19 @@ namespace tds {
             return 0;
 
         if (!ssl_recv_buf.empty()) {
-            auto to_copy = min(sp.size(), ssl_recv_buf.length());
+            auto to_copy = min(sp.size(), ssl_recv_buf.size());
 
             memcpy(sp.data(), ssl_recv_buf.data(), to_copy);
-            ssl_recv_buf = ssl_recv_buf.substr(to_copy);
+
+            vector<uint8_t> newbuf{ssl_recv_buf.data() + to_copy, ssl_recv_buf.data() + ssl_recv_buf.size()};
+
+            ssl_recv_buf.swap(newbuf);
 
             if (sp.size() == to_copy)
                 return (int)sp.size();
 
             sp = sp.subspan(to_copy);
+
             copied = (int)to_copy;
         }
 
@@ -325,7 +329,7 @@ namespace tds {
             copied += (int)to_copy;
 
             if (payload.size() > to_copy)
-                ssl_recv_buf.append(string_view((char*)payload.data(), payload.size()).substr(to_copy));
+                ssl_recv_buf.insert(ssl_recv_buf.end(), payload.data() + to_copy, payload.data() + payload.size());
 
             return copied;
         }
@@ -638,10 +642,13 @@ namespace tds {
             return;
 
         if (!ssl_recv_buf.empty()) {
-            auto to_copy = min(sp.size(), ssl_recv_buf.length());
+            auto to_copy = min(sp.size(), ssl_recv_buf.size());
 
             memcpy(sp.data(), ssl_recv_buf.data(), to_copy);
-            ssl_recv_buf = ssl_recv_buf.substr(to_copy);
+
+            vector<uint8_t> newbuf{ssl_recv_buf.data() + to_copy, ssl_recv_buf.data() + ssl_recv_buf.size()};
+
+            ssl_recv_buf.swap(newbuf);
 
             if (sp.size() == to_copy)
                 return;
@@ -686,7 +693,7 @@ namespace tds {
 
                     sp = sp.subspan(to_copy);
 
-                    ssl_recv_buf += string_view((char*)b.pvBuffer + to_copy, b.cbBuffer - to_copy);
+                    ssl_recv_buf.insert(ssl_recv_buf.end(), (uint8_t*)b.pvBuffer + to_copy, (uint8_t*)b.pvBuffer + b.cbBuffer);
 
                     found = true;
                     break;
