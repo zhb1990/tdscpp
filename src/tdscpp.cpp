@@ -2375,7 +2375,7 @@ namespace tds {
 #endif
             bool last_packet;
             vector<uint8_t> buf;
-            list<string> tokens;
+            list<vector<uint8_t>> tokens;
             vector<column> buf_columns;
             string sspibuf;
 
@@ -2406,14 +2406,14 @@ namespace tds {
 
                     auto type = (token)t[0];
 
-                    auto sv = string_view(t).substr(1);
+                    auto sp = span(t).subspan(1);
 
                     switch (type) {
                         case token::DONE:
                         case token::DONEINPROC:
                         case token::DONEPROC:
-                            if (sv.length() < sizeof(tds_done_msg))
-                                throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), sizeof(tds_done_msg));
+                            if (sp.size() < sizeof(tds_done_msg))
+                                throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), sizeof(tds_done_msg));
 
                             break;
 
@@ -2422,29 +2422,29 @@ namespace tds {
                         case token::TDS_ERROR:
                         case token::ENVCHANGE:
                         {
-                            if (sv.length() < sizeof(uint16_t))
-                                throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
+                            if (sp.size() < sizeof(uint16_t))
+                                throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sp.size());
 
-                            auto len = *(uint16_t*)&sv[0];
+                            auto len = *(uint16_t*)&sp[0];
 
-                            sv = sv.substr(sizeof(uint16_t));
+                            sp = sp.subspan(sizeof(uint16_t));
 
-                            if (sv.length() < len)
-                                throw formatted_error("Short {} message ({} bytes, expected {}).", type, sv.length(), len);
+                            if (sp.size() < len)
+                                throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), len);
 
                             if (type == token::LOGINACK) {
-                                handle_loginack_msg(sv.substr(0, len));
+                                handle_loginack_msg(sp.subspan(0, len));
                                 received_loginack = true;
                             } else if (type == token::INFO) {
                                 if (message_handler)
-                                    handle_info_msg(sv.substr(0, len), false);
+                                    handle_info_msg(string_view((char*)sp.data(), len), false);
                             } else if (type == token::TDS_ERROR) {
                                 if (message_handler)
-                                    handle_info_msg(sv.substr(0, len), true);
+                                    handle_info_msg(string_view((char*)sp.data(), len), true);
 
-                                throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
+                                throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                             } else if (type == token::ENVCHANGE)
-                                handle_envchange_msg(sv.substr(0, len));
+                                handle_envchange_msg(string_view((char*)sp.data(), len));
 
                             break;
                         }
@@ -2452,20 +2452,20 @@ namespace tds {
 #ifdef _WIN32
                         case token::SSPI: // FIXME - handle doing this with GSSAPI
                         {
-                            if (sv.length() < sizeof(uint16_t))
-                                throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sv.length());
+                            if (sp.size() < sizeof(uint16_t))
+                                throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sp.size());
 
-                            auto len = *(uint16_t*)&sv[0];
+                            auto len = *(uint16_t*)&sp[0];
 
-                            sv = sv.substr(sizeof(uint16_t));
+                            sp = sp.subspan(sizeof(uint16_t));
 
-                            if (sv.length() < len)
-                                throw formatted_error("Short SSPI token ({} bytes, expected {}).", type, sv.length(), len);
+                            if (sp.size() < len)
+                                throw formatted_error("Short SSPI token ({} bytes, expected {}).", type, sp.size(), len);
 
                             if (!sspih)
                                 throw runtime_error("SSPI token received, but no current SSPI context.");
 
-                            sspibuf = sv.substr(0, len);
+                            sspibuf.assign(string_view((char*)sp.data(), len));
                             go_again = true;
 
                             break;
@@ -2475,17 +2475,17 @@ namespace tds {
                         case token::FEATUREEXTACK:
                         {
                             while (true) {
-                                auto feature = (enum tds_feature)sv[0];
+                                auto feature = (enum tds_feature)sp[0];
 
                                 if (feature == tds_feature::TERMINATOR)
                                     break;
 
-                                auto len = *(uint32_t*)&sv[1];
+                                auto len = *(uint32_t*)&sp[1];
 
                                 if (feature == tds_feature::UTF8_SUPPORT && len >= 1)
-                                    has_utf8 = (uint8_t)sv[1 + sizeof(uint32_t)];
+                                    has_utf8 = (uint8_t)sp[1 + sizeof(uint32_t)];
 
-                                sv = sv.substr(1 + sizeof(uint32_t) + len);
+                                sp = sp.subspan(1 + sizeof(uint32_t) + len);
                             }
 
                             break;
@@ -2933,7 +2933,7 @@ namespace tds {
         spid = htons(h.spid);
     }
 
-    void tds_impl::handle_loginack_msg(string_view sv) {
+    void tds_impl::handle_loginack_msg(span<const uint8_t> sp) {
         uint8_t server_name_len;
         uint32_t tds_version;
 #ifdef DEBUG_SHOW_MSGS
@@ -2942,21 +2942,21 @@ namespace tds {
 #endif
         u16string_view server_name;
 
-        if (sv.length() < 10)
+        if (sp.size() < 10)
             throw runtime_error("Short LOGINACK message.");
 
-        server_name_len = (uint8_t)sv[5];
+        server_name_len = sp[5];
 
-        if (sv.length() < 10 + (server_name_len * sizeof(char16_t)))
+        if (sp.size() < 10 + (server_name_len * sizeof(char16_t)))
             throw runtime_error("Short LOGINACK message.");
 
 #ifdef DEBUG_SHOW_MSGS
-        interf = (uint8_t)sv[0];
+        interf = sp[0];
 #endif
-        tds_version = *(uint32_t*)&sv[1];
-        server_name = u16string_view((char16_t*)&sv[6], server_name_len);
+        tds_version = *(uint32_t*)&sp[1];
+        server_name = u16string_view((char16_t*)&sp[6], server_name_len);
 #ifdef DEBUG_SHOW_MSGS
-        server_version = *(uint32_t*)&sv[6 + (server_name_len * sizeof(char16_t))];
+        server_version = *(uint32_t*)&sp[6 + (server_name_len * sizeof(char16_t))];
 #endif
 
 #ifdef DEBUG_SHOW_MSGS
