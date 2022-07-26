@@ -548,7 +548,7 @@ namespace tds {
                             std::u16string_view attach_db, std::u16string_view new_password);
         void handle_loginack_msg(std::span<const uint8_t> sp);
 #ifdef _WIN32
-        void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, std::string_view sspi);
+        void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, std::span<const uint8_t> sspi);
 #endif
 
 #ifdef _WIN32

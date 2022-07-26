@@ -2365,7 +2365,9 @@ namespace tds {
             vector<uint8_t> buf;
             list<vector<uint8_t>> tokens;
             vector<column> buf_columns;
-            string sspibuf;
+#ifdef _WIN32
+            vector<uint8_t> sspibuf;
+#endif
 
             do {
                 wait_for_msg(type, payload, &last_packet);
@@ -2453,7 +2455,7 @@ namespace tds {
                             if (!sspih)
                                 throw runtime_error("SSPI token received, but no current SSPI context.");
 
-                            sspibuf.assign(string_view((char*)sp.data(), len));
+                            sspibuf.assign(sp.data(), sp.data() + len);
                             go_again = true;
 
                             break;
@@ -2495,7 +2497,7 @@ namespace tds {
     }
 
 #ifdef _WIN32
-    void tds_impl::send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const u16string& spn, string_view sspi) {
+    void tds_impl::send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const u16string& spn, span<const uint8_t> sspi) {
         SECURITY_STATUS sec_status;
         TimeStamp timestamp;
         SecBuffer inbufs[2], outbuf;
@@ -2503,7 +2505,7 @@ namespace tds {
         unsigned long context_attr;
         string ret;
 
-        inbufs[0].cbBuffer = (uint32_t)sspi.length();
+        inbufs[0].cbBuffer = (uint32_t)sspi.size();
         inbufs[0].BufferType = SECBUFFER_TOKEN;
         inbufs[0].pvBuffer = (void*)sspi.data();
 
