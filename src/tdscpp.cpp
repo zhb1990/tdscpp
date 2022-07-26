@@ -2434,10 +2434,10 @@ namespace tds {
                                 received_loginack = true;
                             } else if (type == token::INFO) {
                                 if (message_handler)
-                                    handle_info_msg(string_view((char*)sp.data(), len), false);
+                                    handle_info_msg(sp.subspan(0, len), false);
                             } else if (type == token::TDS_ERROR) {
                                 if (message_handler)
-                                    handle_info_msg(string_view((char*)sp.data(), len), true);
+                                    handle_info_msg(sp.subspan(0, len), true);
 
                                 throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                             } else if (type == token::ENVCHANGE)
@@ -2970,60 +2970,60 @@ namespace tds {
             throw formatted_error("Server not using TDS 7.4. Version was {:x}, expected {:x}.", tds_version, tds_74_version);
     }
 
-    void tds_impl::handle_info_msg(string_view sv, bool error) {
-        if (sv.length() < sizeof(tds_info_msg))
-            throw formatted_error("Short INFO message ({} bytes, expected at least 6).", sv.length());
+    void tds_impl::handle_info_msg(span<const uint8_t> sp, bool error) {
+        if (sp.size() < sizeof(tds_info_msg))
+            throw formatted_error("Short INFO message ({} bytes, expected at least 6).", sp.size());
 
-        auto tim = (tds_info_msg*)sv.data();
+        auto tim = (tds_info_msg*)sp.data();
 
-        sv = sv.substr(sizeof(tds_info_msg));
+        sp = sp.subspan(sizeof(tds_info_msg));
 
-        if (sv.length() < sizeof(uint16_t))
-            throw formatted_error("Short INFO message ({} bytes left, expected at least 2).", sv.length());
+        if (sp.size() < sizeof(uint16_t))
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 2).", sp.size());
 
-        auto msg_len = *(uint16_t*)sv.data();
-        sv = sv.substr(sizeof(uint16_t));
+        auto msg_len = *(uint16_t*)sp.data();
+        sp = sp.subspan(sizeof(uint16_t));
 
-        if (sv.length() < msg_len * sizeof(char16_t)) {
+        if (sp.size() < msg_len * sizeof(char16_t)) {
             throw formatted_error("Short INFO message ({} bytes left, expected at least {}).",
-                                  sv.length(), msg_len * sizeof(char16_t));
+                                  sp.size(), msg_len * sizeof(char16_t));
         }
 
-        auto msg = u16string_view((char16_t*)sv.data(), msg_len);
-        sv = sv.substr(msg_len * sizeof(char16_t));
+        auto msg = u16string_view((char16_t*)sp.data(), msg_len);
+        sp = sp.subspan(msg_len * sizeof(char16_t));
 
-        if (sv.length() < sizeof(uint8_t))
-            throw formatted_error("Short INFO message ({} bytes left, expected at least 1).", sv.length());
+        if (sp.size() < sizeof(uint8_t))
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 1).", sp.size());
 
-        auto server_name_len = (uint8_t)sv[0];
-        sv = sv.substr(sizeof(uint8_t));
+        auto server_name_len = (uint8_t)sp[0];
+        sp = sp.subspan(sizeof(uint8_t));
 
-        if (sv.length() < server_name_len * sizeof(char16_t)) {
+        if (sp.size() < server_name_len * sizeof(char16_t)) {
             throw formatted_error("Short INFO message ({} bytes left, expected at least {}).",
-                                  sv.length(), server_name_len * sizeof(char16_t));
+                                  sp.size(), server_name_len * sizeof(char16_t));
         }
 
-        auto server_name = u16string_view((char16_t*)sv.data(), server_name_len);
-        sv = sv.substr(server_name_len * sizeof(char16_t));
+        auto server_name = u16string_view((char16_t*)sp.data(), server_name_len);
+        sp = sp.subspan(server_name_len * sizeof(char16_t));
 
-        if (sv.length() < sizeof(uint8_t))
-            throw formatted_error("Short INFO message ({} bytes left, expected at least 1).", sv.length());
+        if (sp.size() < sizeof(uint8_t))
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 1).", sp.size());
 
-        auto proc_name_len = (uint8_t)sv[0];
-        sv = sv.substr(sizeof(uint8_t));
+        auto proc_name_len = (uint8_t)sp[0];
+        sp = sp.subspan(sizeof(uint8_t));
 
-        if (sv.length() < proc_name_len * sizeof(char16_t)) {
+        if (sp.size() < proc_name_len * sizeof(char16_t)) {
             throw formatted_error("Short INFO message ({} bytes left, expected at least {}).",
-                                  sv.length(), proc_name_len * sizeof(char16_t));
+                                  sp.size(), proc_name_len * sizeof(char16_t));
         }
 
-        auto proc_name = u16string_view((char16_t*)sv.data(), proc_name_len);
-        sv = sv.substr(proc_name_len * sizeof(char16_t));
+        auto proc_name = u16string_view((char16_t*)sp.data(), proc_name_len);
+        sp = sp.subspan(proc_name_len * sizeof(char16_t));
 
-        if (sv.length() < sizeof(int32_t))
-            throw formatted_error("Short INFO message ({} bytes left, expected at least 4).", sv.length());
+        if (sp.size() < sizeof(int32_t))
+            throw formatted_error("Short INFO message ({} bytes left, expected at least 4).", sp.size());
 
-        auto line_number = *(int32_t*)sv.data();
+        auto line_number = *(int32_t*)sp.data();
 
         message_handler(utf16_to_utf8(server_name), utf16_to_utf8(msg), utf16_to_utf8(proc_name), tim->msgno, line_number,
                         tim->state, tim->severity, error);
@@ -3602,10 +3602,10 @@ namespace tds {
 
                     if (type == token::INFO) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), false);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), false);
                     } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), true);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), true);
                         else
                             throw formatted_error("RPC {} failed: {}", utf16_to_utf8(name), utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
@@ -4448,10 +4448,10 @@ namespace tds {
 
                     if (type == token::INFO) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), false);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), false);
                     } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), true);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), true);
                         else
                             throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
@@ -4939,10 +4939,10 @@ namespace tds {
 
                     if (type == token::INFO) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), false);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), false);
                     } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), true);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), true);
 
                         throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
@@ -5022,7 +5022,7 @@ namespace tds {
                         if (type == token::INFO) {
                             if (conn.impl->message_handler) {
                                 try {
-                                    conn.impl->handle_info_msg(string_view((char*)sp.data(), len), false);
+                                    conn.impl->handle_info_msg(sp.subspan(0, len), false);
                                 } catch (...) {
                                 }
                             }
@@ -5030,7 +5030,7 @@ namespace tds {
                         } else if (type == token::TDS_ERROR) {
                             if (conn.impl->message_handler) {
                                 try {
-                                    conn.impl->handle_info_msg(string_view((char*)sp.data(), len), true);
+                                    conn.impl->handle_info_msg(sp.subspan(0, len), true);
                                 } catch (...) {
                                 }
                             }
@@ -5108,10 +5108,10 @@ namespace tds {
 
                     if (type == token::INFO) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), false);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), false);
                     } else if (type == token::TDS_ERROR) {
                         if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(string_view((char*)sp.data(), len), true);
+                            conn.impl->handle_info_msg(sp.subspan(0, len), true);
 
                         throw formatted_error("TM_COMMIT_XACT request failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)

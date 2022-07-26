@@ -1557,10 +1557,10 @@ namespace tds {
 
                     if (type == token::INFO) {
                         if (impl->message_handler)
-                            impl->handle_info_msg(string_view((char*)sp.data(), len), false);
+                            impl->handle_info_msg(sp.subspan(0, len), false);
                     } else if (type == token::TDS_ERROR) {
                         if (impl->message_handler)
-                            impl->handle_info_msg(string_view((char*)sp.data(), len), true);
+                            impl->handle_info_msg(sp.subspan(0, len), true);
 
                         throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
