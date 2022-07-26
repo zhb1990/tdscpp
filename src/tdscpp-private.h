@@ -1327,8 +1327,8 @@ static constexpr std::chrono::year_month_day num_to_ymd(int num) noexcept {
 static_assert(num_to_ymd(-693595) == std::chrono::year_month_day{std::chrono::year{1}, std::chrono::January, std::chrono::day{1}});
 static_assert(num_to_ymd(0) == std::chrono::year_month_day{std::chrono::year{1900}, std::chrono::January, std::chrono::day{1}});
 
-static __inline std::u16string_view extract_message(std::string_view sv) {
-    return std::u16string_view((char16_t*)&sv[8], *(uint16_t*)&sv[6]);
+static __inline std::u16string_view extract_message(std::span<const uint8_t> sp) {
+    return std::u16string_view((char16_t*)&sp[8], *(uint16_t*)&sp[6]);
 }
 
 template<unsigned N>

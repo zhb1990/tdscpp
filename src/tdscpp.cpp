@@ -2439,7 +2439,7 @@ namespace tds {
                                 if (message_handler)
                                     handle_info_msg(sp.subspan(0, len), true);
 
-                                throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
+                                throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
                             } else if (type == token::ENVCHANGE)
                                 handle_envchange_msg(sp.subspan(0, len));
 
@@ -3607,7 +3607,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
                         else
-                            throw formatted_error("RPC {} failed: {}", utf16_to_utf8(name), utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
+                            throw formatted_error("RPC {} failed: {}", utf16_to_utf8(name), utf16_to_utf8(extract_message(sp.subspan(0, len))));
                     } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
@@ -4453,7 +4453,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
                         else
-                            throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
+                            throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
                     } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
@@ -4944,7 +4944,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
 
-                        throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
+                        throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
                     } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
@@ -5035,7 +5035,7 @@ namespace tds {
                                 }
                             }
 
-                            throw formatted_error("TM_ROLLBACK_XACT request failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
+                            throw formatted_error("TM_ROLLBACK_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
                         } else if (type == token::ENVCHANGE)
                             conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
@@ -5113,7 +5113,7 @@ namespace tds {
                         if (conn.impl->message_handler)
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
 
-                        throw formatted_error("TM_COMMIT_XACT request failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
+                        throw formatted_error("TM_COMMIT_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
                     } else if (type == token::ENVCHANGE)
                         conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
