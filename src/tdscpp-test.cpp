@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
 
         // FIXME - prompt for password if username set but password isn't
 
-        tds::tds n(server, username, password, "test program", show_msg);
+        tds::tds n(server, username, password, "test program", "", show_msg);
 
 #if 0
         fmt::print("{}\n", (tds::datetime)tds::value("2020-10-29T01:23:45.0-03:00"));
@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
         fmt::print("{}\n", (tds::time)tds::value("2:56 pm"));
 #endif
         {
-            tds::query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, ? AS test", 42, "Hello", tds::datetimeoffset{2010, 10, 28, 17, 58, 50, -360}, 3.1415926f, true);
+            tds::query sq(n, "SELECT SYSTEM_USER AS [user], ? AS answer, ? AS greeting, ? AS now, ? AS pi, ? AS test", 42, "Hello", tds::datetimeoffset{2010y, chrono::October, 28d, 17, 58, 50, -360}, 3.1415926f, true);
 
             for (uint16_t i = 0; i < sq.num_columns(); i++) {
                 fmt::print(FMT_STRING("{}\t"), utf16_to_utf8(sq[i].name));

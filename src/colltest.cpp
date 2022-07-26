@@ -5519,7 +5519,7 @@ int main() {
     tds::tds tds("mssql", "sa", "Password1$");
 
     for (const auto& coll : colls) {
-        tds::query sq(tds, "SELECT N'hello' COLLATE " + string(coll));
+        tds::query sq(tds, tds::no_check{"SELECT N'hello' COLLATE " + string(coll)});
 
         if (!sq.fetch_row())
             throw runtime_error("No row returned.");
