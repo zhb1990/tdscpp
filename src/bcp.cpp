@@ -1564,7 +1564,7 @@ namespace tds {
 
                         throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
-                        impl->handle_envchange_msg(string_view((char*)sp.data(), len));
+                        impl->handle_envchange_msg(sp.subspan(0, len));
 
                     sp = sp.subspan(len);
 

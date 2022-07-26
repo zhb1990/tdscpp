@@ -2441,7 +2441,7 @@ namespace tds {
 
                                 throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                             } else if (type == token::ENVCHANGE)
-                                handle_envchange_msg(string_view((char*)sp.data(), len));
+                                handle_envchange_msg(sp.subspan(0, len));
 
                             break;
                         }
@@ -3609,7 +3609,7 @@ namespace tds {
                         else
                             throw formatted_error("RPC {} failed: {}", utf16_to_utf8(name), utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(string_view((char*)sp.data(), len));
+                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
                     break;
                 }
@@ -4455,7 +4455,7 @@ namespace tds {
                         else
                             throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(string_view((char*)sp.data(), len))));
                     } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(string_view((char*)sp.data(), len));
+                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
                     break;
                 }
@@ -4777,13 +4777,13 @@ namespace tds {
         return impl->cols[i];
     }
 
-    void tds_impl::handle_envchange_msg(string_view sv) {
-        auto ec = (tds_envchange*)(sv.data() - offsetof(tds_envchange, type));
+    void tds_impl::handle_envchange_msg(span<const uint8_t> sp) {
+        auto ec = (tds_envchange*)(sp.data() - offsetof(tds_envchange, type));
 
         switch (ec->type) {
             case tds_envchange_type::database: {
-                if (sv.length() < sizeof(tds_envchange_database) - offsetof(tds_envchange_database, header.type)) {
-                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sv.length(),
+                if (sp.size() < sizeof(tds_envchange_database) - offsetof(tds_envchange_database, header.type)) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sp.size(),
                                           sizeof(tds_envchange_database) - offsetof(tds_envchange_database, header.type));
                 }
 
@@ -4800,8 +4800,8 @@ namespace tds {
             }
 
             case tds_envchange_type::begin_trans: {
-                if (sv.length() < sizeof(tds_envchange_begin_trans) - offsetof(tds_envchange_begin_trans, header.type))
-                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sv.length());
+                if (sp.size() < sizeof(tds_envchange_begin_trans) - offsetof(tds_envchange_begin_trans, header.type))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sp.size());
 
                 auto tebt = (tds_envchange_begin_trans*)ec;
 
@@ -4817,8 +4817,8 @@ namespace tds {
             }
 
             case tds_envchange_type::rollback_trans: {
-                if (sv.length() < sizeof(tds_envchange_rollback_trans) - offsetof(tds_envchange_rollback_trans, header.type))
-                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sv.length());
+                if (sp.size() < sizeof(tds_envchange_rollback_trans) - offsetof(tds_envchange_rollback_trans, header.type))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sp.size());
 
                 auto tert = (tds_envchange_rollback_trans*)ec;
 
@@ -4831,8 +4831,8 @@ namespace tds {
             }
 
             case tds_envchange_type::commit_trans: {
-                if (sv.length() < sizeof(tds_envchange_commit_trans) - offsetof(tds_envchange_begin_trans, header.type))
-                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sv.length());
+                if (sp.size() < sizeof(tds_envchange_commit_trans) - offsetof(tds_envchange_begin_trans, header.type))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sp.size());
 
                 auto tect = (tds_envchange_commit_trans*)ec;
 
@@ -4845,8 +4845,8 @@ namespace tds {
             }
 
             case tds_envchange_type::packet_size: {
-                if (sv.length() < sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type)) {
-                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sv.length(),
+                if (sp.size() < sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type)) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sp.size(),
                                           sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type));
                 }
 
@@ -4946,7 +4946,7 @@ namespace tds {
 
                         throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sv.substr(0, len));
+                        conn.impl->handle_envchange_msg(span((uint8_t*)sv.data(), len));
 
                     sv = sv.substr(len);
 
@@ -5037,7 +5037,7 @@ namespace tds {
 
                             throw formatted_error("TM_ROLLBACK_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                         } else if (type == token::ENVCHANGE)
-                            conn.impl->handle_envchange_msg(sv.substr(0, len));
+                            conn.impl->handle_envchange_msg(span((uint8_t*)sv.data(), len));
 
                         sv = sv.substr(len);
 
@@ -5115,7 +5115,7 @@ namespace tds {
 
                         throw formatted_error("TM_COMMIT_XACT request failed: {}", utf16_to_utf8(extract_message(sv.substr(0, len))));
                     } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sv.substr(0, len));
+                        conn.impl->handle_envchange_msg(span((uint8_t*)sv.data(), len));
 
                     sv = sv.substr(len);
 

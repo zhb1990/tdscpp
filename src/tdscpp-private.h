@@ -527,7 +527,7 @@ namespace tds {
 #endif
         void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
         void handle_info_msg(std::string_view sv, bool error);
-        void handle_envchange_msg(std::string_view sv);
+        void handle_envchange_msg(std::span<const uint8_t> sv);
 
         template<typename... Args>
         void run(std::string_view s, Args&&... args);
