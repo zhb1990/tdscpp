@@ -307,7 +307,7 @@ namespace tds {
         }
 
         if (established) {
-            tds.recv_raw((uint8_t*)data, len);
+            tds.recv_raw(span((uint8_t*)data, len));
             copied += len;
 
             return copied;
@@ -490,7 +490,7 @@ namespace tds {
         SecBuffer outbuf;
         SecBufferDesc out;
         uint32_t context_attr;
-        string outstr;
+        vector<uint8_t> outstr;
         SCHANNEL_CRED cred;
 
         memset(&cred, 0, sizeof(cred));
@@ -523,7 +523,7 @@ namespace tds {
             throw formatted_error("InitializeSecurityContext returned {}", (enum sec_error)sec_status);
         }
 
-        outstr = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+        outstr.assign((uint8_t*)outbuf.pvBuffer, (uint8_t*)outbuf.pvBuffer + outbuf.cbBuffer);
 
         if (outbuf.pvBuffer)
             FreeContextBuffer(outbuf.pvBuffer);
@@ -532,7 +532,7 @@ namespace tds {
 
         while (sec_status == SEC_I_CONTINUE_NEEDED) {
             enum tds_msg type;
-            string payload;
+            vector<uint8_t> payload;
             SecBuffer inbuf;
             SecBufferDesc in;
 
@@ -549,7 +549,7 @@ namespace tds {
             outbuf.BufferType = SECBUFFER_TOKEN;
             outbuf.pvBuffer = nullptr;
 
-            inbuf.cbBuffer = (long)payload.length();
+            inbuf.cbBuffer = (long)payload.size();
             inbuf.BufferType = SECBUFFER_TOKEN;
             inbuf.pvBuffer = payload.data();
 
@@ -565,7 +565,7 @@ namespace tds {
                 throw formatted_error("InitializeSecurityContext returned {}", (enum sec_error)sec_status);
             }
 
-            outstr = string((char*)outbuf.pvBuffer, outbuf.cbBuffer);
+            outstr.assign((uint8_t*)outbuf.pvBuffer, (uint8_t*)outbuf.pvBuffer + outbuf.cbBuffer);
 
             if (outbuf.pvBuffer)
                 FreeContextBuffer(outbuf.pvBuffer);
@@ -594,7 +594,7 @@ namespace tds {
         SECURITY_STATUS sec_status;
         array<SecBuffer, 4> buf;
         SecBufferDesc bufdesc;
-        string payload;
+        vector<uint8_t> payload;
 
         memset(buf.data(), 0, sizeof(SecBuffer) * buf.size());
 
@@ -634,7 +634,7 @@ namespace tds {
         SECURITY_STATUS sec_status;
         array<SecBuffer, 4> buf;
         SecBufferDesc bufdesc;
-        string recvbuf;
+        vector<uint8_t> recvbuf;
 
         if (left == 0)
             return;
@@ -653,7 +653,7 @@ namespace tds {
         }
 
         recvbuf.resize(stream_sizes.cbHeader);
-        tds.recv_raw((uint8_t*)recvbuf.data(), recvbuf.length());
+        tds.recv_raw(recvbuf);
 
         while (left > 0) {
             bool found = false;
@@ -661,7 +661,7 @@ namespace tds {
             memset(buf.data(), 0, sizeof(SecBuffer) * buf.size());
             buf[0].BufferType = SECBUFFER_DATA;
             buf[0].pvBuffer = recvbuf.data();
-            buf[0].cbBuffer = (long)recvbuf.length();
+            buf[0].cbBuffer = (long)recvbuf.size();
             buf[1].BufferType = SECBUFFER_EMPTY;
             buf[2].BufferType = SECBUFFER_EMPTY;
             buf[3].BufferType = SECBUFFER_EMPTY;
@@ -673,8 +673,8 @@ namespace tds {
             sec_status = DecryptMessage(&ctx_handle, &bufdesc, 0, nullptr);
 
             if (sec_status == SEC_E_INCOMPLETE_MESSAGE && buf[0].BufferType == SECBUFFER_MISSING) {
-                recvbuf.resize(recvbuf.length() + buf[0].cbBuffer);
-                tds.recv_raw((uint8_t*)recvbuf.data() + recvbuf.length() - buf[0].cbBuffer, buf[0].cbBuffer);
+                recvbuf.resize(recvbuf.size() + buf[0].cbBuffer);
+                tds.recv_raw(span(recvbuf.data() + recvbuf.size() - buf[0].cbBuffer, buf[0].cbBuffer));
                 continue;
             }
 
@@ -704,7 +704,7 @@ namespace tds {
                 break;
 
             recvbuf.resize(stream_sizes.cbHeader);
-            tds.recv_raw((uint8_t*)recvbuf.data(), recvbuf.length());
+            tds.recv_raw(recvbuf);
         }
     }
 };

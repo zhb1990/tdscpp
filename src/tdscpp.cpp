@@ -2838,23 +2838,22 @@ namespace tds {
         }
     }
 
-    void tds_impl::recv_raw(uint8_t* ptr, size_t left) {
+    void tds_impl::recv_raw(span<uint8_t> buf) {
         do {
 #ifdef _WIN32
             if (pipe.get() != INVALID_HANDLE_VALUE) {
                 DWORD read;
 
-                if (!ReadFile(pipe.get(), ptr, (DWORD)left, &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
+                if (!ReadFile(pipe.get(), buf.data(), (DWORD)buf.size(), &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
                     throw last_error("ReadFile", GetLastError());
 
-                if (read == (DWORD)left)
+                if (read == (DWORD)buf.size())
                     break;
 
-                ptr += read;
-                left -= read;
+                buf = buf.subspan(read);
             } else {
 #endif
-                auto ret = recv(sock, (char*)ptr, (int)left, 0);
+                auto ret = recv(sock, (char*)buf.data(), (int)buf.size(), 0);
 
 #ifdef _WIN32
                 if (ret < 0)
@@ -2867,11 +2866,10 @@ namespace tds {
                 if (ret == 0)
                     throw formatted_error("Disconnected.");
 
-                if ((size_t)ret == left)
+                if ((size_t)ret == buf.size())
                     break;
 
-                ptr += (size_t)ret;
-                left -= (int)ret;
+                buf = buf.subspan(ret);
 #ifdef _WIN32
             }
 #endif
@@ -2889,7 +2887,7 @@ namespace tds {
             ssl->recv((uint8_t*)&h, sizeof(tds_header));
         else
 #endif
-            recv_raw((uint8_t*)&h, sizeof(tds_header));
+            recv_raw(span((uint8_t*)&h, sizeof(tds_header)));
 
         if (htons(h.length) < sizeof(tds_header)) {
             throw formatted_error("message length was {}, expected at least {}",
@@ -2908,7 +2906,7 @@ namespace tds {
                 ssl->recv(&payload[0], left);
             else
 #endif
-                recv_raw(&payload[0], left);
+                recv_raw(span(payload.data(), left));
         } else
             payload.clear();
 
