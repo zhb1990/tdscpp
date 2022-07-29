@@ -1304,7 +1304,7 @@ namespace tds {
 
         do {
             auto l = read_bits(d, off, 6);
-            uint64_t o;
+            int64_t o;
 
             if (l == 0b000000)
                 break;
@@ -1314,7 +1314,13 @@ namespace tds {
                 // FIXME - 000101
                 // FIXME - 000110
                 // FIXME - 0010xx
-                // FIXME - 00111x
+
+                case 0b001110:
+                case 0b001111:
+                    off += 5;
+                    o = read_bits(d, off, 3) - 8;
+                    off += 3;
+                break;
 
                 case 0b010000:
                 case 0b010001:
