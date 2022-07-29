@@ -1312,7 +1312,20 @@ namespace tds {
             switch (l) {
                 // FIXME - 000100
                 // FIXME - 000101
-                // FIXME - 000110
+
+                case 0b000110: {
+                    off += 6;
+                    auto v = read_bits(d, off, 15);
+                    off += 15;
+
+                    o = (v & 0b111110000000000) >> 3;
+                    o |= (v & 0b111000000) >> 2;
+                    o |= (v & 0b10000) >> 1;
+                    o |= v & 0b111;
+                    o -= 4168;
+
+                    break;
+                }
 
                 case 0b001000:
                 case 0b001001:
