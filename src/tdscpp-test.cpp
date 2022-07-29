@@ -123,6 +123,17 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        {
+            tds::query sq(n, "SELECT CONVERT(HIERARCHYID, '/10000000000.20000000000/40000000000.1000000000000/') AS hier, CONVERT(HIERARCHYID, '/10000.20000/40000.1000000/'), CONVERT(HIERARCHYID, '/1998.2001/2077.2101/'), CONVERT(HIERARCHYID, '/80.171/229.1066/'), CONVERT(HIERARCHYID, '/16.21/79/'), CONVERT(HIERARCHYID, '/8.9/10/'), CONVERT(HIERARCHYID, '/4.5/6/'), CONVERT(HIERARCHYID, '/1.2/'), CONVERT(HIERARCHYID, '/-7.-6/-5.-4/'), CONVERT(HIERARCHYID, '/-72.-69/-18.-14/'), CONVERT(HIERARCHYID, '/-3000.-2000/-1000.-100/'), CONVERT(HIERARCHYID, '/-10000.-20000/-40000.-1000000/'), CONVERT(HIERARCHYID, '/-10000000000.-20000000000/-40000000000.-1000000000000/')");
+
+            while (sq.fetch_row()) {
+                for (uint16_t i = 0; i < sq.num_columns(); i++) {
+                    fmt::print("{}\t", sq[i]);
+                }
+                fmt::print("\n");
+            }
+        }
+
         n.run("RAISERROR('Hello, world!', 0, 1)");
 
         n.run("DROP TABLE IF EXISTS dbo.test;");
