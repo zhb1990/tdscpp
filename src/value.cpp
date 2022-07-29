@@ -1313,7 +1313,22 @@ namespace tds {
                 // FIXME - 000100
                 // FIXME - 000101
                 // FIXME - 000110
-                // FIXME - 0010xx
+
+                case 0b001000:
+                case 0b001001:
+                case 0b001010:
+                case 0b001011: {
+                    off += 4;
+                    auto v = read_bits(d, off, 8);
+                    off += 8;
+
+                    o = (v & 0b11000000) >> 2;
+                    o |= (v & 0b10000) >> 1;
+                    o |= v & 0b111;
+                    o -= 72;
+
+                    break;
+                }
 
                 case 0b001110:
                 case 0b001111:
