@@ -2159,7 +2159,7 @@ namespace tds {
 
         // instopt
 
-        opts.emplace_back(tds_login_opt_type::instopt, span((uint8_t*)instance.begin(), instance.size()));
+        opts.emplace_back(tds_login_opt_type::instopt, span((uint8_t*)instance.data(), instance.size()));
 
         // MARS
 
