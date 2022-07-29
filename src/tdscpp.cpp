@@ -4738,6 +4738,76 @@ namespace tds {
                                 break;
                             }
 
+                            case sql_type::UDT:
+                            {
+                                if (sp2.size() < sizeof(uint16_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 2).", sp2.size());
+
+                                col.max_length = *(uint16_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint16_t));
+
+                                // db name
+
+                                if (sp2.size() < sizeof(uint8_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sp2.size());
+
+                                auto string_len = *(uint8_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint8_t));
+
+                                if (sp2.size() < string_len * sizeof(char16_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), string_len * sizeof(char16_t));
+
+                                sp2 = sp2.subspan(string_len * sizeof(char16_t));
+
+                                // schema name
+
+                                if (sp2.size() < sizeof(uint8_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sp2.size());
+
+                                string_len = *(uint8_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint8_t));
+
+                                if (sp2.size() < string_len * sizeof(char16_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), string_len * sizeof(char16_t));
+
+                                sp2 = sp2.subspan(string_len * sizeof(char16_t));
+
+                                // type name
+
+                                if (sp2.size() < sizeof(uint8_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 1).", sp2.size());
+
+                                string_len = *(uint8_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint8_t));
+
+                                if (sp2.size() < string_len * sizeof(char16_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), string_len * sizeof(char16_t));
+
+                                sp2 = sp2.subspan(string_len * sizeof(char16_t));
+
+                                // assembly qualified name
+
+                                if (sp2.size() < sizeof(uint16_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least 2).", sp2.size());
+
+                                auto string_len2 = *(uint16_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint16_t));
+
+                                if (sp2.size() < string_len2 * sizeof(char16_t))
+                                    throw formatted_error("Short COLMETADATA message ({} bytes left, expected at least {}).", sp2.size(), string_len2 * sizeof(char16_t));
+
+                                col.clr_name.assign((uint16_t*)sp2.data(), (uint16_t*)sp2.data() + string_len2);
+
+                                sp2 = sp2.subspan(string_len2 * sizeof(char16_t));
+
+                                break;
+                            }
+
                             default:
                                 throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
                         }
