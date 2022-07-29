@@ -1331,18 +1331,38 @@ namespace tds {
                 case 0b011100:
                 case 0b011101:
                 case 0b011110:
-                case 0b011111: {
+                case 0b011111:
                     off += 2;
-
                     o = read_bits(d, off, 2);
-
                     off += 2;
-
                     break;
-                }
 
-                // FIXME - 100xxx
-                // FIXME - 101xxx
+                case 0b100000:
+                case 0b100001:
+                case 0b100010:
+                case 0b100011:
+                case 0b100100:
+                case 0b100101:
+                case 0b100110:
+                case 0b100111:
+                    off += 3;
+                    o = read_bits(d, off, 2) + 4;
+                    off += 2;
+                    break;
+
+                case 0b101000:
+                case 0b101001:
+                case 0b101010:
+                case 0b101011:
+                case 0b101100:
+                case 0b101101:
+                case 0b101110:
+                case 0b101111:
+                    off += 3;
+                    o = read_bits(d, off, 3) + 8;
+                    off += 3;
+                    break;
+
                 // FIXME - 110xxx
                 // FIXME - 1110xx
                 // FIXME - 11110x
