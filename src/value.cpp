@@ -1389,7 +1389,17 @@ namespace tds {
                     break;
                 }
 
-                // FIXME - 11110x
+                case 0b111100:
+                case 0b111101: {
+                    off += 5;
+                    auto v = read_bits(d, off, 15);
+                    off += 15;
+
+                    o = (((v & 0b111110000000000) >> 3) | ((v & 0b111000000) >> 2)  | ((v & 0b10000) >> 1) | (v & 0b111)) + 1104;
+
+                    break;
+                }
+
                 // FIXME - 111110
                 // FIXME - 111111
 
