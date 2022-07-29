@@ -986,6 +986,8 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
 
                 is_null = false;
 
+                // FIXME - set vector length first of all
+
                 if (len != 0xfffffffffffffffe) // unknown length
                     val.reserve(len);
 
