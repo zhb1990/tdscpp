@@ -3839,6 +3839,65 @@ namespace tds {
                                 break;
                             }
 
+                            case sql_type::UDT:
+                            {
+                                if (sp2.size() < sizeof(uint16_t))
+                                    return;
+
+                                col.max_length = *(uint16_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint16_t));
+
+                                if (sp2.size() < sizeof(uint8_t))
+                                    return;
+
+                                // db name
+
+                                auto string_len = *(uint8_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint8_t));
+
+                                if (sp2.size() < string_len * sizeof(char16_t))
+                                    return;
+
+                                sp2 = sp2.subspan(string_len * sizeof(char16_t));
+
+                                // schema name
+
+                                string_len = *(uint8_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint8_t));
+
+                                if (sp2.size() < string_len * sizeof(char16_t))
+                                    return;
+
+                                sp2 = sp2.subspan(string_len * sizeof(char16_t));
+
+                                // type name
+
+                                string_len = *(uint8_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint8_t));
+
+                                if (sp2.size() < string_len * sizeof(char16_t))
+                                    return;
+
+                                sp2 = sp2.subspan(string_len * sizeof(char16_t));
+
+                                // assembly qualified name
+
+                                auto string_len2 = *(uint16_t*)sp2.data();
+
+                                sp2 = sp2.subspan(sizeof(uint16_t));
+
+                                if (sp2.size() < string_len2 * sizeof(char16_t))
+                                    return;
+
+                                sp2 = sp2.subspan(string_len2 * sizeof(char16_t));
+
+                                break;
+                            }
+
                             default:
                                 throw formatted_error("Unhandled type {} in COLMETADATA message.", c.type);
                         }
