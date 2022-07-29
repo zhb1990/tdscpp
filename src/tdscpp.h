@@ -1307,6 +1307,7 @@ namespace tds {
         uint8_t precision;
         uint8_t scale;
         collation coll;
+        std::u16string clr_name;
     };
 
     class TDSCPP column : public value {

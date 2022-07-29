@@ -3897,6 +3897,8 @@ namespace tds {
                                 if (sp2.size() < string_len2 * sizeof(char16_t))
                                     return;
 
+                                col.clr_name.assign((uint16_t*)sp2.data(), (uint16_t*)sp2.data() + string_len2);
+
                                 sp2 = sp2.subspan(string_len2 * sizeof(char16_t));
 
                                 break;
