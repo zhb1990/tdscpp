@@ -3597,7 +3597,7 @@ namespace tds {
         buf.insert(buf.end(), payload.begin(), payload.end());
 
         {
-            auto sp = parse_tokens(payload, tokens, buf_columns);
+            auto sp = parse_tokens(buf, tokens, buf_columns);
 
             buf.assign(sp.begin(), sp.begin() + sp.size());
         }
