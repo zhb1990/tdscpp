@@ -1257,7 +1257,7 @@ namespace tds {
         auto type2 = type;
         unsigned int max_length2 = max_length;
         uint8_t scale2 = scale;
-        string_view d{(char*)val.data(), val.size()};
+        span d = val;
 
         if (is_null)
             return "";
@@ -1265,11 +1265,11 @@ namespace tds {
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
-            auto propbytes = (uint8_t)d[0];
+            auto propbytes = d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
             switch (type2) {
                 case sql_type::TIME:
@@ -1288,7 +1288,7 @@ namespace tds {
                 break;
             }
 
-            d = d.substr(propbytes);
+            d = d.subspan(propbytes);
         }
 
         switch (type2) {
@@ -1305,7 +1305,7 @@ namespace tds {
                 return fmt::format("{}", *(int64_t*)d.data());
 
             case sql_type::INTN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case 1:
                         return fmt::format("{}", *(uint8_t*)d.data());
 
@@ -1319,7 +1319,7 @@ namespace tds {
                         return fmt::format("{}", *(int64_t*)d.data());
 
                     default:
-                        throw formatted_error("INTN has unexpected length {}.", d.length());
+                        throw formatted_error("INTN has unexpected length {}.", d.size());
                 }
             break;
 
@@ -1328,7 +1328,7 @@ namespace tds {
             case sql_type::NTEXT:
             case sql_type::XML:
             {
-                u16string_view sv((char16_t*)d.data(), d.length() / sizeof(char16_t));
+                u16string_view sv((char16_t*)d.data(), d.size() / sizeof(char16_t));
                 return utf16_to_utf8(sv);
             }
 
@@ -1338,7 +1338,7 @@ namespace tds {
             case sql_type::VARBINARY:
             case sql_type::BINARY:
             case sql_type::IMAGE:
-                return string{d};
+                return string{string_view{(char*)d.data(), d.size()}};
 
             case sql_type::REAL:
                 return fmt::format("{}", *(float*)d.data());
@@ -1347,7 +1347,7 @@ namespace tds {
                 return fmt::format("{}", *(double*)d.data());
 
             case sql_type::FLTN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case sizeof(float):
                         return fmt::format("{}", *(float*)d.data());
 
@@ -1355,7 +1355,7 @@ namespace tds {
                         return fmt::format("{}", *(double*)d.data());
 
                     default:
-                        throw formatted_error("FLTN has unexpected length {}.", d.length());
+                        throw formatted_error("FLTN has unexpected length {}.", d.size());
                 }
             break;
 
@@ -1365,15 +1365,15 @@ namespace tds {
                 memcpy(&v, d.data(), 3);
                 v &= 0xffffff;
 
-                auto d = num_to_ymd(v - jan1900);
+                auto dt = num_to_ymd(v - jan1900);
 
-                return fmt::format("{:04}-{:02}-{:02}", (int)d.year(), (unsigned int)d.month(), (unsigned int)d.day());
+                return fmt::format("{:04}-{:02}-{:02}", (int)dt.year(), (unsigned int)dt.month(), (unsigned int)dt.day());
             }
 
             case sql_type::TIME: {
                 uint64_t ticks = 0;
 
-                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length()));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.size()));
 
                 for (unsigned int n = 0; n < 7 - max_length2; n++) {
                     ticks *= 10;
@@ -1396,13 +1396,13 @@ namespace tds {
                 uint64_t ticks = 0;
                 uint32_t v;
 
-                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 3));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.size() - 3));
 
                 for (unsigned int n = 0; n < 7 - max_length2; n++) {
                     ticks *= 10;
                 }
 
-                memcpy(&v, d.data() + d.length() - 3, 3);
+                memcpy(&v, d.data() + d.size() - 3, 3);
                 v &= 0xffffff;
 
                 datetime dt(num_to_ymd(v - jan1900), time_t(ticks));
@@ -1421,7 +1421,7 @@ namespace tds {
             }
 
             case sql_type::DATETIMN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case 4: {
                         auto v = *(uint16_t*)d.data();
                         auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
@@ -1443,7 +1443,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error("DATETIMN has invalid length {}.", d.length());
+                        throw formatted_error("DATETIMN has invalid length {}.", d.size());
                 }
 
             case sql_type::DATETIM4: {
@@ -1460,19 +1460,19 @@ namespace tds {
                 uint64_t ticks = 0;
                 uint32_t v;
 
-                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 5));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.size() - 5));
 
                 for (unsigned int n = 0; n < 7 - max_length2; n++) {
                     ticks *= 10;
                 }
 
-                memcpy(&v, d.data() + d.length() - 5, 3);
+                memcpy(&v, d.data() + d.size() - 5, 3);
                 v &= 0xffffff;
 
                 datetimeoffset dto;
                 dto.d = num_to_ymd(v - jan1900);
                 dto.t = time_t{ticks};
-                dto.offset = *(int16_t*)(d.data() + d.length() - sizeof(int16_t));
+                dto.offset = *(int16_t*)(d.data() + d.size() - sizeof(int16_t));
 
                 return fmt::format("{:{}}", dto, max_length2);
             }
@@ -1486,11 +1486,11 @@ namespace tds {
                 uint8_t scratch[38];
                 char s[80], *p;
                 unsigned int pos;
-                auto numlen = (unsigned int)(d.length() - 1);
+                auto numlen = (unsigned int)(d.size() - 1);
 
                 // double dabble
 
-                memcpy(scratch, d.data() + 1, d.length() - 1);
+                memcpy(scratch, d.data() + 1, d.size() - 1);
                 memset(scratch + numlen, 0, sizeof(scratch) - numlen);
 
                 for (unsigned int iter = 0; iter < numlen * 8; iter++) {
@@ -1554,7 +1554,7 @@ namespace tds {
             }
 
             case sql_type::MONEYN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case sizeof(int64_t): {
                         auto v = *(int64_t*)d.data();
 
@@ -1580,7 +1580,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error("MONEYN has unexpected length {}.", d.length());
+                        throw formatted_error("MONEYN has unexpected length {}.", d.size());
                 }
 
             case sql_type::MONEY: {
@@ -1610,8 +1610,7 @@ namespace tds {
             case sql_type::UNIQUEIDENTIFIER:
                 return fmt::format("{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
                                    *(uint32_t*)d.data(), *(uint16_t*)(d.data() + 4), *(uint16_t*)(d.data() + 6),
-                                   (uint8_t)d[8], (uint8_t)d[9], (uint8_t)d[10], (uint8_t)d[11], (uint8_t)d[12],
-                                   (uint8_t)d[13], (uint8_t)d[14], (uint8_t)d[15]);
+                                   d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 
             default:
                 throw formatted_error("Cannot convert {} to string", type2);
