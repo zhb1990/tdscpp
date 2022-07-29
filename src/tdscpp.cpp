@@ -145,7 +145,8 @@ static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, span
         case tds::sql_type::NCHAR:
         case tds::sql_type::BINARY:
         case tds::sql_type::XML:
-            if (max_length == 0xffff || type == tds::sql_type::XML) {
+        case tds::sql_type::UDT:
+            if (max_length == 0xffff || type == tds::sql_type::XML || type == tds::sql_type::UDT) {
                 if (sp.size() < sizeof(uint64_t))
                     return false;
 
