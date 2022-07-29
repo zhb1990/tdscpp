@@ -1253,6 +1253,118 @@ namespace tds {
         }
     }
 
+    static constexpr uint8_t bit_mask(uint8_t off, uint8_t len) {
+        auto b = (uint8_t)((1 << (8 - off)) - 1);
+
+        b = (uint8_t)(b & ~((1 << (8 - off - len)) - 1));
+
+        return b;
+    }
+
+    static_assert(bit_mask(0, 1) == 0b10000000);
+    static_assert(bit_mask(0, 6) == 0b11111100);
+    static_assert(bit_mask(0, 7) == 0b11111110);
+    static_assert(bit_mask(1, 1) == 0b01000000);
+    static_assert(bit_mask(1, 6) == 0b01111110);
+    static_assert(bit_mask(6, 2) == 0b00000011);
+
+    static uint64_t read_bits(span<const uint8_t> sp, unsigned int off, unsigned int len) {
+        uint64_t v = 0;
+
+        sp = sp.subspan(off / 8);
+        off %= 8;
+
+        do {
+            auto len2 = (uint8_t)min(len, 8 - off);
+
+            uint64_t b = (sp.front() & bit_mask((uint8_t)off, len2)) >> (8 - off - len2);
+
+            len -= len2;
+
+            v |= b << len;
+
+            if (len == 0)
+                break;
+
+            sp = sp.subspan(1);
+            off += len2;
+            off %= 8;
+        } while (true);
+
+        return v;
+    }
+
+    static string hierarchy_to_string(span<const uint8_t> d) {
+        if (d.empty())
+            return "/";
+
+        unsigned int off = 0;
+        auto bit_length = d.size() * 8;
+        string ret = "/";
+
+        do {
+            auto l = read_bits(d, off, 6);
+            uint64_t o;
+
+            if (l == 0b000000)
+                break;
+
+            switch (l) {
+                // FIXME - 000100
+                // FIXME - 000101
+                // FIXME - 000110
+                // FIXME - 0010xx
+                // FIXME - 00111x
+
+                case 0b010000:
+                case 0b010001:
+                case 0b010010:
+                case 0b010011:
+                case 0b010100:
+                case 0b010101:
+                case 0b010110:
+                case 0b010111:
+                case 0b011000:
+                case 0b011001:
+                case 0b011010:
+                case 0b011011:
+                case 0b011100:
+                case 0b011101:
+                case 0b011110:
+                case 0b011111: {
+                    off += 2;
+
+                    o = read_bits(d, off, 2);
+
+                    off += 2;
+
+                    break;
+                }
+
+                // FIXME - 100xxx
+                // FIXME - 101xxx
+                // FIXME - 110xxx
+                // FIXME - 1110xx
+                // FIXME - 11110x
+                // FIXME - 111110
+                // FIXME - 111111
+
+                default:
+                    throw formatted_error("Unhandled bit sequence {:06b}", l);
+            }
+
+            auto f = read_bits(d, off, 1);
+            off++;
+
+            if (f)
+                ret += fmt::format("{}/", o);
+            else
+                ret += fmt::format("{}.", o - 1);
+        } while (off < bit_length - 6);
+
+        return ret;
+    }
+
     value::operator string() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
@@ -1611,6 +1723,12 @@ namespace tds {
                 return fmt::format("{:08x}-{:04x}-{:04x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
                                    *(uint32_t*)d.data(), *(uint16_t*)(d.data() + 4), *(uint16_t*)(d.data() + 6),
                                    d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
+
+            case sql_type::UDT:
+                if (clr_name == u"Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91")
+                    return hierarchy_to_string(d);
+
+                throw formatted_error("Cannot convert UDT type {} to string", utf16_to_utf8(clr_name));
 
             default:
                 throw formatted_error("Cannot convert {} to string", type2);
