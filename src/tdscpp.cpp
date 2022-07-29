@@ -969,7 +969,8 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
         case tds::sql_type::NCHAR:
         case tds::sql_type::BINARY:
         case tds::sql_type::XML:
-            if (max_length == 0xffff || type == tds::sql_type::XML) {
+        case tds::sql_type::UDT:
+            if (max_length == 0xffff || type == tds::sql_type::XML || type == tds::sql_type::UDT) {
                 if (sp.size() < sizeof(uint64_t))
                     throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sp.size());
 
