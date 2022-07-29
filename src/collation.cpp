@@ -92,6 +92,26 @@ static weak_ordering compare_strings(u16string_view val1, u16string_view val2, c
     }
 }
 
+static strong_ordering hierarchy_cmp(span<const uint8_t> v1, span<const uint8_t> v2) {
+    while (!v1.empty() && !v2.empty()) {
+        if (v1.empty())
+            return strong_ordering::less;
+
+        if (v2.empty())
+            return strong_ordering::greater;
+
+        if (v1.front() < v2.front())
+            return strong_ordering::less;
+        else if (v1.front() > v2.front())
+            return strong_ordering::greater;
+
+        v1 = v1.subspan(1);
+        v2 = v2.subspan(1);
+    }
+
+    return strong_ordering::equivalent;
+}
+
 namespace tds {
     string value::collation_name() const {
         string ret;
@@ -839,6 +859,17 @@ namespace tds {
             // FIXME - IMAGE
             // FIXME - VARBINARY
             // FIXME - BINARY
+
+            case sql_type::UDT: {
+                if (clr_name == u"Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91") {
+                    if (v.type != sql_type::UDT || v.clr_name != u"Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91")
+                        throw runtime_error("HIERARCHYIDs can only be compared with other HIERARCHYIDs.");
+
+                    return hierarchy_cmp(val, v.val);
+                }
+
+                throw formatted_error("Comparison for UDT type {} unimplemented.", utf16_to_utf8(v.clr_name));
+            }
 
             default:
                 throw formatted_error("Comparison for type {} unimplemented.", type);
