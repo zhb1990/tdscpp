@@ -4362,14 +4362,16 @@ namespace tds {
         map<u16string, col_info> info;
 
         {
-            unique_ptr<query> sq2;
-
-            if (db.empty())
-                sq2 = make_unique<query>(tds, no_check(u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM sys.columns WHERE object_id = OBJECT_ID(?)"), table);
-            else
-                sq2 = make_unique<query>(tds, no_check(u"SELECT name, system_type_id, max_length, precision, scale, collation_name, is_nullable, COLLATIONPROPERTY(collation_name, 'CodePage') FROM " + u16string(db) + u".sys.columns WHERE object_id = OBJECT_ID(?)"), u16string(db) + u"." + u16string(table));
-
-            auto& sq = *sq2;
+            query sq(tds, no_check(uR"(SELECT name,
+    system_type_id,
+    max_length,
+    precision,
+    scale,
+    collation_name,
+    is_nullable,
+    COLLATIONPROPERTY(collation_name, 'CodePage')
+FROM )" + (db.empty() ? u"" : (u16string(db) + u".")) + uR"(sys.columns
+WHERE object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) + u"." + u16string(table)));
 
             while (sq.fetch_row()) {
                 auto type = (sql_type)(unsigned int)sq[1];
