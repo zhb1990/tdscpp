@@ -3201,9 +3201,12 @@ namespace tds {
                         bufsize += 1 + sizeof(schema) - sizeof(char16_t);
                         bufsize += 1 + sizeof(type) - sizeof(char16_t);
                         bufsize += sizeof(uint64_t);
-                        bufsize += sizeof(uint32_t);
-                        bufsize += p.val.size();
-                        bufsize += sizeof(uint32_t);
+
+                        if (!p.is_null) {
+                            bufsize += sizeof(uint32_t);
+                            bufsize += p.val.size();
+                            bufsize += sizeof(uint32_t);
+                        }
                     } else
                         throw formatted_error("Unhandled UDT type {} in RPC params.", utf16_to_utf8(p.clr_name));
                 break;
@@ -3554,16 +3557,21 @@ namespace tds {
                         memcpy(ptr, type, sizeof(type) - sizeof(char16_t));
                         ptr += sizeof(type) - sizeof(char16_t);
 
-                        *(uint64_t*)ptr = p.val.size();
-                        ptr += sizeof(uint64_t);
-                        *(uint32_t*)ptr = (uint32_t)p.val.size();
-                        ptr += sizeof(uint32_t);
+                        if (p.is_null) {
+                            *(uint64_t*)ptr = 0xffffffffffffffff;
+                            ptr += sizeof(uint64_t);
+                        } else {
+                            *(uint64_t*)ptr = p.val.size();
+                            ptr += sizeof(uint64_t);
+                            *(uint32_t*)ptr = (uint32_t)p.val.size();
+                            ptr += sizeof(uint32_t);
 
-                        memcpy(ptr, p.val.data(), p.val.size());
-                        ptr += p.val.size();
+                            memcpy(ptr, p.val.data(), p.val.size());
+                            ptr += p.val.size();
 
-                        *(uint32_t*)ptr = 0;
-                        ptr += sizeof(uint32_t);
+                            *(uint32_t*)ptr = 0;
+                            ptr += sizeof(uint32_t);
+                        }
                     } else
                         throw formatted_error("Unhandled UDT type {} in RPC params.", utf16_to_utf8(p.clr_name));
                 break;
