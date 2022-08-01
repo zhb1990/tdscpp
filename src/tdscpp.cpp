@@ -3190,6 +3190,24 @@ namespace tds {
                         bufsize += p.val.size();
                 break;
 
+                case sql_type::UDT:
+                    if (p.clr_name == u"Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91") {
+                        static const char16_t schema[] = u"sys";
+                        static const char16_t type[] = u"HIERARCHYID";
+
+                        bufsize += sizeof(tds_param_header);
+
+                        bufsize++;
+                        bufsize += 1 + sizeof(schema) - sizeof(char16_t);
+                        bufsize += 1 + sizeof(type) - sizeof(char16_t);
+                        bufsize += sizeof(uint64_t);
+                        bufsize += sizeof(uint32_t);
+                        bufsize += p.val.size();
+                        bufsize += sizeof(uint32_t);
+                    } else
+                        throw formatted_error("Unhandled UDT type {} in RPC params.", utf16_to_utf8(p.clr_name));
+                break;
+
                 default:
                     throw formatted_error("Unhandled type {} in RPC params.", p.type);
             }
@@ -3514,6 +3532,41 @@ namespace tds {
 
                     break;
                 }
+
+                case sql_type::UDT:
+                    if (p.clr_name == u"Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91") {
+                        static const char16_t schema[] = u"sys";
+                        static const char16_t type[] = u"HIERARCHYID";
+
+                        // DB name
+                        *ptr = 0;
+                        ptr++;
+
+                        // schema name
+                        *ptr = (sizeof(schema) / sizeof(char16_t)) - 1;
+                        ptr++;
+                        memcpy(ptr, schema, sizeof(schema) - sizeof(char16_t));
+                        ptr += sizeof(schema) - sizeof(char16_t);
+
+                        // type name
+                        *ptr = (sizeof(type) / sizeof(char16_t)) - 1;
+                        ptr++;
+                        memcpy(ptr, type, sizeof(type) - sizeof(char16_t));
+                        ptr += sizeof(type) - sizeof(char16_t);
+
+                        *(uint64_t*)ptr = p.val.size();
+                        ptr += sizeof(uint64_t);
+                        *(uint32_t*)ptr = (uint32_t)p.val.size();
+                        ptr += sizeof(uint32_t);
+
+                        memcpy(ptr, p.val.data(), p.val.size());
+                        ptr += p.val.size();
+
+                        *(uint32_t*)ptr = 0;
+                        ptr += sizeof(uint32_t);
+                    } else
+                        throw formatted_error("Unhandled UDT type {} in RPC params.", utf16_to_utf8(p.clr_name));
+                break;
 
                 default:
                     throw formatted_error("Unhandled type {} in RPC params.", p.type);
