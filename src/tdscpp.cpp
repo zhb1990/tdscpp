@@ -4179,7 +4179,7 @@ namespace tds {
         }
     }
 
-    u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, u16string_view collation) {
+    u16string type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, u16string_view collation, u16string_view clr_name) {
         switch (type) {
             case sql_type::TINYINT:
                 return u"TINYINT";
@@ -4336,6 +4336,12 @@ namespace tds {
             case sql_type::XML:
                 return u"XML";
 
+            case sql_type::UDT:
+                if (clr_name == u"Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91")
+                    return u"HIERARCHYID";
+
+                throw formatted_error("Could not get type string for UDT type {}.", utf16_to_utf8(clr_name));
+
             default:
                 throw formatted_error("Could not get type string for {}.", type);
         }
@@ -4350,7 +4356,7 @@ namespace tds {
                 s += u", ";
 
             s += u"@P" + to_u16string(num) + u" ";
-            s += type_to_string(p.type, p.val.size(), p.precision, p.scale, u"");
+            s += type_to_string(p.type, p.val.size(), p.precision, p.scale, u"", p.clr_name);
 
             num++;
         }
@@ -4362,16 +4368,18 @@ namespace tds {
         map<u16string, col_info> info;
 
         {
-            query sq(tds, no_check(uR"(SELECT name,
-    system_type_id,
-    max_length,
-    precision,
-    scale,
-    collation_name,
-    is_nullable,
-    COLLATIONPROPERTY(collation_name, 'CodePage')
+            query sq(tds, no_check(uR"(SELECT columns.name,
+    columns.system_type_id,
+    columns.max_length,
+    columns.precision,
+    columns.scale,
+    columns.collation_name,
+    columns.is_nullable,
+    COLLATIONPROPERTY(columns.collation_name, 'CodePage'),
+    assembly_types.assembly_qualified_name
 FROM )" + (db.empty() ? u"" : (u16string(db) + u".")) + uR"(sys.columns
-WHERE object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) + u"." + u16string(table)));
+LEFT JOIN )" + (db.empty() ? u"" : (u16string(db) + u".")) + uR"(sys.assembly_types ON assembly_types.user_type_id = columns.user_type_id
+WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) + u"." + u16string(table)));
 
             while (sq.fetch_row()) {
                 auto type = (sql_type)(unsigned int)sq[1];
@@ -4408,7 +4416,7 @@ WHERE object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) + u"." + 
 
                 info.emplace(sq[0], col_info(type, (int16_t)sq[2], (uint8_t)(unsigned int)sq[3],
                                              (uint8_t)(unsigned int)sq[4], (u16string)sq[5], nullable,
-                                             (unsigned int)sq[7]));
+                                             (unsigned int)sq[7], (u16string)sq[8]));
             }
         }
 

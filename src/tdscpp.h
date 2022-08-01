@@ -142,9 +142,11 @@ namespace tds {
     class col_info {
     public:
         col_info(sql_type type, int16_t max_length, uint8_t precision, uint8_t scale,
-                std::u16string_view collation, bool nullable, unsigned int codepage) :
+                std::u16string_view collation, bool nullable, unsigned int codepage,
+                std::u16string_view clr_name) :
                 type(type), max_length(max_length), precision(precision), scale(scale),
-                collation(collation), nullable(nullable), codepage(codepage) {
+                collation(collation), nullable(nullable), codepage(codepage),
+                clr_name(clr_name) {
         }
 
         sql_type type;
@@ -154,6 +156,7 @@ namespace tds {
         std::u16string collation;
         bool nullable;
         unsigned int codepage;
+        std::u16string clr_name;
     };
 
 #if __cpp_lib_constexpr_string >= 201907L
@@ -1861,7 +1864,8 @@ namespace tds {
     }
 
     std::map<std::u16string, col_info> TDSCPP get_col_info(tds& tds, std::u16string_view table, std::u16string_view db);
-    std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale, std::u16string_view collation);
+    std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale,
+                                         std::u16string_view collation, std::u16string_view clr_name);
 
     std::vector<col_info> tds::bcp_start(std::u16string_view table, const list_of_u16string auto& np, std::u16string_view db) {
         if (np.empty())
@@ -1896,7 +1900,7 @@ namespace tds {
                     q += u", ";
 
                 q += escape(*it) + u" ";
-                q += type_to_string(col.type, col.max_length, col.precision, col.scale, col.collation);
+                q += type_to_string(col.type, col.max_length, col.precision, col.scale, col.collation, col.clr_name);
 
                 first = false;
 
