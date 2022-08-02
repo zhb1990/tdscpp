@@ -5390,12 +5390,14 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         committed = true;
     }
 
-    nlohmann::json TDSCPP to_json(const value& v) {
+    void TDSCPP to_json(nlohmann::json& j, const value& v) {
         auto type2 = v.type;
         auto val = span(v.val);
 
-        if (v.is_null)
-            return nlohmann::json(nullptr);
+        if (v.is_null) {
+            j = nlohmann::json(nullptr);
+            return;
+        }
 
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)val[0];
@@ -5413,7 +5415,8 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             case sql_type::SMALLINT:
             case sql_type::INT:
             case sql_type::BIGINT:
-                return nlohmann::json((int64_t)v);
+                j = nlohmann::json((int64_t)v);
+                break;
 
             case sql_type::NUMERIC:
             case sql_type::DECIMAL:
@@ -5422,14 +5425,16 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             case sql_type::MONEYN:
             case sql_type::MONEY:
             case sql_type::SMALLMONEY:
-                return nlohmann::json((double)v);
+                j = nlohmann::json((double)v);
+                break;
 
             case sql_type::BITN:
             case sql_type::BIT:
-                return nlohmann::json(val[0] != 0);
+                j = nlohmann::json(val[0] != 0);
+                break;
 
             default:
-                return nlohmann::json((string)v);
+                j = nlohmann::json((string)v);
         }
     }
 

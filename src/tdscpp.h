@@ -19,7 +19,7 @@
 #include <chrono>
 #include <array>
 #include <time.h>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -1656,10 +1656,10 @@ namespace tds {
         bool committed = false;
     };
 
-    nlohmann::json TDSCPP to_json(const value& v);
+    void TDSCPP to_json(nlohmann::json& j, const value& v);
 
-    static nlohmann::json __inline to_json(const column& c) {
-        return to_json(static_cast<const value&>(c));
+    static void __inline to_json(nlohmann::json& j, const column& c) {
+        to_json(j, static_cast<const value&>(c));
     }
 
     static std::string __inline escape(std::string_view sv) {
