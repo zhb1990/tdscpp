@@ -3152,10 +3152,10 @@ namespace tds {
 
 #ifdef _WIN32
                 if (ret < 0)
-                    throw formatted_error("recv failed (error {})", WSAGetLastError());
+                    throw formatted_error("recv failed (error {})", wsa_error_to_string(WSAGetLastError()));
 #else
                 if (ret < 0)
-                    throw formatted_error("recv failed (error {})", errno);
+                    throw formatted_error("recv failed (error {})", errno_to_string(errno));
 #endif
 
                 if (ret == 0)
