@@ -4943,8 +4943,8 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                     if (sp.size() < bitset_length)
                         throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sp.size(), bitset_length);
 
-                    string_view bitset((char*)sp.data(), bitset_length);
-                    auto bsv = (uint8_t)bitset[0];
+                    auto bitset = sp.subspan(0, bitset_length);
+                    auto bsv = bitset[0];
 
                     sp = sp.subspan(bitset_length);
 
@@ -4953,8 +4953,8 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
                         if (i != 0) {
                             if ((i & 7) == 0) {
-                                bitset = bitset.substr(1);
-                                bsv = (uint8_t)bitset[0];
+                                bitset = bitset.subspan(1);
+                                bsv = bitset[0];
                             } else
                                 bsv >>= 1;
                         }
