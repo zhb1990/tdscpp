@@ -1237,16 +1237,16 @@ namespace tds {
         template<unsigned N>
         explicit operator numeric<N>() const {
             auto type2 = type;
-            std::string_view d{(char*)val.data(), val.size()};
+            std::span d = val;
 
             if (is_null)
                 return 0;
 
             if (type2 == sql_type::SQL_VARIANT) {
                 type2 = (sql_type)d[0];
-                d = d.substr(1);
-                auto propbytes = (uint8_t)d[0];
-                d = d.substr(1 + propbytes);
+                d = d.subspan(1);
+                auto propbytes = d[0];
+                d = d.subspan(1 + propbytes);
             }
 
             switch (type2) {
@@ -1263,14 +1263,14 @@ namespace tds {
 
                     n.neg = d[0] == 0;
 
-                    if (d.length() >= 9)
+                    if (d.size() >= 9)
                         n.low_part = *(uint64_t*)&d[1];
                     else
                         n.low_part = *(uint32_t*)&d[1];
 
-                    if (d.length() >= 17)
+                    if (d.size() >= 17)
                         n.high_part = *(uint64_t*)&d[1 + sizeof(uint64_t)];
-                    else if (d.length() >= 13)
+                    else if (d.size() >= 13)
                         n.high_part = *(uint32_t*)&d[1 + sizeof(uint64_t)];
                     else
                         n.high_part = 0;
