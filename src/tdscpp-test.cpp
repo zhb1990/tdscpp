@@ -8,7 +8,7 @@
 
 using namespace std;
 
-static void show_msg(const string_view&, const string_view& message, const string_view&, int32_t msgno, int32_t, int16_t,
+static void show_msg(string_view, string_view message, string_view, int32_t msgno, int32_t, int16_t,
                      uint8_t severity, bool) {
     if (severity > 10)
         fmt::print(FMT_STRING("\x1b[31;1mError {}: {}\x1b[0m\n"), msgno, message);
@@ -18,7 +18,7 @@ static void show_msg(const string_view&, const string_view& message, const strin
         fmt::print(FMT_STRING("{}: {}\n"), msgno, message);
 }
 
-static string utf16_to_utf8(const u16string_view& sv) {
+static string utf16_to_utf8(u16string_view sv) {
 #ifdef _WIN32
     string ret;
 
