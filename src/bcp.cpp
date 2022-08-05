@@ -357,7 +357,7 @@ namespace tds {
                     if (col.max_length == -1 || col.type == sql_type::UDT) // MAX
                         bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
-                    if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
+                    if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY || vv.type == sql_type::UDT) {
                         bufsize += vv.val.size();
 
                         if ((col.max_length == -1 || col.type == sql_type::UDT) && !vv.val.empty())
