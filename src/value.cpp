@@ -2720,7 +2720,7 @@ namespace tds {
     value::operator datetimeoffset() const {
         auto type2 = type;
         unsigned int max_length2 = max_length;
-        string_view d{(char*)val.data(), val.size()};
+        span d = val;
 
         if (is_null)
             return datetimeoffset{1900y, chrono::January, 1d, 0, 0, 0, 0};
@@ -2728,11 +2728,11 @@ namespace tds {
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
-            auto propbytes = (uint8_t)d[0];
+            auto propbytes = d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
             switch (type2) {
                 case sql_type::TIME:
@@ -2745,7 +2745,7 @@ namespace tds {
                     break;
             }
 
-            d = d.substr(propbytes);
+            d = d.subspan(propbytes);
         }
 
         switch (type2) {
@@ -2757,7 +2757,7 @@ namespace tds {
                 uint8_t mon, day;
                 int16_t offset;
 
-                auto t = d;
+                auto t = string_view((char*)d.data(), d.size());
 
                 // remove leading whitespace
 
@@ -2777,7 +2777,7 @@ namespace tds {
                 time_t dur;
 
                 if (!parse_datetimeoffset(t, y, mon, day, dur, offset))
-                    throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", d);
+                    throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", string_view((char*)d.data(), d.size()));
 
                 return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, dur, offset};
             }
@@ -2790,7 +2790,7 @@ namespace tds {
                 uint8_t mon, day;
                 int16_t offset;
 
-                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
+                auto t = u16string_view((char16_t*)d.data(), d.size() / sizeof(char16_t));
 
                 // remove leading whitespace
 
@@ -2818,7 +2818,7 @@ namespace tds {
                 time_t dur;
 
                 if (!parse_datetimeoffset(t2, y, mon, day, dur, offset))
-                    throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error("Cannot convert string \"{}\" to datetimeoffset", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.size() / sizeof(char16_t))));
 
                 return datetimeoffset{chrono::year{y}, chrono::month{mon}, chrono::day{day}, dur, offset};
             }
@@ -2834,7 +2834,7 @@ namespace tds {
             case sql_type::TIME: {
                 uint64_t ticks = 0;
 
-                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length()));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.size()));
 
                 for (unsigned int n = 0; n < 7 - max_length2; n++) {
                     ticks *= 10;
@@ -2852,7 +2852,7 @@ namespace tds {
             }
 
             case sql_type::DATETIMN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case 4: {
                         auto v = *(uint16_t*)d.data();
                         auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
@@ -2870,7 +2870,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error("DATETIMN has invalid length {}", d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.size());
                 }
 
             case sql_type::DATETIM4: {
@@ -2885,9 +2885,9 @@ namespace tds {
                 uint32_t n = 0;
                 uint64_t ticks = 0;
 
-                memcpy(&n, d.data() + d.length() - 3, 3);
+                memcpy(&n, d.data() + d.size() - 3, 3);
 
-                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 3));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.size() - 3));
 
                 for (unsigned int n = 0; n < 7 - max_length2; n++) {
                     ticks *= 10;
@@ -2900,9 +2900,9 @@ namespace tds {
                 uint32_t n = 0;
                 uint64_t ticks = 0;
 
-                memcpy(&n, d.data() + d.length() - 5, 3);
+                memcpy(&n, d.data() + d.size() - 5, 3);
 
-                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.length() - 5));
+                memcpy(&ticks, d.data(), min(sizeof(uint64_t), d.size() - 5));
 
                 for (unsigned int n = 0; n < 7 - max_length2; n++) {
                     ticks *= 10;
@@ -2912,7 +2912,7 @@ namespace tds {
 
                 dto.d = num_to_ymd((int32_t)n - jan1900);
                 dto.t = time_t(ticks);
-                dto.offset = *(int16_t*)&d[d.length() - sizeof(int16_t)];
+                dto.offset = *(int16_t*)&d[d.size() - sizeof(int16_t)];
 
                 return dto;
             }
