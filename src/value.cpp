@@ -2990,25 +2990,18 @@ namespace tds {
                 if (d.empty())
                     return 0.0;
 
-                // from_chars not implemented for double yet as of mingw gcc 11.1
-#if 0
+                auto sv = string_view((char*)d.data(), d.size());
+
                 double res;
 
-                auto [p, ec] = from_chars(d.data(), d.data() + d.size(), res);
+                auto [p, ec] = from_chars((char*)sv.data(), (char*)sv.data() + sv.size(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error("Cannot convert string \"{}\" to float", d);
+                    throw formatted_error("Cannot convert string \"{}\" to float", sv);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error("String \"{}\" was too large to convert to float.", d);
+                    throw formatted_error("String \"{}\" was too large to convert to float.", sv);
 
                 return res;
-#else
-                try {
-                    return stod(string(string_view((char*)d.data(), d.size())));
-                } catch (...) {
-                    throw formatted_error("Cannot convert string \"{}\" to float", string_view((char*)d.data(), d.size()));
-                }
-#endif
             }
 
             case sql_type::NVARCHAR:
@@ -3027,8 +3020,6 @@ namespace tds {
                     s += (char)c;
                 }
 
-                // from_chars not implemented for double yet as of mingw gcc 11.1
-#if 0
                 double res;
 
                 auto [p, ec] = from_chars(s.data(), s.data() + s.length(), res);
@@ -3039,13 +3030,6 @@ namespace tds {
                     throw formatted_error("String \"{}\" was too large to convert to float.", s);
 
                 return res;
-#else
-                try {
-                    return stod(s);
-                } catch (...) {
-                    throw formatted_error("Cannot convert string \"{}\" to float", s);
-                }
-#endif
             }
 
             case sql_type::DATETIME: {
