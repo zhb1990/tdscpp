@@ -320,13 +320,14 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
+            case sql_type::XML: // changed into NVARCHAR(MAX)
                 bufsize = sizeof(uint16_t);
 
                 if (vv.is_null) {
-                    if (col.max_length == -1) // MAX
+                    if (col.max_length == -1 || col.type == sql_type::XML) // MAX
                         bufsize += sizeof(uint64_t) - sizeof(uint16_t);
                 } else {
-                    if (col.max_length == -1) // MAX
+                    if (col.max_length == -1 || col.type == sql_type::XML) // MAX
                         bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
                     if (vv.type == sql_type::NVARCHAR || vv.type == sql_type::NCHAR) {
@@ -702,7 +703,8 @@ namespace tds {
 
             case sql_type::NVARCHAR:
             case sql_type::NCHAR:
-                if (col.max_length == -1) {
+            case sql_type::XML: // changed into NVARCHAR(MAX)
+                if (col.max_length == -1 || col.type == sql_type::XML) {
                     if (vv.is_null) {
                         *(uint64_t*)ptr = 0xffffffffffffffff;
                         ptr += sizeof(uint64_t);
@@ -1609,6 +1611,7 @@ namespace tds {
             case sql_type::NVARCHAR:
             case sql_type::CHAR:
             case sql_type::NCHAR:
+            case sql_type::XML: // changed into NVARCHAR(MAX)
                 return sizeof(uint16_t) + sizeof(collation);
 
             case sql_type::VARBINARY:
@@ -1633,7 +1636,15 @@ namespace tds {
         if (col.nullable)
             c->flags |= 1;
 
-        c->type = col.type;
+        switch (col.type) {
+            case sql_type::XML:
+                c->type = sql_type::NVARCHAR;
+                break;
+
+            default:
+                c->type = col.type;
+                break;
+        }
 
         ptr += sizeof(tds_colmetadata_col);
 
@@ -1674,8 +1685,10 @@ namespace tds {
             case sql_type::VARCHAR:
             case sql_type::NVARCHAR:
             case sql_type::CHAR:
-            case sql_type::NCHAR: {
-                *(uint16_t*)ptr = (uint16_t)col.max_length;
+            case sql_type::NCHAR:
+            case sql_type::XML: // changed into NVARCHAR(MAX)
+            {
+                *(uint16_t*)ptr = col.type != sql_type::XML ? (uint16_t)col.max_length : 0xffff;
                 ptr += sizeof(uint16_t);
 
                 auto c = (collation*)ptr;
