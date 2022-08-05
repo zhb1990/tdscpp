@@ -3644,6 +3644,43 @@ namespace tds {
         }
     }
 
+    static void handle_nbcrow(span<const uint8_t>& sp, const vector<column>& cols, list<vector<pair<value_data_t, bool>>>& rows) {
+        if (cols.empty())
+            return;
+
+        rows.emplace_back();
+        auto& row = rows.back();
+
+        row.resize(cols.size());
+
+        auto bitset_length = (cols.size() + 7) / 8;
+
+        if (sp.size() < bitset_length)
+            throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sp.size(), bitset_length);
+
+        auto bitset = sp.subspan(0, bitset_length);
+        auto bsv = bitset[0];
+
+        sp = sp.subspan(bitset_length);
+
+        for (unsigned int i = 0; i < row.size(); i++) {
+            auto& col = row[i];
+
+            if (i != 0) {
+                if ((i & 7) == 0) {
+                    bitset = bitset.subspan(1);
+                    bsv = bitset[0];
+                } else
+                    bsv >>= 1;
+            }
+
+            if (bsv & 1) // NULL
+                get<1>(col) = true;
+            else
+                handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sp);
+        }
+    }
+
     void rpc::wait_for_packet() {
         enum tds_msg type;
         vector<uint8_t> payload;
@@ -4056,44 +4093,8 @@ namespace tds {
                 }
 
                 case token::NBCROW:
-                {
-                    if (cols.empty())
-                        break;
-
-                    rows.emplace_back();
-                    auto& row = rows.back();
-
-                    row.resize(cols.size());
-
-                    auto bitset_length = (cols.size() + 7) / 8;
-
-                    if (sp.size() < bitset_length)
-                        throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sp.size(), bitset_length);
-
-                    auto bitset = sp.subspan(0, bitset_length);
-                    auto bsv = bitset[0];
-
-                    sp = sp.subspan(bitset_length);
-
-                    for (unsigned int i = 0; i < row.size(); i++) {
-                        auto& col = row[i];
-
-                        if (i != 0) {
-                            if ((i & 7) == 0) {
-                                bitset = bitset.subspan(1);
-                                bsv = bitset[0];
-                            } else
-                                bsv >>= 1;
-                        }
-
-                        if (bsv & 1) // NULL
-                            get<1>(col) = true;
-                        else
-                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sp);
-                    }
-
+                    handle_nbcrow(sp, cols, rows);
                     break;
-                }
 
                 case token::ORDER:
                 {
@@ -4929,44 +4930,8 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 }
 
                 case token::NBCROW:
-                {
-                    if (cols.empty())
-                        break;
-
-                    rows.emplace_back();
-                    auto& row = rows.back();
-
-                    row.resize(cols.size());
-
-                    auto bitset_length = (cols.size() + 7) / 8;
-
-                    if (sp.size() < bitset_length)
-                        throw formatted_error("Short NBCROW message ({} bytes, expected at least {}).", sp.size(), bitset_length);
-
-                    auto bitset = sp.subspan(0, bitset_length);
-                    auto bsv = bitset[0];
-
-                    sp = sp.subspan(bitset_length);
-
-                    for (unsigned int i = 0; i < row.size(); i++) {
-                        auto& col = row[i];
-
-                        if (i != 0) {
-                            if ((i & 7) == 0) {
-                                bitset = bitset.subspan(1);
-                                bsv = bitset[0];
-                            } else
-                                bsv >>= 1;
-                        }
-
-                        if (bsv & 1) // NULL
-                            get<1>(col) = true;
-                        else
-                            handle_row_col(get<0>(col), get<1>(col), cols[i].type, cols[i].max_length, sp);
-                    }
-
+                    handle_nbcrow(sp, cols, rows);
                     break;
-                }
 
                 case token::ORDER:
                 {
