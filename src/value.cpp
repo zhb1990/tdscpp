@@ -1949,7 +1949,7 @@ namespace tds {
 
             d = d.subspan(1);
 
-            auto propbytes = (uint8_t)d[0];
+            auto propbytes = d[0];
 
             d = d.subspan(1 + propbytes);
         }
@@ -2189,7 +2189,7 @@ namespace tds {
 
     value::operator chrono::year_month_day() const {
         auto type2 = type;
-        string_view d{(char*)val.data(), val.size()};
+        span d = val;
 
         if (is_null)
             return chrono::year_month_day{1900y, chrono::January, 1d};
@@ -2197,11 +2197,11 @@ namespace tds {
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
-            auto propbytes = (uint8_t)d[0];
+            auto propbytes = d[0];
 
-            d = d.substr(1 + propbytes);
+            d = d.subspan(1 + propbytes);
         }
 
         switch (type2) {
@@ -2212,7 +2212,7 @@ namespace tds {
                 uint16_t y;
                 uint8_t mon, day;
 
-                auto t = d;
+                auto t = string_view((char*)d.data(), d.size());
 
                 // remove leading whitespace
 
@@ -2232,7 +2232,7 @@ namespace tds {
                 time_t dur;
 
                 if (!parse_datetime(t, y, mon, day, dur) || !is_valid_date(y, mon, day))
-                    throw formatted_error("Cannot convert string \"{}\" to date", d);
+                    throw formatted_error("Cannot convert string \"{}\" to date", string_view((char*)d.data(), d.size()));
 
                 return chrono::year_month_day{chrono::year{y}, chrono::month{mon}, chrono::day{day}};
             }
@@ -2244,7 +2244,7 @@ namespace tds {
                 uint16_t y;
                 uint8_t mon, day;
 
-                auto t = u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t));
+                auto t = u16string_view((char16_t*)d.data(), d.size() / sizeof(char16_t));
 
                 // remove leading whitespace
 
@@ -2273,7 +2273,7 @@ namespace tds {
                 time_t dur;
 
                 if (!parse_datetime(sv, y, mon, day, dur) || !is_valid_date(y, mon, day))
-                    throw formatted_error("Cannot convert string \"{}\" to date", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.length() / sizeof(char16_t))));
+                    throw formatted_error("Cannot convert string \"{}\" to date", utf16_to_utf8(u16string_view((char16_t*)d.data(), d.size() / sizeof(char16_t))));
 
                 return chrono::year_month_day{chrono::year{y}, chrono::month{mon}, chrono::day{day}};
             }
@@ -2290,7 +2290,7 @@ namespace tds {
                 return num_to_ymd(*(int32_t*)d.data());
 
             case sql_type::DATETIMN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case 4:
                         return num_to_ymd(*(uint16_t*)d.data());
 
@@ -2298,7 +2298,7 @@ namespace tds {
                         return num_to_ymd(*(int32_t*)d.data());
 
                     default:
-                        throw formatted_error("DATETIMN has invalid length {}", d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.size());
                 }
 
             case sql_type::DATETIM4:
@@ -2307,7 +2307,7 @@ namespace tds {
             case sql_type::DATETIME2: {
                 uint32_t n = 0;
 
-                memcpy(&n, d.data() + d.length() - 3, 3);
+                memcpy(&n, d.data() + d.size() - 3, 3);
 
                 return num_to_ymd((int32_t)n - jan1900);
             }
@@ -2315,7 +2315,7 @@ namespace tds {
             case sql_type::DATETIMEOFFSET: {
                 uint32_t n = 0;
 
-                memcpy(&n, d.data() + d.length() - 5, 3);
+                memcpy(&n, d.data() + d.size() - 5, 3);
 
                 return num_to_ymd((int32_t)n - jan1900);
             }
