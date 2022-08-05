@@ -5807,10 +5807,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
 #ifdef _WIN32
             if (ret < 0)
-                throw formatted_error("send failed (error {})", WSAGetLastError());
+                throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
 #else
             if (ret < 0)
-                throw formatted_error("send failed (error {})", errno);
+                throw formatted_error("send failed (error {})", errno_to_string(errno));
 #endif
 
             // FIXME - 1 second timeout
