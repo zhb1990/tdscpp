@@ -2927,7 +2927,7 @@ namespace tds {
     value::operator double() const {
         auto type2 = type;
         auto max_length2 = max_length;
-        string_view d{(char*)val.data(), val.size()};
+        span d = val;
 
         if (is_null)
             return 0;
@@ -2935,11 +2935,11 @@ namespace tds {
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
-            auto propbytes = (uint8_t)d[0];
+            auto propbytes = d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
             switch (type2) {
                 case sql_type::TIME:
@@ -2952,7 +2952,7 @@ namespace tds {
                     break;
             }
 
-            d = d.substr(propbytes);
+            d = d.subspan(propbytes);
         }
 
         switch (type2) {
@@ -2972,7 +2972,7 @@ namespace tds {
                 return *(double*)d.data();
 
             case sql_type::FLTN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case sizeof(float):
                         return *(float*)d.data();
 
@@ -2980,7 +2980,7 @@ namespace tds {
                         return *(double*)d.data();
 
                     default:
-                        throw formatted_error("FLTN has unexpected length {}", d.length());
+                        throw formatted_error("FLTN has unexpected length {}", d.size());
                 }
 
             case sql_type::VARCHAR:
@@ -2994,7 +2994,7 @@ namespace tds {
 #if 0
                 double res;
 
-                auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
+                auto [p, ec] = from_chars(d.data(), d.data() + d.size(), res);
 
                 if (ec == errc::invalid_argument)
                     throw formatted_error("Cannot convert string \"{}\" to float", d);
@@ -3004,9 +3004,9 @@ namespace tds {
                 return res;
 #else
                 try {
-                    return stod(string(d));
+                    return stod(string(string_view((char*)d.data(), d.size())));
                 } catch (...) {
-                    throw formatted_error("Cannot convert string \"{}\" to float", d);
+                    throw formatted_error("Cannot convert string \"{}\" to float", string_view((char*)d.data(), d.size()));
                 }
 #endif
             }
@@ -3018,7 +3018,7 @@ namespace tds {
                 if (d.empty())
                     return 0.0;
 
-                u16string_view v((char16_t*)d.data(), d.length() / sizeof(char16_t));
+                u16string_view v((char16_t*)d.data(), d.size() / sizeof(char16_t));
                 string s;
 
                 s.reserve(v.length());
@@ -3059,9 +3059,9 @@ namespace tds {
                 uint32_t n = 0;
                 uint64_t secs = 0;
 
-                memcpy(&n, d.data() + d.length() - 3, 3);
+                memcpy(&n, d.data() + d.size() - 3, 3);
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 3));
+                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.size() - 3));
 
                 for (auto n = max_length2; n > 0; n--) {
                     secs /= 10;
@@ -3074,9 +3074,9 @@ namespace tds {
                 uint32_t n = 0;
                 uint64_t secs = 0;
 
-                memcpy(&n, d.data() + d.length() - 5, 3);
+                memcpy(&n, d.data() + d.size() - 5, 3);
 
-                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.length() - 5));
+                memcpy(&secs, d.data(), min(sizeof(uint64_t), d.size() - 5));
 
                 for (auto n = max_length2; n > 0; n--) {
                     secs /= 10;
@@ -3086,7 +3086,7 @@ namespace tds {
             }
 
             case sql_type::DATETIMN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case 4: {
                         auto dt = *(uint16_t*)d.data();
                         auto t = *(uint16_t*)(d.data() + sizeof(uint16_t));
@@ -3102,7 +3102,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error("DATETIMN has invalid length {}", d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.size());
                 }
 
             case sql_type::DATETIM4: {
@@ -3124,7 +3124,7 @@ namespace tds {
             }
 
             case sql_type::MONEYN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case sizeof(int64_t): {
                         auto v = *(int64_t*)d.data();
 
@@ -3140,7 +3140,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error("MONEYN has unexpected length {}", d.length());
+                        throw formatted_error("MONEYN has unexpected length {}", d.size());
                 }
 
             case sql_type::MONEY: {
