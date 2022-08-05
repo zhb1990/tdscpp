@@ -3071,10 +3071,10 @@ namespace tds {
 
 #ifdef _WIN32
                 if (ret < 0)
-                    throw formatted_error("send failed (error {})", WSAGetLastError());
+                    throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
 #else
                 if (ret < 0)
-                    throw formatted_error("send failed (error {})", errno);
+                    throw formatted_error("send failed (error {})", errno_to_string(errno));
 #endif
 
                 if (ret == (int)msg.size())
