@@ -1939,7 +1939,7 @@ namespace tds {
 
     value::operator int64_t() const {
         auto type2 = type;
-        string_view d{(char*)val.data(), val.size()};
+        span d = val;
 
         if (is_null)
             return 0;
@@ -1947,11 +1947,11 @@ namespace tds {
         if (type2 == sql_type::SQL_VARIANT) {
             type2 = (sql_type)d[0];
 
-            d = d.substr(1);
+            d = d.subspan(1);
 
             auto propbytes = (uint8_t)d[0];
 
-            d = d.substr(1 + propbytes);
+            d = d.subspan(1 + propbytes);
         }
 
         switch (type2) {
@@ -1968,7 +1968,7 @@ namespace tds {
                 return *(int64_t*)d.data();
 
             case sql_type::INTN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case 1:
                         return *(uint8_t*)d.data();
 
@@ -1982,7 +1982,7 @@ namespace tds {
                         return *(int64_t*)d.data();
 
                     default:
-                        throw formatted_error("INTN has unexpected length {}.", d.length());
+                        throw formatted_error("INTN has unexpected length {}.", d.size());
                 }
 
             case sql_type::REAL:
@@ -1992,7 +1992,7 @@ namespace tds {
                 return (int64_t)*(double*)d.data();
 
             case sql_type::FLTN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case sizeof(float):
                         return (int64_t)*(float*)d.data();
 
@@ -2000,7 +2000,7 @@ namespace tds {
                         return (int64_t)*(double*)d.data();
 
                     default:
-                        throw formatted_error("FLTN has unexpected length {}.", d.length());
+                        throw formatted_error("FLTN has unexpected length {}.", d.size());
                 }
 
             case sql_type::BITN:
@@ -2016,24 +2016,26 @@ namespace tds {
 
                 bool first = true;
 
-                for (auto c : d) {
+                auto sv = string_view((char*)d.data(), d.size());
+
+                for (auto c : sv) {
                     if (c == '-') {
                         if (!first)
-                            throw formatted_error("Cannot convert string \"{}\" to integer", d);
+                            throw formatted_error("Cannot convert string \"{}\" to integer", sv);
                     } else if (c < '0' || c > '9')
-                        throw formatted_error("Cannot convert string \"{}\" to integer", d);
+                        throw formatted_error("Cannot convert string \"{}\" to integer", sv);
 
                     first = false;
                 }
 
                 int64_t res;
 
-                auto [p, ec] = from_chars(d.data(), d.data() + d.length(), res);
+                auto [p, ec] = from_chars(sv.data(), sv.data() + sv.size(), res);
 
                 if (ec == errc::invalid_argument)
-                    throw formatted_error("Cannot convert string \"{}\" to integer", d);
+                    throw formatted_error("Cannot convert string \"{}\" to integer", sv);
                 else if (ec == errc::result_out_of_range)
-                    throw formatted_error("String \"{}\" was too large to convert to BIGINT", d);
+                    throw formatted_error("String \"{}\" was too large to convert to BIGINT", sv);
 
                 return res;
             }
@@ -2045,7 +2047,7 @@ namespace tds {
                 if (d.empty())
                     return 0;
 
-                u16string_view v((char16_t*)d.data(), d.length() / sizeof(char16_t));
+                u16string_view v((char16_t*)d.data(), d.size() / sizeof(char16_t));
                 string s;
 
                 s.reserve(v.length());
@@ -2081,7 +2083,7 @@ namespace tds {
             case sql_type::DATETIME2: {
                 uint32_t n = 0;
 
-                memcpy(&n, d.data() + d.length() - 3, 3);
+                memcpy(&n, d.data() + d.size() - 3, 3);
 
                 return (int32_t)n - jan1900;
             }
@@ -2089,13 +2091,13 @@ namespace tds {
             case sql_type::DATETIMEOFFSET: {
                 uint32_t n = 0;
 
-                memcpy(&n, d.data() + d.length() - 5, 3);
+                memcpy(&n, d.data() + d.size() - 5, 3);
 
                 return (int32_t)n - jan1900;
             }
 
             case sql_type::DATETIMN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case 4:
                         return *(uint16_t*)d.data(); // MSSQL adds 1 if after midday
 
@@ -2103,7 +2105,7 @@ namespace tds {
                         return *(int32_t*)d.data(); // MSSQL adds 1 if after midday
 
                     default:
-                        throw formatted_error("DATETIMN has invalid length {}", d.length());
+                        throw formatted_error("DATETIMN has invalid length {}", d.size());
                 }
 
             case sql_type::DATETIM4:
@@ -2143,7 +2145,7 @@ namespace tds {
             }
 
             case sql_type::MONEYN:
-                switch (d.length()) {
+                switch (d.size()) {
                     case sizeof(int64_t): {
                         auto v = *(int64_t*)d.data();
 
@@ -2159,7 +2161,7 @@ namespace tds {
                     }
 
                     default:
-                        throw formatted_error("MONEYN has unexpected length {}", d.length());
+                        throw formatted_error("MONEYN has unexpected length {}", d.size());
                 }
 
             case sql_type::MONEY: {
