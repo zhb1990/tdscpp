@@ -347,19 +347,20 @@ namespace tds {
 
             case sql_type::VARBINARY:
             case sql_type::BINARY:
+            case sql_type::UDT: // changed into VARBINARY(MAX)
                 bufsize = sizeof(uint16_t);
 
                 if (vv.is_null) {
-                    if (col.max_length == -1) // MAX
+                    if (col.max_length == -1 || col.type == sql_type::UDT) // MAX
                         bufsize += sizeof(uint64_t) - sizeof(uint16_t);
                 } else {
-                    if (col.max_length == -1) // MAX
+                    if (col.max_length == -1 || col.type == sql_type::UDT) // MAX
                         bufsize += sizeof(uint64_t) + sizeof(uint32_t) - sizeof(uint16_t);
 
                     if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
                         bufsize += vv.val.size();
 
-                        if (col.max_length == -1 && !vv.val.empty())
+                        if ((col.max_length == -1 || col.type == sql_type::UDT) && !vv.val.empty())
                             bufsize += sizeof(uint32_t);
                     } else
                         throw formatted_error("Could not convert {} to {}.", vv.type, col.type);
@@ -775,11 +776,12 @@ namespace tds {
 
             case sql_type::VARBINARY:
             case sql_type::BINARY:
-                if (col.max_length == -1) {
+            case sql_type::UDT: // changed into VARBINARY(MAX)
+                if (col.max_length == -1 || col.type == sql_type::UDT) {
                     if (vv.is_null) {
                         *(uint64_t*)ptr = 0xffffffffffffffff;
                         ptr += sizeof(uint64_t);
-                    } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
+                    } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY || vv.type == sql_type::UDT) {
                         *(uint64_t*)ptr = 0xfffffffffffffffe;
                         ptr += sizeof(uint64_t);
 
@@ -799,7 +801,7 @@ namespace tds {
                     if (vv.is_null) {
                         *(uint16_t*)ptr = 0xffff;
                         ptr += sizeof(uint16_t);
-                    } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY) {
+                    } else if (vv.type == sql_type::VARBINARY || vv.type == sql_type::BINARY || vv.type == sql_type::UDT) {
                         if (vv.val.size() > (uint16_t)col.max_length)
                             throw formatted_error("Binary data too long for column {} ({} bytes, maximum {}).", utf16_to_utf8(col_name), vv.val.size(), col.max_length);
 
@@ -1616,6 +1618,7 @@ namespace tds {
 
             case sql_type::VARBINARY:
             case sql_type::BINARY:
+            case sql_type::UDT: // changed into VARBINARY(MAX)
                 return sizeof(uint16_t);
 
             case sql_type::DECIMAL:
@@ -1639,6 +1642,10 @@ namespace tds {
         switch (col.type) {
             case sql_type::XML:
                 c->type = sql_type::NVARCHAR;
+                break;
+
+            case sql_type::UDT:
+                c->type = sql_type::VARBINARY;
                 break;
 
             default:
@@ -1714,7 +1721,8 @@ namespace tds {
 
             case sql_type::VARBINARY:
             case sql_type::BINARY:
-                *(uint16_t*)ptr = (uint16_t)col.max_length;
+            case sql_type::UDT: // changed into VARBINARY(MAX)
+                *(uint16_t*)ptr = col.type != sql_type::UDT ? (uint16_t)col.max_length : 0xffff;
                 ptr += sizeof(uint16_t);
                 break;
 

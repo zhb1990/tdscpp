@@ -1900,7 +1900,11 @@ namespace tds {
                     q += u", ";
 
                 q += escape(*it) + u" ";
-                q += type_to_string(col.type, col.max_length, col.precision, col.scale, col.collation, col.clr_name);
+
+                if (col.type == sql_type::UDT)
+                    q += u"VARBINARY(MAX)";
+                else
+                    q += type_to_string(col.type, col.max_length, col.precision, col.scale, col.collation, col.clr_name);
 
                 first = false;
 
