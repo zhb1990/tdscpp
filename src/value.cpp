@@ -3147,4 +3147,210 @@ namespace tds {
                 throw formatted_error("Cannot convert {} to float", type2);
         }
     }
+
+    static string quote_string(string_view s) {
+        string ret;
+
+        ret.reserve(s.size() + 2);
+
+        ret += "'";
+
+        for (auto c : s) {
+            if (c == '\'')
+                ret += "''";
+            else
+                ret += c;
+        }
+
+        ret += "'";
+
+        return ret;
+    }
+
+    string value::to_literal() const {
+        if (is_null)
+            return "NULL";
+
+        unsigned int max_length2 = max_length;
+        auto type2 = type;
+        span d = val;
+
+        if (type == sql_type::SQL_VARIANT) {
+            type2 = (sql_type)d[0];
+
+            d = d.subspan(1);
+
+            auto propbytes = d[0];
+
+            d = d.subspan(1);
+
+            switch (type2) {
+                case sql_type::TIME:
+                case sql_type::DATETIME2:
+                case sql_type::DATETIMEOFFSET:
+                    max_length2 = d[0];
+                    break;
+
+                default:
+                    break;
+            }
+
+            d = d.subspan(propbytes);
+        }
+
+        switch (type2) {
+            case sql_type::INTN:
+            case sql_type::TINYINT:
+            case sql_type::SMALLINT:
+            case sql_type::INT:
+            case sql_type::BIGINT:
+            case sql_type::BIT:
+            case sql_type::BITN:
+                return to_string((int64_t)*this);
+
+            case sql_type::TEXT:
+            case sql_type::VARCHAR:
+            case sql_type::CHAR:
+            case sql_type::XML:
+            case sql_type::UNIQUEIDENTIFIER:
+                return quote_string((string)*this);
+
+            case sql_type::NTEXT:
+            case sql_type::NVARCHAR:
+            case sql_type::NCHAR:
+                return "N" + quote_string((string)*this);
+
+            case sql_type::IMAGE:
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
+            case sql_type::UDT: {
+                string ret = "0x";
+
+                for (auto b : d) {
+                    ret += fmt::format("{:02x}", b);
+                }
+
+                return ret;
+            }
+
+            case sql_type::FLOAT:
+            case sql_type::REAL:
+            case sql_type::FLTN:
+                return fmt::format("{}", (double)*this);
+
+            case sql_type::MONEY:
+            case sql_type::SMALLMONEY:
+            case sql_type::MONEYN:
+            case sql_type::DECIMAL:
+            case sql_type::NUMERIC:
+                return (string)*this;
+
+            case sql_type::DATE: {
+                auto ymd = (chrono::year_month_day)*this;
+
+                return fmt::format("'{:04}{:02}{:02}'", (int)ymd.year(), (unsigned int)ymd.month(), (unsigned int)ymd.day());
+            }
+
+            case sql_type::TIME:
+                return "'" + (string)*this + "'";
+
+            case sql_type::DATETIME: {
+                auto dt = (datetime)*this;
+                chrono::hh_mm_ss hms(dt.t);
+                constexpr decltype(dt.t)::period ratio;
+                constexpr double ratio2 = (double)ratio.num / (double)ratio.den;
+
+                double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() * ratio2);
+
+                return fmt::format("'{:04}{:02}{:02} {:02}:{:02}:{:06.3f}'", (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
+                                                                        hms.hours().count(), hms.minutes().count(), s);
+            }
+
+            case sql_type::DATETIMN: {
+                auto dt = (datetime)*this;
+                chrono::hh_mm_ss hms(dt.t);
+
+                switch (d.size()) {
+                    case 4:
+                        return fmt::format("'{:04}{:02}{:02} {:02}:{:02}'", (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
+                                                                            hms.hours().count(), hms.minutes().count());
+
+                    case 8: {
+                        constexpr decltype(dt.t)::period ratio;
+                        constexpr double ratio2 = (double)ratio.num / (double)ratio.den;
+                        double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() * ratio2);
+
+                        return fmt::format("'{:04}{:02}{:02} {:02}:{:02}:{:06.3f}'", (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
+                                                                                hms.hours().count(), hms.minutes().count(), s);
+                    }
+
+                    default:
+                        throw formatted_error("DATETIMN has invalid length {}.", d.size());
+                }
+            }
+
+            case sql_type::DATETIM4: {
+                auto dt = (datetime)*this;
+                chrono::hh_mm_ss hms(dt.t);
+
+                return fmt::format("'{:04}{:02}{:02} {:02}:{:02}'", (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
+                                                                    hms.hours().count(), hms.minutes().count());
+            }
+
+            case sql_type::DATETIME2: {
+                auto dt = (datetime)*this;
+                chrono::hh_mm_ss hms(dt.t);
+
+                if (max_length2 == 0) {
+                    return fmt::format("'{:04}{:02}{:02} {:02}:{:02}:{:02}'", (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
+                                    hms.hours().count(), hms.minutes().count(), hms.seconds().count());
+                } else {
+                    constexpr decltype(dt.t)::period ratio;
+                    constexpr double ratio2 = (double)ratio.num / (double)ratio.den;
+                    double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() * ratio2);
+
+                    return fmt::format("'{:04}{:02}{:02} {:02}:{:02}:{:0{}.{}f}'", (int)dt.d.year(), (unsigned int)dt.d.month(), (unsigned int)dt.d.day(),
+                                    hms.hours().count(), hms.minutes().count(), s, max_length2 + 3, max_length2);
+                }
+            }
+
+            case sql_type::DATETIMEOFFSET: {
+                auto dto = (datetimeoffset)*this;
+
+                auto d = dto.d;
+                auto t = dto.t;
+
+                t += chrono::minutes{dto.offset};
+
+                if (t < time_t::zero()) {
+                    d = chrono::year_month_day{(chrono::sys_days)d - chrono::days{1}};
+                    t += chrono::days{1};
+                } else if (t >= chrono::days{1}) {
+                    d = chrono::year_month_day{(chrono::sys_days)d + chrono::days{1}};
+                    t -= chrono::days{1};
+                }
+
+                chrono::hh_mm_ss hms(t);
+
+                if (max_length2 == 0) {
+                    return fmt::format("'{:04}{:02}{:02} {:02}:{:02}:{:02}{:+03}:{:02}'",
+                                        (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
+                                        hms.hours().count(), hms.minutes().count(), hms.seconds().count(),
+                                        dto.offset / 60, abs(dto.offset) % 60);
+                } else {
+                    constexpr decltype(t)::period ratio;
+                    constexpr double ratio2 = (double)ratio.num / (double)ratio.den;
+                    double s = (double)hms.seconds().count() + ((double)hms.subseconds().count() * ratio2);
+
+                    return fmt::format("'{:04}{:02}{:02} {:02}:{:02}:{:0{}.{}f}{:+03}:{:02}'",
+                                    (int)dto.d.year(), (unsigned int)dto.d.month(), (unsigned int)dto.d.day(),
+                                    hms.hours().count(), hms.minutes().count(), s, max_length2 + 3, max_length2,
+                                    dto.offset / 60, abs(dto.offset) % 60);
+                }
+            }
+
+            default:
+                throw formatted_error("Cannot convert {} to literal.", type2);
+        }
+    }
 };

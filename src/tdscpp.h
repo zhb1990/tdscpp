@@ -1302,6 +1302,8 @@ namespace tds {
             return (*this <=> v) == std::partial_ordering::equivalent;
         }
 
+        std::string to_literal() const;
+
         enum sql_type type;
         value_data_t val;
         bool is_null = false;
