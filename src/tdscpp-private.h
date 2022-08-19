@@ -641,8 +641,14 @@ namespace tds {
     class smp_session {
     public:
         smp_session(tds_impl& impl);
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        void send(std::span<const uint8_t> sp, bool do_ssl);
+#else
+        void send(std::span<const uint8_t> sp);
+#endif
 
         tds_impl& impl;
+        uint32_t seqnum = 1;
     };
 };
 
