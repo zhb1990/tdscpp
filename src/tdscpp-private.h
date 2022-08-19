@@ -516,7 +516,7 @@ namespace tds {
                  std::string_view app_name, std::string_view db,
                  const msg_handler& message_handler,
                  const func_count_handler& count_handler, uint16_t port, encryption_type enc,
-                 bool check_certificate);
+                 bool check_certificate, bool mars);
         ~tds_impl();
         void send_raw(std::span<const uint8_t> msg);
         void recv_raw(std::span<uint8_t> buf);
@@ -536,7 +536,7 @@ namespace tds {
                  std::u16string_view db);
 
         void connect(const std::string& server, uint16_t port, bool get_fqdn);
-        void send_prelogin_msg(enum encryption_type encrypt);
+        void send_prelogin_msg(enum encryption_type encrypt, bool mars);
         void send_login_msg(std::string_view user, std::string_view password, std::string_view server,
                             std::string_view app_name, std::string_view db);
         void send_login_msg2(uint32_t tds_version, uint32_t packet_size, uint32_t client_version, uint32_t client_pid,
@@ -570,6 +570,7 @@ namespace tds {
 #endif
         encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
+        bool mars = false;
     };
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)

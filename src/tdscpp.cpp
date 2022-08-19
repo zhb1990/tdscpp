@@ -2196,7 +2196,7 @@ namespace tds {
     tds::tds(const options& opts) {
         impl = make_unique<tds_impl>(opts.server, opts.user, opts.password, opts.app_name, opts.db,
                                      opts.message_handler, opts.count_handler, opts.port,
-                                     opts.encrypt, opts.check_certificate);
+                                     opts.encrypt, opts.check_certificate, opts.mars);
 
         codepage = opts.codepage;
 
@@ -2221,7 +2221,7 @@ namespace tds {
     tds_impl::tds_impl(const string& server, string_view user, string_view password,
                        string_view app_name, string_view db, const msg_handler& message_handler,
                        const func_count_handler& count_handler, uint16_t port, encryption_type enc,
-                       bool check_certificate) :
+                       bool check_certificate, bool mars) :
                        message_handler(message_handler), count_handler(count_handler), check_certificate(check_certificate) {
 #ifdef _WIN32
         WSADATA wsa_data;
@@ -2261,7 +2261,7 @@ namespace tds {
         enc = encryption_type::ENCRYPT_NOT_SUP;
 #endif
 
-        send_prelogin_msg(enc);
+        send_prelogin_msg(enc, mars);
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         if (server_enc != encryption_type::ENCRYPT_NOT_SUP)
@@ -2367,7 +2367,7 @@ namespace tds {
 #endif
     }
 
-    void tds_impl::send_prelogin_msg(enum encryption_type encrypt) {
+    void tds_impl::send_prelogin_msg(enum encryption_type encrypt, bool mars) {
         vector<uint8_t> msg;
         vector<login_opt> opts;
         login_opt_version lov;
@@ -2395,7 +2395,7 @@ namespace tds {
 
         // MARS
 
-        opts.emplace_back(tds_login_opt_type::mars, (uint8_t)0);
+        opts.emplace_back(tds_login_opt_type::mars, (uint8_t)(mars ? 1 : 0));
 
         size = (sizeof(tds_login_opt) * opts.size()) + sizeof(enum tds_login_opt_type);
         off = size;
@@ -2453,17 +2453,31 @@ namespace tds {
             if (tlo->type == tds_login_opt_type::terminator)
                 break;
 
-            if (tlo->type == tds_login_opt_type::encryption) {
-                auto off = htons(tlo->offset);
-                auto len = htons(tlo->length);
+            auto off = htons(tlo->offset);
+            auto len = htons(tlo->length);
 
-                if (payload.size() < off + len)
-                    throw runtime_error("Malformed PRELOGIN response.");
+            if (payload.size() < off + len)
+                throw runtime_error("Malformed PRELOGIN response.");
 
-                if (len < sizeof(enum encryption_type))
-                    throw formatted_error("Returned encryption type was {} bytes, expected {}.", len, sizeof(enum encryption_type));
+            auto pl = span(payload.data() + off, len);
 
-                server_enc = *(enum encryption_type*)(payload.data() + off);
+            switch (tlo->type) {
+                case tds_login_opt_type::encryption:
+                    if (pl.size() < sizeof(enum encryption_type))
+                        throw formatted_error("Returned encryption type was {} bytes, expected {}.", pl.size(), sizeof(enum encryption_type));
+
+                    server_enc = *(enum encryption_type*)pl.data();
+                break;
+
+                case tds_login_opt_type::mars:
+                    if (pl.empty())
+                        throw formatted_error("Returned MARS value was empty, expected 1 byte.");
+
+                    this->mars = pl[0] != 0;
+                break;
+
+                default:
+                break;
             }
 
             sp = sp.subspan(sizeof(tds_login_opt));
