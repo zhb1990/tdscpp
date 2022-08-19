@@ -419,6 +419,17 @@ enum class tds_feature : uint8_t {
     TERMINATOR = 0xff
 };
 
+struct smp_header {
+    uint8_t smid;
+    uint8_t flags;
+    uint16_t sid;
+    uint32_t length;
+    uint32_t seqnum;
+    uint32_t wndw;
+};
+
+static_assert(sizeof(smp_header) == 16, "smp_header has wrong size");
+
 #pragma pack(pop)
 
 #ifdef _WIN32
@@ -509,6 +520,7 @@ namespace tds {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
     class tds_ssl;
 #endif
+    class smp_session;
 
     class tds_impl {
     public:
@@ -571,6 +583,7 @@ namespace tds {
         encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
         bool mars = false;
+        std::unique_ptr<smp_session> mars_sess;
     };
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
@@ -623,6 +636,13 @@ namespace tds {
         std::list<std::vector<uint8_t>> tokens;
         std::vector<uint8_t> buf;
         std::vector<column> buf_columns;
+    };
+
+    class smp_session {
+    public:
+        smp_session(tds_impl& impl);
+
+        tds_impl& impl;
     };
 };
 

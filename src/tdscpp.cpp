@@ -2274,6 +2274,31 @@ namespace tds {
         if (server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ)
             ssl.reset();
 #endif
+
+        if (this->mars)
+            mars_sess = make_unique<smp_session>(*this);
+    }
+
+    smp_session::smp_session(tds_impl& impl) : impl(impl) {
+        // send SYN packet
+
+        smp_header h;
+
+        h.smid = 0x53;
+        h.flags = 0x01;
+        h.sid = 0;
+        h.length = sizeof(smp_header);
+        h.seqnum = 0;
+        h.wndw = 4;
+
+        auto sp = span((const uint8_t*)&h, sizeof(smp_header));
+
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        if (impl.ssl)
+            impl.ssl->send(sp);
+        else
+#endif
+            impl.send_raw(sp);
     }
 
     tds_impl::~tds_impl() {
