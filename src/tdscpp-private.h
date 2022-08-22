@@ -652,6 +652,7 @@ namespace tds {
         bool check_certificate;
         bool mars = false;
         std::unique_ptr<smp_session> mars_sess;
+        unique_handle mess_event;
         std::condition_variable mess_cv;
         std::mutex mess_lock;
         std::list<mess> mess_list;
