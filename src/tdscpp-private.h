@@ -653,8 +653,8 @@ namespace tds {
         bool mars = false;
         std::unique_ptr<smp_session> mars_sess;
         unique_handle mess_event;
-        std::condition_variable mess_cv;
-        std::mutex mess_lock;
+        std::condition_variable mess_in_cv;
+        std::mutex mess_in_lock;
         std::list<mess> mess_list;
         std::exception_ptr socket_thread_exc;
         std::jthread t;

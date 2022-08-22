@@ -2303,11 +2303,11 @@ namespace tds {
             socket_thread(stop);
         } catch (...) {
             {
-                lock_guard lg(mess_lock);
+                lock_guard lg(mess_in_lock);
                 socket_thread_exc = current_exception();
             }
 
-            mess_cv.notify_all();
+            mess_in_cv.notify_all();
         }
     }
 
@@ -2415,12 +2415,12 @@ namespace tds {
                                 spid = htons(h.spid);
 
                                 {
-                                    lock_guard lg(mess_lock);
+                                    lock_guard lg(mess_in_lock);
 
                                     mess_list.emplace_back(move(m));
                                 }
 
-                                mess_cv.notify_one();
+                                mess_in_cv.notify_one();
 
                                 decltype(in_buf) newbuf{in_buf.begin() + len, in_buf.end()};
                                 in_buf.swap(newbuf);
@@ -3416,9 +3416,9 @@ namespace tds {
         mess m;
 
         {
-            unique_lock ul(mess_lock);
+            unique_lock ul(mess_in_lock);
 
-            mess_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc; });
+            mess_in_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc; });
 
             if (!socket_thread_exc) {
                 m = move(mess_list.front());
