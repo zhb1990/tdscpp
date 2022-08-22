@@ -2326,9 +2326,9 @@ namespace tds {
 
         array<struct epoll_event, 2> evs;
 
-        // FIXME - EPOLLOUT
+        bool poll_out = true;
 
-        evs[0].events = EPOLLIN;
+        evs[0].events = EPOLLIN | EPOLLOUT | EPOLLRDHUP;
         evs[0].data.fd = sock;
         evs[1].events = EPOLLIN;
         evs[1].data.fd = mess_event.get();
@@ -2428,7 +2428,73 @@ namespace tds {
                         }
                     }
 
-                    // FIXME - EPOLLHUP
+                    if (ev.events & EPOLLOUT) {
+                        lock_guard lg(mess_out_lock);
+
+                        while (!mess_out_buf.empty()) {
+                            auto ret = send(sock, (char*)mess_out_buf.data(), (int)mess_out_buf.size(), 0);
+
+                            if (ret < 0) {
+                                if (errno == EWOULDBLOCK)
+                                    break;
+
+                                throw formatted_error("send failed (error {})", errno_to_string(errno));
+                            }
+
+                            if (ret == (int)mess_out_buf.size()) {
+                                mess_out_buf.clear();
+                                break;
+                            }
+
+                            vector<uint8_t> newbuf{mess_out_buf.begin() + ret, mess_out_buf.end()};
+                            mess_out_buf.swap(newbuf);
+                        }
+
+                        if (mess_out_buf.empty()) {
+                            auto& e = evs[0];
+
+                            e.events &= ~EPOLLOUT;
+
+                            if (epoll_ctl(epoll.get(), EPOLL_CTL_MOD, e.data.fd, &e) == -1)
+                                throw formatted_error("epoll_ctl failed (error {})", errno_to_string(errno));
+
+                            poll_out = false;
+                        }
+                    }
+
+                    if (ev.events & (EPOLLRDHUP | EPOLLHUP)) {
+                        if (stop.stop_requested())
+                            break;
+
+                        throw runtime_error("Disconnected.");
+                    }
+                } else if (ev.data.fd == mess_event.get()) {
+                    uint64_t num;
+
+                    do {
+                        if (read(mess_event.get(), &num, sizeof(num)) == sizeof(num))
+                            break;
+
+                        if (errno == EINTR)
+                            continue;
+
+                        throw formatted_error("read failed (error {})", errno_to_string(errno));
+                    } while (true);
+
+                    {
+                        lock_guard lg(mess_out_lock);
+
+                        if (!poll_out && !mess_out_buf.empty()) {
+                            auto& e = evs[0];
+
+                            e.events |= EPOLLOUT;
+
+                            if (epoll_ctl(epoll.get(), EPOLL_CTL_MOD, e.data.fd, &e) == -1)
+                                throw formatted_error("epoll_ctl failed (error {})", errno_to_string(errno));
+
+                            poll_out = true;
+                        }
+                    }
                 }
             }
         }
@@ -3326,51 +3392,35 @@ namespace tds {
     void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
-        vector<uint8_t> payload;
-        const size_t size = packet_size - sizeof(tds_header);
-        auto sv = msg;
+        // FIXME - SSL
 
-        while (true) {
-            span<const uint8_t> sv2;
+        while (!msg.empty()) {
+            size_t to_send = min(msg.size(), packet_size - sizeof(tds_header));
 
-            if (sv.size() > size)
-                sv2 = sv.subspan(0, size);
-            else
-                sv2 = sv;
+            {
+                lock_guard lg(mess_out_lock);
 
-            payload.resize(sv2.size() + sizeof(tds_header));
+                auto old_size = mess_out_buf.size();
 
-            auto& h = *(tds_header*)payload.data();
+                mess_out_buf.resize(old_size + sizeof(tds_header) + to_send);
 
-            h.type = type;
-            h.status = sv2.size() == sv.size() ? 1 : 0; // 1 == last message
-            h.length = htons((uint16_t)(sv2.size() + sizeof(tds_header)));
-            h.spid = 0;
-            h.packet_id = 0; // FIXME? "Currently ignored" according to spec
-            h.window = 0;
+                auto& h = *(tds_header*)(mess_out_buf.data() + old_size);
 
-            if (!sv2.empty())
-                memcpy(payload.data() + sizeof(tds_header), sv2.data(), sv2.size());
+                h.type = type;
+                h.status = to_send == msg.size() ? 1 : 0; // 1 == last message
+                h.length = htons((uint16_t)(to_send + sizeof(tds_header)));
+                h.spid = 0;
+                h.packet_id = 0; // FIXME? "Currently ignored" according to spec
+                h.window = 0;
 
-            if (mars_sess) {
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-                mars_sess->send(payload, do_ssl);
-#else
-                mars_sess->send(payload);
-#endif
-            } else {
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-                if (do_ssl && ssl)
-                    ssl->send(payload);
-                else
-#endif
-                    send_raw(payload);
+                memcpy(mess_out_buf.data() + old_size + sizeof(tds_header), msg.data(), to_send);
+
+                // trigger event
+                uint64_t num = 1;
+                write(mess_event.get(), &num, sizeof(num));
             }
 
-            if (sv2.size() == sv.size())
-                return;
-
-            sv = sv.subspan(size);
+            msg = msg.subspan(to_send);
         }
     }
 

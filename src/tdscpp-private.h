@@ -656,6 +656,8 @@ namespace tds {
         std::condition_variable mess_in_cv;
         std::mutex mess_in_lock;
         std::list<mess> mess_list;
+        std::mutex mess_out_lock;
+        std::vector<uint8_t> mess_out_buf;
         std::exception_ptr socket_thread_exc;
         std::jthread t;
     };
