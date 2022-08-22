@@ -7,6 +7,8 @@
 
 #include <string>
 #include <cstdint>
+#include <thread>
+#include <condition_variable>
 #include "config.h"
 
 #ifdef _WIN32
@@ -522,6 +524,12 @@ namespace tds {
 #endif
     class smp_session;
 
+    struct mess {
+        enum tds_msg type;
+        std::vector<uint8_t> payload;
+        bool last_packet;
+    };
+
     class tds_impl {
     public:
         tds_impl(const std::string& server, std::string_view user, std::string_view password,
@@ -562,6 +570,8 @@ namespace tds {
 #ifdef _WIN32
         void send_sspi_msg(CredHandle* cred_handle, CtxtHandle* ctx_handle, const std::u16string& spn, std::span<const uint8_t> sspi);
 #endif
+        void socket_thread(std::stop_token stop);
+        void socket_thread_wrap(std::stop_token stop) noexcept;
 
 #ifdef _WIN32
         SOCKET sock = INVALID_SOCKET;
@@ -584,6 +594,11 @@ namespace tds {
         bool check_certificate;
         bool mars = false;
         std::unique_ptr<smp_session> mars_sess;
+        std::condition_variable mess_cv;
+        std::mutex mess_lock;
+        std::list<mess> mess_list;
+        std::exception_ptr socket_thread_exc;
+        std::jthread t;
     };
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)

@@ -2261,22 +2261,93 @@ namespace tds {
         enc = encryption_type::ENCRYPT_NOT_SUP;
 #endif
 
+        t = jthread([this](stop_token stop) { socket_thread_wrap(stop); });
+
         send_prelogin_msg(enc, mars);
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (server_enc != encryption_type::ENCRYPT_NOT_SUP)
+        if (server_enc != encryption_type::ENCRYPT_NOT_SUP) {
             ssl = make_unique<tds_ssl>(*this);
+
+            // FIXME - recreate t
+        }
 #endif
 
         send_login_msg(user, password, server, app_name, db);
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ)
+        if (ssl && server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ) {
             ssl.reset();
+
+            // FIXME - recreate t
+        }
 #endif
 
         if (this->mars)
             mars_sess = make_unique<smp_session>(*this);
+    }
+
+    void tds_impl::socket_thread_wrap(stop_token stop) noexcept {
+        try {
+            socket_thread(stop);
+        } catch (...) {
+            {
+                lock_guard lg(mess_lock);
+                socket_thread_exc = current_exception();
+            }
+
+            mess_cv.notify_all();
+        }
+    }
+
+    void tds_impl::socket_thread(stop_token stop) {
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+#endif
+
+        while (!stop.stop_requested()) {
+            tds_header h;
+            mess m;
+
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+            if (do_ssl)
+                ssl->recv(span((uint8_t*)&h, sizeof(tds_header)));
+            else
+#endif
+                recv_raw(span((uint8_t*)&h, sizeof(tds_header)));
+
+            if (htons(h.length) < sizeof(tds_header)) {
+                throw formatted_error("message length was {}, expected at least {}",
+                                      htons(h.length), sizeof(tds_header));
+            }
+
+            m.type = h.type;
+
+            if (htons(h.length) > sizeof(tds_header)) {
+                auto left = (int)(htons(h.length) - sizeof(tds_header));
+
+                m.payload.resize(left);
+
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+                if (do_ssl)
+                    ssl->recv(m.payload);
+                else
+#endif
+                    recv_raw(m.payload);
+            }
+
+            m.last_packet = h.status & 1;
+
+            spid = htons(h.spid);
+
+            {
+                lock_guard lg(mess_lock);
+
+                mess_list.emplace_back(move(m));
+            }
+
+            mess_cv.notify_one();
+        }
     }
 
     smp_session::smp_session(tds_impl& impl) : impl(impl) {
@@ -3249,43 +3320,27 @@ namespace tds {
     }
 
     void tds_impl::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
-        tds_header h;
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
-#endif
+        mess m;
 
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (do_ssl)
-            ssl->recv(span((uint8_t*)&h, sizeof(tds_header)));
-        else
-#endif
-            recv_raw(span((uint8_t*)&h, sizeof(tds_header)));
+        {
+            unique_lock ul(mess_lock);
 
-        if (htons(h.length) < sizeof(tds_header)) {
-            throw formatted_error("message length was {}, expected at least {}",
-                                    htons(h.length), sizeof(tds_header));
+            mess_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc; });
+
+            if (!socket_thread_exc) {
+                m = move(mess_list.front());
+                mess_list.pop_front();
+            }
         }
 
-        type = h.type;
+        if (socket_thread_exc)
+            rethrow_exception(socket_thread_exc);
 
-        if (htons(h.length) > sizeof(tds_header)) {
-            auto left = (int)(htons(h.length) - sizeof(tds_header));
-
-            payload.resize(left);
-
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-            if (do_ssl)
-                ssl->recv(span(payload.data(), left));
-            else
-#endif
-                recv_raw(span(payload.data(), left));
-        } else
-            payload.clear();
+        type = m.type;
+        payload.swap(m.payload);
 
         if (last_packet)
-            *last_packet = h.status & 1;
-
-        spid = htons(h.spid);
+            *last_packet = m.last_packet;
     }
 
     void tds_impl::handle_loginack_msg(span<const uint8_t> sp) {
