@@ -3352,9 +3352,9 @@ namespace tds {
     }
 
     void tds_impl::send_raw(span<const uint8_t> msg) {
-        do {
 #ifdef _WIN32
-            if (pipe.get() != INVALID_HANDLE_VALUE) {
+        if (pipe.get() != INVALID_HANDLE_VALUE) {
+            do {
                 DWORD written;
 
                 if (!WriteFile(pipe.get(), msg.data(), (DWORD)msg.size(), &written, nullptr))
@@ -3364,26 +3364,23 @@ namespace tds {
                     break;
 
                 msg = msg.subspan(written);
-            } else {
+            } while (true);
+        } else {
 #endif
-                auto ret = send(sock, (char*)msg.data(), (int)msg.size(), 0);
+            lock_guard lg(mess_out_lock);
 
+            auto old_size = mess_out_buf.size();
+
+            mess_out_buf.resize(old_size + msg.size());
+
+            memcpy(mess_out_buf.data() + old_size, msg.data(), msg.size());
+
+            // trigger event
+            uint64_t num = 1;
+            write(mess_event.get(), &num, sizeof(num));
 #ifdef _WIN32
-                if (ret < 0)
-                    throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
-#else
-                if (ret < 0)
-                    throw formatted_error("send failed (error {})", errno_to_string(errno));
+        }
 #endif
-
-                if (ret == (int)msg.size())
-                    break;
-
-                msg = msg.subspan(ret);
-#ifdef _WIN32
-            }
-#endif
-        } while (true);
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
@@ -3392,7 +3389,34 @@ namespace tds {
     void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
-        // FIXME - SSL
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        if (do_ssl && ssl) {
+            while (!msg.empty()) {
+                size_t to_send = min(msg.size(), packet_size - sizeof(tds_header));
+
+                vector<uint8_t> buf;
+
+                buf.resize(to_send + sizeof(tds_header));
+
+                auto& h = *(tds_header*)buf.data();
+
+                h.type = type;
+                h.status = to_send == msg.size() ? 1 : 0; // 1 == last message
+                h.length = htons((uint16_t)(to_send + sizeof(tds_header)));
+                h.spid = 0;
+                h.packet_id = 0; // FIXME? "Currently ignored" according to spec
+                h.window = 0;
+
+                memcpy(buf.data() + sizeof(tds_header), msg.data(), to_send);
+
+                ssl->send(buf);
+
+                msg = msg.subspan(to_send);
+            }
+
+            return;
+        }
+#endif
 
         while (!msg.empty()) {
             size_t to_send = min(msg.size(), packet_size - sizeof(tds_header));
