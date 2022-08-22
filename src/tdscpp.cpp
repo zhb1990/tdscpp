@@ -17,6 +17,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <fcntl.h>
+#include <sys/epoll.h>
 
 #ifdef HAVE_GSSAPI
 #include <gssapi/gssapi.h>
@@ -2253,6 +2255,9 @@ namespace tds {
 #endif
             connect(server, port, user.empty());
             hostname = server;
+
+            if (fcntl(sock, F_SETFL, fcntl(sock, F_GETFL, 0) | O_NONBLOCK) != 0)
+                throw formatted_error("fcntl failed to make socket non-blocking (errno {})", errno);
 #ifdef _WIN32
         }
 #endif
@@ -2305,48 +2310,116 @@ namespace tds {
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
 #endif
 
+        // FIXME - Windows
+        // FIXME - Windows pipes (overlapped I/O?)
+
+        unique_handle epoll{epoll_create1(EPOLL_CLOEXEC)};
+
+        if (epoll.get() == -1)
+            throw formatted_error("epoll_create1 failed (error {})", errno_to_string(errno));
+
+        struct epoll_event evs;
+
+        // FIXME - EPOLLOUT
+
+        evs.events = EPOLLIN;
+        evs.data.fd = sock;
+
+        if (epoll_ctl(epoll.get(), EPOLL_CTL_ADD, evs.data.fd, &evs) == -1)
+            throw formatted_error("epoll_ctl failed (error {})", errno_to_string(errno));
+
+        vector<uint8_t> in_buf;
+
         while (!stop.stop_requested()) {
-            tds_header h;
-            mess m;
+            struct epoll_event ev;
 
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-            if (do_ssl)
-                ssl->recv(span((uint8_t*)&h, sizeof(tds_header)));
-            else
-#endif
-                recv_raw(span((uint8_t*)&h, sizeof(tds_header)));
+            // FIXME - use event rather than timeout
+            auto ret = epoll_wait(epoll.get(), &ev, 1, 1000);
 
-            if (htons(h.length) < sizeof(tds_header)) {
-                throw formatted_error("message length was {}, expected at least {}",
-                                      htons(h.length), sizeof(tds_header));
+            if (ret == -1) {
+                if (errno == EINTR)
+                    continue;
+
+                throw formatted_error("epoll_wait failed (error {})", errno_to_string(errno));
             }
 
-            m.type = h.type;
+            if (ret != 0 && ev.data.fd == sock) {
+                if (ev.events & EPOLLIN) {
+                    // FIXME - SSL
 
-            if (htons(h.length) > sizeof(tds_header)) {
-                auto left = (int)(htons(h.length) - sizeof(tds_header));
+                    if (in_buf.size() < sizeof(tds_header)) {
+                        char buf[sizeof(tds_header)];
+                        span sp(buf, sizeof(tds_header) - in_buf.size());
 
-                m.payload.resize(left);
+                        auto ret = recv(sock, (char*)sp.data(), (int)sp.size(), 0);
 
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-                if (do_ssl)
-                    ssl->recv(m.payload);
-                else
-#endif
-                    recv_raw(m.payload);
+                        if (ret < 0)
+                            throw formatted_error("recv failed (error {})", errno_to_string(errno));
+
+                        if (ret > 0) {
+                            sp = sp.subspan(0, ret);
+
+                            auto old_size = in_buf.size();
+                            in_buf.resize(old_size + sp.size());
+                            memcpy(in_buf.data() + old_size, sp.data(), sp.size());
+                        }
+                    }
+
+                    if (in_buf.size() >= sizeof(tds_header)) {
+                        tds_header h = *(tds_header*)in_buf.data();
+
+                        auto len = htons(h.length);
+
+                        if (len < sizeof(tds_header))
+                            throw formatted_error("message length was {}, expected at least {}", len, sizeof(tds_header));
+
+                        if (in_buf.size() < len) {
+                            vector<uint8_t> buf;
+
+                            buf.resize(len - in_buf.size());
+
+                            auto ret = recv(sock, (char*)buf.data(), (int)buf.size(), 0);
+
+                            if (ret < 0)
+                                throw formatted_error("recv failed (error {})", errno_to_string(errno));
+
+                            if (ret > 0) {
+                                auto old_size = in_buf.size();
+                                in_buf.resize(old_size + ret);
+                                memcpy(in_buf.data() + old_size, buf.data(), ret);
+                            }
+                        }
+
+                        if (in_buf.size() >= len) {
+                            mess m;
+
+                            m.type = h.type;
+
+                            if (len >= sizeof(tds_header)) {
+                                m.payload.resize(len - sizeof(tds_header));
+                                memcpy(m.payload.data(), in_buf.data() + sizeof(tds_header), len - sizeof(tds_header));
+                            }
+
+                            m.last_packet = h.status & 1;
+
+                            spid = htons(h.spid);
+
+                            {
+                                lock_guard lg(mess_lock);
+
+                                mess_list.emplace_back(move(m));
+                            }
+
+                            mess_cv.notify_one();
+
+                            decltype(in_buf) newbuf{in_buf.begin() + len, in_buf.end()};
+                            in_buf.swap(newbuf);
+                        }
+                    }
+                }
+
+                // FIXME - EPOLLHUP
             }
-
-            m.last_packet = h.status & 1;
-
-            spid = htons(h.spid);
-
-            {
-                lock_guard lg(mess_lock);
-
-                mess_list.emplace_back(move(m));
-            }
-
-            mess_cv.notify_one();
         }
     }
 

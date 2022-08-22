@@ -435,6 +435,7 @@ static_assert(sizeof(smp_header) == 16, "smp_header has wrong size");
 #pragma pack(pop)
 
 #ifdef _WIN32
+
 class handle_closer {
 public:
     typedef HANDLE pointer;
@@ -447,8 +448,65 @@ public:
     }
 };
 
-typedef std::unique_ptr<HANDLE, handle_closer> unique_handle;
+using unique_handle = std::unique_ptr<HANDLE, handle_closer>;
 
+#else
+
+class unique_handle {
+public:
+    unique_handle() : fd(0) {
+    }
+
+    explicit unique_handle(int fd) : fd(fd) {
+    }
+
+    unique_handle(unique_handle&& that) noexcept {
+        fd = that.fd;
+        that.fd = 0;
+    }
+
+    unique_handle(const unique_handle&) = delete;
+    unique_handle& operator=(const unique_handle&) = delete;
+
+    unique_handle& operator=(unique_handle&& that) noexcept {
+        if (fd > 0)
+            close(fd);
+
+        fd = that.fd;
+        that.fd = 0;
+
+        return *this;
+    }
+
+    ~unique_handle() {
+        if (fd <= 0)
+            return;
+
+        close(fd);
+    }
+
+    explicit operator bool() const noexcept {
+        return fd != 0;
+    }
+
+    void reset(int new_fd = 0) noexcept {
+        if (fd > 0)
+            close(fd);
+
+        fd = new_fd;
+    }
+
+    int get() const noexcept {
+        return fd;
+    }
+
+private:
+    int fd;
+};
+
+#endif
+
+#ifdef _WIN32
 class last_error : public std::exception {
 public:
     last_error(std::string_view function, int le) {
