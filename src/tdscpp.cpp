@@ -2173,6 +2173,41 @@ static string errno_to_string(int err) {
 }
 #endif
 
+event::event() {
+    h.reset(eventfd(0, EFD_CLOEXEC));
+
+    if (h.get() == -1)
+        throw formatted_error("eventfd failed (error {})", errno_to_string(errno));
+}
+
+void event::reset() {
+    uint64_t num;
+
+    do {
+        if (read(h.get(), &num, sizeof(num)) == sizeof(num))
+            break;
+
+        if (errno == EINTR)
+            continue;
+
+        throw formatted_error("read failed (error {})", errno_to_string(errno));
+    } while (true);
+}
+
+void event::set() {
+    uint64_t num = 1;
+
+    do {
+        if (write(h.get(), &num, sizeof(num)) == sizeof(num))
+            break;
+
+        if (errno == EINTR)
+            continue;
+
+        throw formatted_error("write failed (error {})", errno_to_string(errno));
+    } while (true);
+}
+
 namespace tds {
 #if __cpp_lib_constexpr_string >= 201907L
     static_assert(utf8_to_utf16("hello") == u"hello"); // single bytes
@@ -2267,11 +2302,6 @@ namespace tds {
         enc = encryption_type::ENCRYPT_NOT_SUP;
 #endif
 
-        mess_event.reset(eventfd(0, EFD_CLOEXEC));
-
-        if (mess_event.get() == -1)
-            throw formatted_error("eventfd failed (error {})", errno_to_string(errno));
-
         t = jthread([this](stop_token stop) { socket_thread_wrap(stop); });
 
         send_prelogin_msg(enc, mars);
@@ -2331,7 +2361,7 @@ namespace tds {
         evs[0].events = EPOLLIN | EPOLLOUT | EPOLLRDHUP;
         evs[0].data.fd = sock;
         evs[1].events = EPOLLIN;
-        evs[1].data.fd = mess_event.get();
+        evs[1].data.fd = mess_event.h.get();
 
         for (auto& e : evs) {
             if (epoll_ctl(epoll.get(), EPOLL_CTL_ADD, e.data.fd, &e) == -1)
@@ -2468,18 +2498,8 @@ namespace tds {
 
                         throw runtime_error("Disconnected.");
                     }
-                } else if (ev.data.fd == mess_event.get()) {
-                    uint64_t num;
-
-                    do {
-                        if (read(mess_event.get(), &num, sizeof(num)) == sizeof(num))
-                            break;
-
-                        if (errno == EINTR)
-                            continue;
-
-                        throw formatted_error("read failed (error {})", errno_to_string(errno));
-                    } while (true);
+                } else if (ev.data.fd == mess_event.h.get()) {
+                    mess_event.reset();
 
                     {
                         lock_guard lg(mess_out_lock);
@@ -2554,12 +2574,12 @@ namespace tds {
 
     tds_impl::~tds_impl() {
         if (t.joinable()) {
-            uint64_t num;
-
             t.request_stop();
 
-            num = 1;
-            write(mess_event.get(), &num, sizeof(num));
+            try {
+                mess_event.set();
+            } catch (...) {
+            }
         }
 
 #ifdef _WIN32
@@ -3375,9 +3395,7 @@ namespace tds {
 
             memcpy(mess_out_buf.data() + old_size, msg.data(), msg.size());
 
-            // trigger event
-            uint64_t num = 1;
-            write(mess_event.get(), &num, sizeof(num));
+            mess_event.set();
 #ifdef _WIN32
         }
 #endif
@@ -3439,9 +3457,7 @@ namespace tds {
 
                 memcpy(mess_out_buf.data() + old_size + sizeof(tds_header), msg.data(), to_send);
 
-                // trigger event
-                uint64_t num = 1;
-                write(mess_event.get(), &num, sizeof(num));
+                mess_event.set();
             }
 
             msg = msg.subspan(to_send);
