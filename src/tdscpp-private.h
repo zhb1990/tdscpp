@@ -605,7 +605,6 @@ namespace tds {
                  const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                  bool check_certificate, bool mars);
         ~tds_impl();
-        void recv_raw(std::span<uint8_t> buf);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg, bool do_ssl = true);
 #else
@@ -640,6 +639,10 @@ namespace tds {
         void socket_thread_wrap(std::stop_token stop) noexcept;
         void socket_thread_read(std::vector<uint8_t>& in_buf);
         bool socket_thread_write();
+        void socket_thread_parse_messages(std::vector<uint8_t>& in_buf);
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        void decrypt_messages(std::vector<uint8_t>& in_buf, std::vector<uint8_t>& pt_buf);
+#endif
 
 #ifdef _WIN32
         SOCKET sock = INVALID_SOCKET;
@@ -685,7 +688,7 @@ namespace tds {
         ~tds_ssl();
 #endif
         [[nodiscard]] std::vector<uint8_t> enc(std::span<const uint8_t> sp);
-        void recv(std::span<uint8_t> sp);
+        [[nodiscard]] std::vector<uint8_t> dec(std::span<const uint8_t>& sp);
 
         std::exception_ptr exception;
 
@@ -693,6 +696,7 @@ namespace tds {
         tds_impl& tds;
         std::vector<uint8_t> ssl_recv_buf;
         std::vector<uint8_t> ssl_send_buf;
+        std::span<const uint8_t> ssl_recv_span;
 #ifdef WITH_OPENSSL
         bool established = false;
         BIO* bio;

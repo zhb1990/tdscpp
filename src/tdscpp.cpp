@@ -2337,19 +2337,15 @@ namespace tds {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         if (server_enc != encryption_type::ENCRYPT_NOT_SUP) {
             ssl = make_unique<tds_ssl>(*this);
-
-            // FIXME - recreate t
+            mess_event.set();
         }
 #endif
 
         send_login_msg(user, password, server, app_name, db);
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (ssl && server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ) {
+        if (server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ)
             ssl.reset();
-
-            // FIXME - recreate t
-        }
 #endif
 
 //         if (this->mars)
@@ -2370,8 +2366,6 @@ namespace tds {
     }
 
     void tds_impl::socket_thread_read(vector<uint8_t>& in_buf) {
-        // FIXME - SSL
-
         do {
             char buf[4096];
 
@@ -2393,7 +2387,36 @@ namespace tds {
 
             in_buf.insert(in_buf.end(), buf, buf + ret);
         } while (true);
+    }
 
+    bool tds_impl::socket_thread_write() {
+        while (!mess_out_buf.empty()) {
+            auto ret = send(sock, (char*)mess_out_buf.data(), (int)mess_out_buf.size(), 0);
+
+            if (ret < 0) {
+                if (errno == EWOULDBLOCK)
+                    return false;
+
+#ifdef _WIN32
+                throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
+#else
+                throw formatted_error("send failed (error {})", errno_to_string(errno));
+#endif
+            }
+
+            if (ret == (int)mess_out_buf.size()) {
+                mess_out_buf.clear();
+                break;
+            }
+
+            vector<uint8_t> newbuf{mess_out_buf.begin() + ret, mess_out_buf.end()};
+            mess_out_buf.swap(newbuf);
+        }
+
+        return true;
+    }
+
+    void tds_impl::socket_thread_parse_messages(vector<uint8_t>& in_buf) {
         while (in_buf.size() >= sizeof(tds_header)) {
             tds_header h = *(tds_header*)in_buf.data();
 
@@ -2431,36 +2454,26 @@ namespace tds {
         }
     }
 
-    bool tds_impl::socket_thread_write() {
-        while (!mess_out_buf.empty()) {
-            auto ret = send(sock, (char*)mess_out_buf.data(), (int)mess_out_buf.size(), 0);
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+    void tds_impl::decrypt_messages(vector<uint8_t>& in_buf, vector<uint8_t>& pt_buf) {
+        auto sp = span((const uint8_t*)in_buf.data(), in_buf.size());
 
-            if (ret < 0) {
-                if (errno == EWOULDBLOCK)
-                    return false;
+        auto ret = ssl->dec(sp);
 
-#ifdef _WIN32
-                throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
-#else
-                throw formatted_error("send failed (error {})", errno_to_string(errno));
-#endif
-            }
-
-            if (ret == (int)mess_out_buf.size()) {
-                mess_out_buf.clear();
-                break;
-            }
-
-            vector<uint8_t> newbuf{mess_out_buf.begin() + ret, mess_out_buf.end()};
-            mess_out_buf.swap(newbuf);
+        if (sp.size() != in_buf.size()) {
+            vector<uint8_t> newbuf{sp.begin(), sp.end()};
+            in_buf.swap(newbuf);
         }
 
-        return true;
+        if (!ret.empty())
+            pt_buf.insert(pt_buf.end(), ret.begin(), ret.end());
     }
+#endif
 
     void tds_impl::socket_thread(stop_token stop) {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+        vector<uint8_t> pt_buf;
 #endif
         vector<uint8_t> in_buf;
 
@@ -2490,8 +2503,15 @@ namespace tds {
                 if (WSAEnumNetworkEvents(sock, winsock_event.h.get(), &netev))
                     throw formatted_error("WSAEnumNetworkEvents failed (error {}).", wsa_error_to_string(WSAGetLastError()));
 
-                if (netev.lNetworkEvents & FD_READ)
+                if (netev.lNetworkEvents & FD_READ) {
                     socket_thread_read(in_buf);
+
+                    if (do_ssl) {
+                        decrypt_messages(in_buf, pt_buf);
+                        socket_thread_parse_messages(pt_buf);
+                    } else
+                        socket_thread_parse_messages(in_buf);
+                }
 
                 if (netev.lNetworkEvents & FD_WRITE) {
                     lock_guard lg(mess_out_lock);
@@ -2507,6 +2527,8 @@ namespace tds {
                 }
             } else if (ret == WAIT_OBJECT_0 + 1) {
                 mess_event.reset();
+
+                do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
 
                 {
                     lock_guard lg(mess_out_lock);
@@ -2550,8 +2572,17 @@ namespace tds {
 
             if (ret != 0) {
                 if (ev.data.fd == sock) {
-                    if (ev.events & EPOLLIN)
+                    if (ev.events & EPOLLIN) {
                         socket_thread_read(in_buf);
+
+#ifdef WITH_OPENSSL
+                        if (do_ssl) {
+                            decrypt_messages(in_buf, pt_buf);
+                            socket_thread_parse_messages(pt_buf);
+                        } else
+#endif
+                            socket_thread_parse_messages(in_buf);
+                    }
 
                     if (ev.events & EPOLLOUT) {
                         lock_guard lg(mess_out_lock);
@@ -2578,6 +2609,10 @@ namespace tds {
                     }
                 } else if (ev.data.fd == mess_event.h.get()) {
                     mess_event.reset();
+
+#ifdef WITH_OPENSSL
+                    do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+#endif
 
                     {
                         lock_guard lg(mess_out_lock);
@@ -3519,44 +3554,6 @@ namespace tds {
 
             msg = msg.subspan(to_send);
         }
-    }
-
-    void tds_impl::recv_raw(span<uint8_t> buf) {
-        do {
-#ifdef _WIN32
-            if (pipe.get() != INVALID_HANDLE_VALUE) {
-                DWORD read;
-
-                if (!ReadFile(pipe.get(), buf.data(), (DWORD)buf.size(), &read, nullptr) && GetLastError() != ERROR_MORE_DATA)
-                    throw last_error("ReadFile", GetLastError());
-
-                if (read == (DWORD)buf.size())
-                    break;
-
-                buf = buf.subspan(read);
-            } else {
-#endif
-                auto ret = recv(sock, (char*)buf.data(), (int)buf.size(), 0);
-
-#ifdef _WIN32
-                if (ret < 0)
-                    throw formatted_error("recv failed (error {})", wsa_error_to_string(WSAGetLastError()));
-#else
-                if (ret < 0)
-                    throw formatted_error("recv failed (error {})", errno_to_string(errno));
-#endif
-
-                if (ret == 0)
-                    throw formatted_error("Disconnected.");
-
-                if ((size_t)ret == buf.size())
-                    break;
-
-                buf = buf.subspan(ret);
-#ifdef _WIN32
-            }
-#endif
-        } while (true);
     }
 
     void tds_impl::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
