@@ -2372,29 +2372,29 @@ namespace tds {
     void tds_impl::socket_thread_read(vector<uint8_t>& in_buf) {
         // FIXME - SSL
 
-        if (in_buf.size() < sizeof(tds_header)) {
-            char buf[sizeof(tds_header)];
-            span sp(buf, sizeof(tds_header) - in_buf.size());
+        do {
+            char buf[4096];
 
-            auto ret = recv(sock, (char*)sp.data(), (int)sp.size(), 0);
+            auto ret = recv(sock, buf, sizeof(buf), 0);
 
-            if (ret < 0)
+            if (ret < 0) {
 #ifdef _WIN32
+                if (WSAGetLastError() == WSAEWOULDBLOCK)
+                    break;
+
                 throw formatted_error("recv failed (error {})", wsa_error_to_string(WSAGetLastError()));
 #else
+                if (errno == EWOULDBLOCK)
+                    break;
+
                 throw formatted_error("recv failed (error {})", errno_to_string(errno));
 #endif
-
-            if (ret > 0) {
-                sp = sp.subspan(0, ret);
-
-                auto old_size = in_buf.size();
-                in_buf.resize(old_size + sp.size());
-                memcpy(in_buf.data() + old_size, sp.data(), sp.size());
             }
-        }
 
-        if (in_buf.size() >= sizeof(tds_header)) {
+            in_buf.insert(in_buf.end(), buf, buf + ret);
+        } while (true);
+
+        while (in_buf.size() >= sizeof(tds_header)) {
             tds_header h = *(tds_header*)in_buf.data();
 
             auto len = htons(h.length);
@@ -2402,52 +2402,32 @@ namespace tds {
             if (len < sizeof(tds_header))
                 throw formatted_error("message length was {}, expected at least {}", len, sizeof(tds_header));
 
-            if (in_buf.size() < len) {
-                vector<uint8_t> buf;
+            if (in_buf.size() < len)
+                return;
 
-                buf.resize(len - in_buf.size());
+            mess m;
 
-                auto ret = recv(sock, (char*)buf.data(), (int)buf.size(), 0);
+            m.type = h.type;
 
-            if (ret < 0)
-#ifdef _WIN32
-                throw formatted_error("recv failed (error {})", wsa_error_to_string(WSAGetLastError()));
-#else
-                throw formatted_error("recv failed (error {})", errno_to_string(errno));
-#endif
-
-                if (ret > 0) {
-                    auto old_size = in_buf.size();
-                    in_buf.resize(old_size + ret);
-                    memcpy(in_buf.data() + old_size, buf.data(), ret);
-                }
+            if (len >= sizeof(tds_header)) {
+                m.payload.resize(len - sizeof(tds_header));
+                memcpy(m.payload.data(), in_buf.data() + sizeof(tds_header), len - sizeof(tds_header));
             }
 
-            if (in_buf.size() >= len) {
-                mess m;
+            m.last_packet = h.status & 1;
 
-                m.type = h.type;
+            spid = htons(h.spid);
 
-                if (len >= sizeof(tds_header)) {
-                    m.payload.resize(len - sizeof(tds_header));
-                    memcpy(m.payload.data(), in_buf.data() + sizeof(tds_header), len - sizeof(tds_header));
-                }
+            {
+                lock_guard lg(mess_in_lock);
 
-                m.last_packet = h.status & 1;
-
-                spid = htons(h.spid);
-
-                {
-                    lock_guard lg(mess_in_lock);
-
-                    mess_list.emplace_back(move(m));
-                }
-
-                mess_in_cv.notify_one();
-
-                vector<uint8_t> newbuf{in_buf.begin() + len, in_buf.end()};
-                in_buf.swap(newbuf);
+                mess_list.emplace_back(move(m));
             }
+
+            mess_in_cv.notify_one();
+
+            vector<uint8_t> newbuf{in_buf.begin() + len, in_buf.end()};
+            in_buf.swap(newbuf);
         }
     }
 
