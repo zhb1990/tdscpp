@@ -3526,7 +3526,15 @@ namespace tds {
 
                 memcpy(buf.data() + sizeof(tds_header), msg.data(), to_send);
 
-                ssl->send(buf);
+                {
+                    lock_guard lg(mess_out_lock);
+
+                    auto enc = ssl->enc(buf);
+
+                    mess_out_buf.insert(mess_out_buf.end(), enc.begin(), enc.end());
+
+                    mess_event.set();
+                }
 
                 msg = msg.subspan(to_send);
             }

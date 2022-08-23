@@ -592,7 +592,7 @@ namespace tds {
         FreeCredentialsHandle(&cred_handle);
     }
 
-    void tds_ssl::send(span<const uint8_t> sp) {
+    vector<uint8_t> tds_ssl::enc(span<const uint8_t> sp) {
         SECURITY_STATUS sec_status;
         array<SecBuffer, 4> buf;
         SecBufferDesc bufdesc;
@@ -629,7 +629,7 @@ namespace tds {
 
         payload.resize(buf[0].cbBuffer + buf[1].cbBuffer + buf[2].cbBuffer);
 
-        tds.send_raw(payload);
+        return payload;
     }
 
     void tds_ssl::recv(span<uint8_t> sp) {
