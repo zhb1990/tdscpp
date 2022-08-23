@@ -2352,8 +2352,8 @@ namespace tds {
         }
 #endif
 
-        if (this->mars)
-            mars_sess = make_unique<smp_session>(*this);
+//         if (this->mars)
+//             mars_sess = make_unique<smp_session>(*this);
     }
 
     void tds_impl::socket_thread_wrap(stop_token stop) noexcept {
@@ -2619,57 +2619,57 @@ namespace tds {
 #endif
     }
 
-    smp_session::smp_session(tds_impl& impl) : impl(impl) {
-        smp_header h;
+//     smp_session::smp_session(tds_impl& impl) : impl(impl) {
+//         smp_header h;
+//
+//         h.smid = 0x53;
+//         h.flags = 0x01; // SYN
+//         h.sid = 0; // FIXME
+//         h.length = sizeof(smp_header);
+//         h.seqnum = 0;
+//         h.wndw = 4; // FIXME?
+//
+//         auto sp = span((const uint8_t*)&h, sizeof(smp_header));
+//
+// #if defined(WITH_OPENSSL) || defined(_WIN32)
+//         if (impl.ssl)
+//             impl.ssl->send(sp);
+//         else
+// #endif
+//             impl.send_raw(sp);
+//     }
 
-        h.smid = 0x53;
-        h.flags = 0x01; // SYN
-        h.sid = 0; // FIXME
-        h.length = sizeof(smp_header);
-        h.seqnum = 0;
-        h.wndw = 4; // FIXME?
-
-        auto sp = span((const uint8_t*)&h, sizeof(smp_header));
-
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (impl.ssl)
-            impl.ssl->send(sp);
-        else
-#endif
-            impl.send_raw(sp);
-    }
-
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-    void smp_session::send(span<const uint8_t> sp, bool do_ssl)
-#else
-    void smp_session::send(span<const uint8_t> sp)
-#endif
-    {
-        smp_header h;
-
-        h.smid = 0x53;
-        h.flags = 0x08; // DATA
-        h.sid = 0; // FIXME
-        h.length = (uint32_t)(sizeof(smp_header) + sp.size());
-        h.seqnum = seqnum;
-        h.wndw = 4; // FIXME?
-
-        seqnum++;
-
-        auto hsp = span((const uint8_t*)&h, sizeof(smp_header));
-
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (do_ssl && impl.ssl) {
-            impl.ssl->send(hsp);
-            impl.ssl->send(sp);
-        } else {
-#endif
-            impl.send_raw(hsp);
-            impl.send_raw(sp);
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        }
-#endif
-    }
+// #if defined(WITH_OPENSSL) || defined(_WIN32)
+//     void smp_session::send(span<const uint8_t> sp, bool do_ssl)
+// #else
+//     void smp_session::send(span<const uint8_t> sp)
+// #endif
+//     {
+//         smp_header h;
+//
+//         h.smid = 0x53;
+//         h.flags = 0x08; // DATA
+//         h.sid = 0; // FIXME
+//         h.length = (uint32_t)(sizeof(smp_header) + sp.size());
+//         h.seqnum = seqnum;
+//         h.wndw = 4; // FIXME?
+//
+//         seqnum++;
+//
+//         auto hsp = span((const uint8_t*)&h, sizeof(smp_header));
+//
+// #if defined(WITH_OPENSSL) || defined(_WIN32)
+//         if (do_ssl && impl.ssl) {
+//             impl.ssl->send(hsp);
+//             impl.ssl->send(sp);
+//         } else {
+// #endif
+//             impl.send_raw(hsp);
+//             impl.send_raw(sp);
+// #if defined(WITH_OPENSSL) || defined(_WIN32)
+//         }
+// #endif
+//     }
 
     tds_impl::~tds_impl() {
         if (t.joinable()) {

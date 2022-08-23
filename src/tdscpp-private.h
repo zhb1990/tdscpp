@@ -589,7 +589,7 @@ namespace tds {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
     class tds_ssl;
 #endif
-    class smp_session;
+//     class smp_session;
 
     struct mess {
         enum tds_msg type;
@@ -662,7 +662,7 @@ namespace tds {
         encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
         bool mars = false;
-        std::unique_ptr<smp_session> mars_sess;
+//         std::unique_ptr<smp_session> mars_sess;
         event mess_event;
         std::condition_variable mess_in_cv;
         std::mutex mess_in_lock;
@@ -725,18 +725,18 @@ namespace tds {
         std::vector<column> buf_columns;
     };
 
-    class smp_session {
-    public:
-        smp_session(tds_impl& impl);
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        void send(std::span<const uint8_t> sp, bool do_ssl);
-#else
-        void send(std::span<const uint8_t> sp);
-#endif
-
-        tds_impl& impl;
-        uint32_t seqnum = 1;
-    };
+//     class smp_session {
+//     public:
+//         smp_session(tds_impl& impl);
+// #if defined(WITH_OPENSSL) || defined(_WIN32)
+//         void send(std::span<const uint8_t> sp, bool do_ssl);
+// #else
+//         void send(std::span<const uint8_t> sp);
+// #endif
+//
+//         tds_impl& impl;
+//         uint32_t seqnum = 1;
+//     };
 };
 
 #ifdef _WIN32
