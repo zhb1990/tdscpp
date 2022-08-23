@@ -337,7 +337,7 @@ namespace tds {
 
     int tds_ssl::ssl_write_cb(span<const uint8_t> sp) {
         if (established)
-            tds.send_raw(sp);
+            ssl_send_buf.insert(ssl_send_buf.end(), sp.begin(), sp.end());
         else
             tds.send_msg(tds_msg::prelogin, sp, false);
 
@@ -455,7 +455,9 @@ namespace tds {
         established = true;
     }
 
-    void tds_ssl::send(span<const uint8_t> sp) {
+    vector<uint8_t> tds_ssl::enc(span<const uint8_t> sp) {
+        ssl_send_buf.clear();
+
         while (!sp.empty()) {
             auto ret = SSL_write(ssl.get(), sp.data(), (int)sp.size());
 
@@ -468,6 +470,8 @@ namespace tds {
 
             sp = sp.subspan(ret);
         }
+
+        return ssl_send_buf;
     }
 
     void tds_ssl::recv(span<uint8_t> sp) {

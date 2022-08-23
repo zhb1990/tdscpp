@@ -3470,36 +3470,6 @@ namespace tds {
         send_msg(tds_msg::tds7_login, payload);
     }
 
-    void tds_impl::send_raw(span<const uint8_t> msg) {
-#ifdef _WIN32
-        if (pipe.get() != INVALID_HANDLE_VALUE) {
-            do {
-                DWORD written;
-
-                if (!WriteFile(pipe.get(), msg.data(), (DWORD)msg.size(), &written, nullptr))
-                    throw last_error("WriteFile", GetLastError());
-
-                if (written == (DWORD)msg.size())
-                    break;
-
-                msg = msg.subspan(written);
-            } while (true);
-        } else {
-#endif
-            lock_guard lg(mess_out_lock);
-
-            auto old_size = mess_out_buf.size();
-
-            mess_out_buf.resize(old_size + msg.size());
-
-            memcpy(mess_out_buf.data() + old_size, msg.data(), msg.size());
-
-            mess_event.set();
-#ifdef _WIN32
-        }
-#endif
-    }
-
 #if defined(WITH_OPENSSL) || defined(_WIN32)
     void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg, bool do_ssl)
 #else
