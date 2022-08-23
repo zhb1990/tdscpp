@@ -654,15 +654,12 @@ namespace tds {
         vector<uint8_t> recvbuf;
         vector<uint8_t> ret;
 
-        ret.swap(ssl_recv_buf);
-
         if (sp.empty())
-            return ret;
+            return {};
 
-        recvbuf.resize(sp.size());
-        memcpy(recvbuf.data(), sp.data(), sp.size());
+        recvbuf.assign(sp.begin(), sp.end());
 
-        while (!sp.empty()) {
+        while (!recvbuf.empty()) {
             bool found = false;
 
             memset(buf.data(), 0, sizeof(SecBuffer) * buf.size());
@@ -680,7 +677,7 @@ namespace tds {
             sec_status = DecryptMessage(&ctx_handle, &bufdesc, 0, nullptr);
 
             if (sec_status == SEC_E_INCOMPLETE_MESSAGE && buf[0].BufferType == SECBUFFER_MISSING)
-                break;
+                return ret;
 
             if (FAILED(sec_status))
                 throw formatted_error("DecryptMessage returned {}", (enum sec_error)sec_status);
@@ -688,9 +685,6 @@ namespace tds {
             for (const auto& b : buf) {
                 if (b.BufferType == SECBUFFER_DATA) {
                     ret.insert(ret.end(), (uint8_t*)b.pvBuffer, (uint8_t*)b.pvBuffer + b.cbBuffer);
-
-                    sp = sp.subspan(b.cbBuffer);
-
                     found = true;
                     break;
                 }
@@ -699,9 +693,25 @@ namespace tds {
             if (!found)
                 throw runtime_error("DecryptMessage did not return a SECBUFFER_DATA buffer.");
 
-            if (sp.empty())
+            bool extra = false;
+            for (const auto& b : buf) {
+                if (b.BufferType == SECBUFFER_EXTRA) {
+                    extra = true;
+
+                    sp = sp.subspan((uint8_t*)b.pvBuffer - recvbuf.data());
+
+                    vector<uint8_t> newbuf{(uint8_t*)b.pvBuffer, (uint8_t*)b.pvBuffer + b.cbBuffer};
+                    recvbuf.swap(newbuf);
+
+                    break;
+                }
+            }
+
+            if (!extra)
                 break;
         }
+
+        sp = {};
 
         return ret;
     }
