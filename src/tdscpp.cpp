@@ -2173,6 +2173,25 @@ static string errno_to_string(int err) {
 }
 #endif
 
+#ifdef _WIN32
+
+event::event() {
+    h.reset(CreateEventW(nullptr, false, false, nullptr));
+
+    if (!h)
+        throw last_error("CreateEvent", GetLastError());
+}
+
+void event::reset() {
+    ResetEvent(h.get());
+}
+
+void event::set() {
+    SetEvent(h.get());
+}
+
+#else
+
 event::event() {
     h.reset(eventfd(0, EFD_CLOEXEC));
 
@@ -2207,6 +2226,8 @@ void event::set() {
         throw formatted_error("write failed (error {})", errno_to_string(errno));
     } while (true);
 }
+
+#endif
 
 namespace tds {
 #if __cpp_lib_constexpr_string >= 201907L
@@ -2292,8 +2313,15 @@ namespace tds {
             connect(server, port, user.empty());
             hostname = server;
 
+#ifdef _WIN32
+            u_long mode = 1;
+
+            if (ioctlsocket(sock, FIONBIO, &mode) != 0)
+                throw formatted_error("ioctlsocket failed ({}).", wsa_error_to_string(WSAGetLastError()));
+#else
             if (fcntl(sock, F_SETFL, fcntl(sock, F_GETFL, 0) | O_NONBLOCK) != 0)
                 throw formatted_error("fcntl failed to make socket non-blocking (error {})", errno_to_string(errno));
+#endif
 #ifdef _WIN32
         }
 #endif
@@ -2341,14 +2369,174 @@ namespace tds {
         }
     }
 
+    void tds_impl::socket_thread_read(vector<uint8_t>& in_buf) {
+        // FIXME - SSL
+
+        if (in_buf.size() < sizeof(tds_header)) {
+            char buf[sizeof(tds_header)];
+            span sp(buf, sizeof(tds_header) - in_buf.size());
+
+            auto ret = recv(sock, (char*)sp.data(), (int)sp.size(), 0);
+
+            if (ret < 0)
+#ifdef _WIN32
+                throw formatted_error("recv failed (error {})", wsa_error_to_string(WSAGetLastError()));
+#else
+                throw formatted_error("recv failed (error {})", errno_to_string(errno));
+#endif
+
+            if (ret > 0) {
+                sp = sp.subspan(0, ret);
+
+                auto old_size = in_buf.size();
+                in_buf.resize(old_size + sp.size());
+                memcpy(in_buf.data() + old_size, sp.data(), sp.size());
+            }
+        }
+
+        if (in_buf.size() >= sizeof(tds_header)) {
+            tds_header h = *(tds_header*)in_buf.data();
+
+            auto len = htons(h.length);
+
+            if (len < sizeof(tds_header))
+                throw formatted_error("message length was {}, expected at least {}", len, sizeof(tds_header));
+
+            if (in_buf.size() < len) {
+                vector<uint8_t> buf;
+
+                buf.resize(len - in_buf.size());
+
+                auto ret = recv(sock, (char*)buf.data(), (int)buf.size(), 0);
+
+            if (ret < 0)
+#ifdef _WIN32
+                throw formatted_error("recv failed (error {})", wsa_error_to_string(WSAGetLastError()));
+#else
+                throw formatted_error("recv failed (error {})", errno_to_string(errno));
+#endif
+
+                if (ret > 0) {
+                    auto old_size = in_buf.size();
+                    in_buf.resize(old_size + ret);
+                    memcpy(in_buf.data() + old_size, buf.data(), ret);
+                }
+            }
+
+            if (in_buf.size() >= len) {
+                mess m;
+
+                m.type = h.type;
+
+                if (len >= sizeof(tds_header)) {
+                    m.payload.resize(len - sizeof(tds_header));
+                    memcpy(m.payload.data(), in_buf.data() + sizeof(tds_header), len - sizeof(tds_header));
+                }
+
+                m.last_packet = h.status & 1;
+
+                spid = htons(h.spid);
+
+                {
+                    lock_guard lg(mess_in_lock);
+
+                    mess_list.emplace_back(move(m));
+                }
+
+                mess_in_cv.notify_one();
+
+                vector<uint8_t> newbuf{in_buf.begin() + len, in_buf.end()};
+                in_buf.swap(newbuf);
+            }
+        }
+    }
+
+    bool tds_impl::socket_thread_write() {
+        while (!mess_out_buf.empty()) {
+            auto ret = send(sock, (char*)mess_out_buf.data(), (int)mess_out_buf.size(), 0);
+
+            if (ret < 0) {
+                if (errno == EWOULDBLOCK)
+                    return false;
+
+#ifdef _WIN32
+                throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
+#else
+                throw formatted_error("send failed (error {})", errno_to_string(errno));
+#endif
+            }
+
+            if (ret == (int)mess_out_buf.size()) {
+                mess_out_buf.clear();
+                break;
+            }
+
+            vector<uint8_t> newbuf{mess_out_buf.begin() + ret, mess_out_buf.end()};
+            mess_out_buf.swap(newbuf);
+        }
+
+        return true;
+    }
+
     void tds_impl::socket_thread(stop_token stop) {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
 #endif
+        vector<uint8_t> in_buf;
 
-        // FIXME - Windows
+#ifdef _WIN32
         // FIXME - Windows pipes (overlapped I/O?)
 
+        event winsock_event;
+        bool can_write = false;
+
+        if (WSAEventSelect(sock, winsock_event.h.get(), FD_READ | FD_WRITE | FD_CLOSE) == SOCKET_ERROR)
+            throw formatted_error("WSAEventSelect failed (error {}).", wsa_error_to_string(WSAGetLastError()));
+
+        array<HANDLE, 2> objs;
+
+        objs[0] = winsock_event.h.get();
+        objs[1] = mess_event.h.get();
+
+        while (!stop.stop_requested()) {
+            WSANETWORKEVENTS netev;
+
+            auto ret = WaitForMultipleObjects(objs.size(), objs.data(), false, INFINITE);
+
+            if (ret == WAIT_FAILED)
+                throw formatted_error("WaitForSingleObject failed (error {}).", GetLastError());
+
+            if (ret == WAIT_OBJECT_0) {
+                if (WSAEnumNetworkEvents(sock, winsock_event.h.get(), &netev))
+                    throw formatted_error("WSAEnumNetworkEvents failed (error {}).", wsa_error_to_string(WSAGetLastError()));
+
+                if (netev.lNetworkEvents & FD_READ)
+                    socket_thread_read(in_buf);
+
+                if (netev.lNetworkEvents & FD_WRITE) {
+                    lock_guard lg(mess_out_lock);
+
+                    can_write = socket_thread_write();
+                }
+
+                if (netev.lNetworkEvents & FD_CLOSE) {
+                    if (stop.stop_requested())
+                        break;
+
+                    throw runtime_error("Disconnected.");
+                }
+            } else if (ret == WAIT_OBJECT_0 + 1) {
+                mess_event.reset();
+
+                {
+                    lock_guard lg(mess_out_lock);
+
+                    if (can_write && !mess_out_buf.empty())
+                        can_write = socket_thread_write();
+                }
+            }
+        }
+#else
         unique_handle epoll{epoll_create1(EPOLL_CLOEXEC)};
 
         if (epoll.get() == -1)
@@ -2368,8 +2556,6 @@ namespace tds {
                 throw formatted_error("epoll_ctl failed (error {})", errno_to_string(errno));
         }
 
-        vector<uint8_t> in_buf;
-
         while (!stop.stop_requested()) {
             struct epoll_event ev;
 
@@ -2384,101 +2570,13 @@ namespace tds {
 
             if (ret != 0) {
                 if (ev.data.fd == sock) {
-                    if (ev.events & EPOLLIN) {
-                        // FIXME - SSL
-
-                        if (in_buf.size() < sizeof(tds_header)) {
-                            char buf[sizeof(tds_header)];
-                            span sp(buf, sizeof(tds_header) - in_buf.size());
-
-                            auto ret = recv(sock, (char*)sp.data(), (int)sp.size(), 0);
-
-                            if (ret < 0)
-                                throw formatted_error("recv failed (error {})", errno_to_string(errno));
-
-                            if (ret > 0) {
-                                sp = sp.subspan(0, ret);
-
-                                auto old_size = in_buf.size();
-                                in_buf.resize(old_size + sp.size());
-                                memcpy(in_buf.data() + old_size, sp.data(), sp.size());
-                            }
-                        }
-
-                        if (in_buf.size() >= sizeof(tds_header)) {
-                            tds_header h = *(tds_header*)in_buf.data();
-
-                            auto len = htons(h.length);
-
-                            if (len < sizeof(tds_header))
-                                throw formatted_error("message length was {}, expected at least {}", len, sizeof(tds_header));
-
-                            if (in_buf.size() < len) {
-                                vector<uint8_t> buf;
-
-                                buf.resize(len - in_buf.size());
-
-                                auto ret = recv(sock, (char*)buf.data(), (int)buf.size(), 0);
-
-                                if (ret < 0)
-                                    throw formatted_error("recv failed (error {})", errno_to_string(errno));
-
-                                if (ret > 0) {
-                                    auto old_size = in_buf.size();
-                                    in_buf.resize(old_size + ret);
-                                    memcpy(in_buf.data() + old_size, buf.data(), ret);
-                                }
-                            }
-
-                            if (in_buf.size() >= len) {
-                                mess m;
-
-                                m.type = h.type;
-
-                                if (len >= sizeof(tds_header)) {
-                                    m.payload.resize(len - sizeof(tds_header));
-                                    memcpy(m.payload.data(), in_buf.data() + sizeof(tds_header), len - sizeof(tds_header));
-                                }
-
-                                m.last_packet = h.status & 1;
-
-                                spid = htons(h.spid);
-
-                                {
-                                    lock_guard lg(mess_in_lock);
-
-                                    mess_list.emplace_back(move(m));
-                                }
-
-                                mess_in_cv.notify_one();
-
-                                decltype(in_buf) newbuf{in_buf.begin() + len, in_buf.end()};
-                                in_buf.swap(newbuf);
-                            }
-                        }
-                    }
+                    if (ev.events & EPOLLIN)
+                        socket_thread_read(in_buf);
 
                     if (ev.events & EPOLLOUT) {
                         lock_guard lg(mess_out_lock);
 
-                        while (!mess_out_buf.empty()) {
-                            auto ret = send(sock, (char*)mess_out_buf.data(), (int)mess_out_buf.size(), 0);
-
-                            if (ret < 0) {
-                                if (errno == EWOULDBLOCK)
-                                    break;
-
-                                throw formatted_error("send failed (error {})", errno_to_string(errno));
-                            }
-
-                            if (ret == (int)mess_out_buf.size()) {
-                                mess_out_buf.clear();
-                                break;
-                            }
-
-                            vector<uint8_t> newbuf{mess_out_buf.begin() + ret, mess_out_buf.end()};
-                            mess_out_buf.swap(newbuf);
-                        }
+                        socket_thread_write();
 
                         if (mess_out_buf.empty()) {
                             auto& e = evs[0];
@@ -2518,6 +2616,7 @@ namespace tds {
                 }
             }
         }
+#endif
     }
 
     smp_session::smp_session(tds_impl& impl) : impl(impl) {
