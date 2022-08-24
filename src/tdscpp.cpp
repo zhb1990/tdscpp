@@ -2545,9 +2545,9 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
-        ringbuf pt_buf(1048576); // FIXME - don't allocate unless we need to
+        ringbuf pt_buf(65536);
 #endif
-        ringbuf in_buf(1048576);
+        ringbuf in_buf(65536);
 
 #ifdef _WIN32
         if (pipe.get() != INVALID_HANDLE_VALUE) {
