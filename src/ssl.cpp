@@ -341,7 +341,7 @@ namespace tds {
         if (established)
             ssl_send_buf.insert(ssl_send_buf.end(), sp.begin(), sp.end());
         else
-            tds.send_msg(tds_msg::prelogin, sp, false);
+            tds.sess.send_msg(tds_msg::prelogin, sp, false);
 
         return (int)sp.size();
     }
@@ -553,7 +553,7 @@ namespace tds {
             SecBuffer inbuf;
             SecBufferDesc in;
 
-            tds.send_msg(tds_msg::prelogin, outstr, false);
+            tds.sess.send_msg(tds_msg::prelogin, outstr, false);
 
             tds.sess.wait_for_msg(type, payload);
 

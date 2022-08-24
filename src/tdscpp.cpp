@@ -2856,7 +2856,7 @@ namespace tds {
 
         tlo->type = tds_login_opt_type::terminator;
 
-        send_msg(tds_msg::prelogin, msg);
+        sess.send_msg(tds_msg::prelogin, msg);
 
         enum tds_msg type;
         vector<uint8_t> payload;
@@ -3268,8 +3268,8 @@ namespace tds {
             FreeContextBuffer(outbuf.pvBuffer);
 
         if (!ret.empty()) {
-            send_msg(tds_msg::sspi, span((uint8_t*)ret.data(), ret.size()),
-                     server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+            sess.send_msg(tds_msg::sspi, span((uint8_t*)ret.data(), ret.size()),
+                          server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
         }
     }
 #endif
@@ -3485,19 +3485,19 @@ namespace tds {
 
         *(enum tds_feature*)((uint8_t*)&msg + off) = tds_feature::TERMINATOR;
 
-        send_msg(tds_msg::tds7_login, payload);
+        sess.send_msg(tds_msg::tds7_login, payload);
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-    void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg, bool do_ssl)
+    void session::send_msg(enum tds_msg type, span<const uint8_t> msg, bool do_ssl)
 #else
-    void tds_impl::send_msg(enum tds_msg type, span<const uint8_t> msg)
+    void session::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (do_ssl && ssl) {
+        if (do_ssl && tds.ssl) {
             while (!msg.empty()) {
-                size_t to_send = min(msg.size(), packet_size - sizeof(tds_header));
+                size_t to_send = min(msg.size(), tds.packet_size - sizeof(tds_header));
 
                 vector<uint8_t> buf;
 
@@ -3515,13 +3515,13 @@ namespace tds {
                 memcpy(buf.data() + sizeof(tds_header), msg.data(), to_send);
 
                 {
-                    lock_guard lg(mess_out_lock);
+                    lock_guard lg(tds.mess_out_lock);
 
-                    auto enc = ssl->enc(buf);
+                    auto enc = tds.ssl->enc(buf);
 
-                    mess_out_buf.insert(mess_out_buf.end(), enc.begin(), enc.end());
+                    tds.mess_out_buf.insert(tds.mess_out_buf.end(), enc.begin(), enc.end());
 
-                    mess_event.set();
+                    tds.mess_event.set();
                 }
 
                 msg = msg.subspan(to_send);
@@ -3532,16 +3532,16 @@ namespace tds {
 #endif
 
         while (!msg.empty()) {
-            size_t to_send = min(msg.size(), packet_size - sizeof(tds_header));
+            size_t to_send = min(msg.size(), tds.packet_size - sizeof(tds_header));
 
             {
-                lock_guard lg(mess_out_lock);
+                lock_guard lg(tds.mess_out_lock);
 
-                auto old_size = mess_out_buf.size();
+                auto old_size = tds.mess_out_buf.size();
 
-                mess_out_buf.resize(old_size + sizeof(tds_header) + to_send);
+                tds.mess_out_buf.resize(old_size + sizeof(tds_header) + to_send);
 
-                auto& h = *(tds_header*)(mess_out_buf.data() + old_size);
+                auto& h = *(tds_header*)(tds.mess_out_buf.data() + old_size);
 
                 h.type = type;
                 h.status = to_send == msg.size() ? 1 : 0; // 1 == last message
@@ -3550,9 +3550,9 @@ namespace tds {
                 h.packet_id = 0; // FIXME? "Currently ignored" according to spec
                 h.window = 0;
 
-                memcpy(mess_out_buf.data() + old_size + sizeof(tds_header), msg.data(), to_send);
+                memcpy(tds.mess_out_buf.data() + old_size + sizeof(tds_header), msg.data(), to_send);
 
-                mess_event.set();
+                tds.mess_event.set();
             }
 
             msg = msg.subspan(to_send);
@@ -4185,7 +4185,7 @@ namespace tds {
             }
         }
 
-        conn.impl->send_msg(tds_msg::rpc, buf);
+        conn.impl->sess.send_msg(tds_msg::rpc, buf);
 
         wait_for_packet();
     }
@@ -4197,7 +4197,7 @@ namespace tds {
         try {
             received_attn = false;
 
-            conn.impl->send_msg(tds_msg::attention_signal, span<uint8_t>());
+            conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
 
             while (!finished) {
                 wait_for_packet();
@@ -5116,7 +5116,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
         memcpy(ptr, q.data(), q.length() * sizeof(char16_t));
 
-        conn.impl->send_msg(tds_msg::sql_batch, buf);
+        conn.impl->sess.send_msg(tds_msg::sql_batch, buf);
 
         wait_for_packet();
     }
@@ -5128,7 +5128,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         try {
             received_attn = false;
 
-            conn.impl->send_msg(tds_msg::attention_signal, span<uint8_t>());
+            conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
 
             while (!finished) {
                 wait_for_packet();
@@ -5725,7 +5725,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.isolation_level = 0;
         msg.name_len = 0;
 
-        conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+        conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         vector<uint8_t> payload;
@@ -5807,7 +5807,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             msg.name_len = 0;
             msg.flags = 0;
 
-            conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+            conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
             enum tds_msg type;
             vector<uint8_t> payload;
@@ -5894,7 +5894,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.name_len = 0;
         msg.flags = 0;
 
-        conn.impl->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+        conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         vector<uint8_t> payload;

@@ -597,10 +597,20 @@ namespace tds {
         bool last_packet;
     };
 
+    class tds_impl;
+
     class session {
     public:
-        void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
+        session(tds_impl& tds) : tds(tds) { }
 
+        void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        void send_msg(enum tds_msg type, std::span<const uint8_t> msg, bool do_ssl = true);
+#else
+        void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
+#endif
+
+        tds_impl& tds;
         std::condition_variable mess_in_cv;
         std::mutex mess_in_lock;
         std::list<mess> mess_list;
@@ -615,11 +625,6 @@ namespace tds {
                  const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                  bool check_certificate, bool mars);
         ~tds_impl();
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        void send_msg(enum tds_msg type, std::span<const uint8_t> msg, bool do_ssl = true);
-#else
-        void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
-#endif
         void handle_info_msg(std::span<const uint8_t> sp, bool error);
         void handle_envchange_msg(std::span<const uint8_t> sp);
 
@@ -675,7 +680,7 @@ namespace tds {
         bool mars = false;
 //         std::unique_ptr<smp_session> mars_sess;
         event mess_event;
-        session sess;
+        session sess{*this};
         std::mutex mess_out_lock;
         std::vector<uint8_t> mess_out_buf;
         std::jthread t;

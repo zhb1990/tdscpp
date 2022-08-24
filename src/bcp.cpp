@@ -1508,7 +1508,7 @@ namespace tds {
     }
 
     void tds::bcp_sendmsg(span<const uint8_t> data) {
-        impl->send_msg(tds_msg::bulk_load_data, data);
+        impl->sess.send_msg(tds_msg::bulk_load_data, data);
 
         enum tds_msg type;
         vector<uint8_t> payload;
