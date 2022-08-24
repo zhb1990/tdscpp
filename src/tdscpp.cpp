@@ -2552,7 +2552,7 @@ namespace tds {
 #ifdef _WIN32
         if (pipe.get() != INVALID_HANDLE_VALUE) {
             event read_event;
-            char buf[4096];
+            uint8_t buf[4096];
             DWORD tmp;
             OVERLAPPED async = {};
 
@@ -2584,7 +2584,7 @@ namespace tds {
                             throw last_error("GetOverlappedResult", GetLastError());
 
                         if (read > 0) {
-                            in_buf.insert(in_buf.end(), buf, buf + read);
+                            in_buf.write(span(buf, read));
 
                             if (do_ssl) {
                                 decrypt_messages(in_buf, pt_buf);
