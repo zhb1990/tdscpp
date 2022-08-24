@@ -53,14 +53,18 @@ void ringbuf::write(span<const uint8_t> sp) {
     memcpy(data, sp.data(), sp.size());
 }
 
-size_t ringbuf::size() {
+size_t ringbuf::size() const {
     return used;
 }
 
-size_t ringbuf::available() {
+size_t ringbuf::available() const {
     return length - used;
 }
 
-bool ringbuf::empty() {
+bool ringbuf::empty() const {
     return used == 0;
+}
+
+void ringbuf::clear() {
+    used = 0;
 }

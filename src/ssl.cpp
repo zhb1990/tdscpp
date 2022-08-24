@@ -646,17 +646,18 @@ namespace tds {
         return payload;
     }
 
-    vector<uint8_t> tds_ssl::dec(span<const uint8_t>& sp) {
+    vector<uint8_t> tds_ssl::dec(ringbuf& in_buf) {
         SECURITY_STATUS sec_status;
         array<SecBuffer, 4> buf;
         SecBufferDesc bufdesc;
         vector<uint8_t> recvbuf;
         vector<uint8_t> ret;
 
-        if (sp.empty())
+        if (in_buf.empty())
             return {};
 
-        recvbuf.assign(sp.begin(), sp.end());
+        recvbuf.resize(in_buf.size());
+        in_buf.peek(recvbuf);
 
         while (!recvbuf.empty()) {
             bool found = false;
@@ -697,7 +698,7 @@ namespace tds {
                 if (b.BufferType == SECBUFFER_EXTRA) {
                     extra = true;
 
-                    sp = sp.subspan((uint8_t*)b.pvBuffer - recvbuf.data());
+                    in_buf.discard((uint8_t*)b.pvBuffer - recvbuf.data());
 
                     vector<uint8_t> newbuf{(uint8_t*)b.pvBuffer, (uint8_t*)b.pvBuffer + b.cbBuffer};
                     recvbuf.swap(newbuf);
@@ -710,7 +711,7 @@ namespace tds {
                 break;
         }
 
-        sp = {};
+        in_buf.clear();
 
         return ret;
     }

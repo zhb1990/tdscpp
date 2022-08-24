@@ -12,9 +12,10 @@ public:
     void peek(std::span<uint8_t> sp);
     void write(std::span<const uint8_t> sp);
     void discard(size_t bytes);
-    size_t size();
-    size_t available();
-    [[nodiscard]] bool empty();
+    size_t size() const;
+    size_t available() const;
+    [[nodiscard]] bool empty() const;
+    void clear();
 
 private:
     uint8_t* data;
