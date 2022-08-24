@@ -2229,6 +2229,28 @@ void event::set() {
 
 #endif
 
+static void name_thread(string_view name) {
+#ifdef _WIN32
+    if (auto h = LoadLibraryW(L"kernelbase.dll")) {
+        HRESULT (WINAPI *_SetThreadDescription)(HANDLE hThread, PCWSTR lpThreadDescription);
+
+        _SetThreadDescription = (decltype(_SetThreadDescription))(void(*)(void))GetProcAddress(h, "SetThreadDescription");
+
+        if (_SetThreadDescription) {
+            auto namew = tds::utf8_to_utf16(name);
+            _SetThreadDescription(GetCurrentThread(), (WCHAR*)namew.c_str());
+        }
+    }
+#else
+    auto fn = fmt::format("/proc/self/task/{}/comm", gettid());
+
+    unique_handle h{open(fn.c_str(), O_WRONLY)};
+
+    if (h.get() > 0)
+        write(h.get(), name.data(), name.size());
+#endif
+}
+
 namespace tds {
 #if __cpp_lib_constexpr_string >= 201907L
     static_assert(utf8_to_utf16("hello") == u"hello"); // single bytes
@@ -2519,6 +2541,8 @@ namespace tds {
 #endif
 
     void tds_impl::socket_thread(stop_token stop) {
+        name_thread("tdscpp thread");
+
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
         vector<uint8_t> pt_buf;
