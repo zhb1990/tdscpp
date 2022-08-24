@@ -1513,7 +1513,7 @@ namespace tds {
         enum tds_msg type;
         vector<uint8_t> payload;
 
-        impl->wait_for_msg(type, payload);
+        impl->sess.wait_for_msg(type, payload);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)

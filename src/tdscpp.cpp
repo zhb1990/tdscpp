@@ -2357,11 +2357,11 @@ namespace tds {
             socket_thread(stop);
         } catch (...) {
             {
-                lock_guard lg(mess_in_lock);
-                socket_thread_exc = current_exception();
+                lock_guard lg(sess.mess_in_lock);
+                sess.socket_thread_exc = current_exception();
             }
 
-            mess_in_cv.notify_all();
+            sess.mess_in_cv.notify_all();
         }
     }
 
@@ -2442,12 +2442,12 @@ namespace tds {
             spid = htons(h.spid);
 
             {
-                lock_guard lg(mess_in_lock);
+                lock_guard lg(sess.mess_in_lock);
 
-                mess_list.emplace_back(move(m));
+                sess.mess_list.emplace_back(move(m));
             }
 
-            mess_in_cv.notify_one();
+            sess.mess_in_cv.notify_one();
 
             vector<uint8_t> newbuf{in_buf.begin() + len, in_buf.end()};
             in_buf.swap(newbuf);
@@ -2858,7 +2858,7 @@ namespace tds {
         enum tds_msg type;
         vector<uint8_t> payload;
 
-        wait_for_msg(type, payload);
+        sess.wait_for_msg(type, payload);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -3098,7 +3098,7 @@ namespace tds {
 #endif
 
             do {
-                wait_for_msg(type, payload, &last_packet);
+                sess.wait_for_msg(type, payload, &last_packet);
                 // FIXME - timeout
 
                 if (type != tds_msg::tabular_result)
@@ -3556,7 +3556,7 @@ namespace tds {
         }
     }
 
-    void tds_impl::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
+    void session::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
         mess m;
 
         {
@@ -4208,7 +4208,7 @@ namespace tds {
                 enum tds_msg type;
                 vector<uint8_t> payload;
 
-                conn.impl->wait_for_msg(type, payload);
+                conn.impl->sess.wait_for_msg(type, payload);
                 // FIXME - timeout
 
                 if (type != tds_msg::tabular_result)
@@ -4287,7 +4287,7 @@ namespace tds {
         vector<uint8_t> payload;
         bool last_packet;
 
-        conn.impl->wait_for_msg(type, payload, &last_packet);
+        conn.impl->sess.wait_for_msg(type, payload, &last_packet);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -5139,7 +5139,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 enum tds_msg type;
                 vector<uint8_t> payload;
 
-                conn.impl->wait_for_msg(type, payload);
+                conn.impl->sess.wait_for_msg(type, payload);
                 // FIXME - timeout
 
                 if (type != tds_msg::tabular_result)
@@ -5181,7 +5181,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         vector<uint8_t> payload;
         bool last_packet;
 
-        conn.impl->wait_for_msg(type, payload, &last_packet);
+        conn.impl->sess.wait_for_msg(type, payload, &last_packet);
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -5728,7 +5728,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         vector<uint8_t> payload;
 
         // FIXME - timeout
-        conn.impl->wait_for_msg(type, payload);
+        conn.impl->sess.wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
@@ -5810,7 +5810,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             vector<uint8_t> payload;
 
             // FIXME - timeout
-            conn.impl->wait_for_msg(type, payload);
+            conn.impl->sess.wait_for_msg(type, payload);
 
             if (type != tds_msg::tabular_result)
                 throw formatted_error("Received message type {}, expected tabular_result", (int)type);
@@ -5897,7 +5897,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         vector<uint8_t> payload;
 
         // FIXME - timeout
-        conn.impl->wait_for_msg(type, payload);
+        conn.impl->sess.wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);

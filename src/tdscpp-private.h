@@ -597,6 +597,16 @@ namespace tds {
         bool last_packet;
     };
 
+    class session {
+    public:
+        void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
+
+        std::condition_variable mess_in_cv;
+        std::mutex mess_in_lock;
+        std::list<mess> mess_list;
+        std::exception_ptr socket_thread_exc;
+    };
+
     class tds_impl {
     public:
         tds_impl(const std::string& server, std::string_view user, std::string_view password,
@@ -610,7 +620,6 @@ namespace tds {
 #else
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
 #endif
-        void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
         void handle_info_msg(std::span<const uint8_t> sp, bool error);
         void handle_envchange_msg(std::span<const uint8_t> sp);
 
@@ -666,12 +675,9 @@ namespace tds {
         bool mars = false;
 //         std::unique_ptr<smp_session> mars_sess;
         event mess_event;
-        std::condition_variable mess_in_cv;
-        std::mutex mess_in_lock;
-        std::list<mess> mess_list;
+        session sess;
         std::mutex mess_out_lock;
         std::vector<uint8_t> mess_out_buf;
-        std::exception_ptr socket_thread_exc;
         std::jthread t;
     };
 

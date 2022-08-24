@@ -320,7 +320,7 @@ namespace tds {
             enum tds_msg type;
             vector<uint8_t> payload;
 
-            tds.wait_for_msg(type, payload);
+            tds.sess.wait_for_msg(type, payload);
 
             if (type != tds_msg::prelogin)
                 throw formatted_error("Received message type {}, expected prelogin", (int)type);
@@ -555,7 +555,7 @@ namespace tds {
 
             tds.send_msg(tds_msg::prelogin, outstr, false);
 
-            tds.wait_for_msg(type, payload);
+            tds.sess.wait_for_msg(type, payload);
 
             if (type != tds_msg::prelogin) {
                 FreeCredentialsHandle(&cred_handle);
