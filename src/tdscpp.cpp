@@ -5,6 +5,7 @@
 #include "tdscpp.h"
 #include "tdscpp-private.h"
 #include "config.h"
+#include "ringbuf.h"
 #include <iostream>
 #include <string>
 #include <list>
@@ -2388,11 +2389,16 @@ namespace tds {
         }
     }
 
-    void tds_impl::socket_thread_read(vector<uint8_t>& in_buf) {
-        do {
-            char buf[4096];
+    void tds_impl::socket_thread_read(ringbuf& in_buf) {
+        uint8_t buf[4096];
 
-            auto ret = recv(sock, buf, sizeof(buf), 0);
+        do {
+            size_t to_read = min(in_buf.available(), sizeof(buf));
+
+            if (to_read == 0)
+                break;
+
+            auto ret = recv(sock, (char*)buf, to_read, 0);
 
             if (ret < 0) {
 #ifdef _WIN32
@@ -2411,7 +2417,7 @@ namespace tds {
             if (ret == 0)
                 break;
 
-            in_buf.insert(in_buf.end(), buf, buf + ret);
+            in_buf.write(span(buf, ret));
         } while (true);
     }
 
@@ -2442,9 +2448,11 @@ namespace tds {
         return true;
     }
 
-    void tds_impl::socket_thread_parse_messages(vector<uint8_t>& in_buf) {
+    void tds_impl::socket_thread_parse_messages(ringbuf& in_buf) {
         while (in_buf.size() >= sizeof(tds_header)) {
-            tds_header h = *(tds_header*)in_buf.data();
+            tds_header h;
+
+            in_buf.peek(span((uint8_t*)&h, sizeof(tds_header)));
 
             auto len = htons(h.length);
 
@@ -2454,13 +2462,15 @@ namespace tds {
             if (in_buf.size() < len)
                 return;
 
+            in_buf.discard(sizeof(tds_header));
+
             mess m;
 
             m.type = h.type;
 
             if (len >= sizeof(tds_header)) {
                 m.payload.resize(len - sizeof(tds_header));
-                memcpy(m.payload.data(), in_buf.data() + sizeof(tds_header), len - sizeof(tds_header));
+                in_buf.read(m.payload);
             }
 
             m.last_packet = h.status & 1;
@@ -2474,14 +2484,11 @@ namespace tds {
             }
 
             sess.mess_in_cv.notify_one();
-
-            vector<uint8_t> newbuf{in_buf.begin() + len, in_buf.end()};
-            in_buf.swap(newbuf);
         }
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-    void tds_impl::decrypt_messages(vector<uint8_t>& in_buf, vector<uint8_t>& pt_buf) {
+    void tds_impl::decrypt_messages(ringbuf& in_buf, ringbuf& pt_buf) {
         auto sp = span((const uint8_t*)in_buf.data(), in_buf.size());
 
         auto ret = ssl->dec(sp);
@@ -2492,7 +2499,7 @@ namespace tds {
         }
 
         if (!ret.empty())
-            pt_buf.insert(pt_buf.end(), ret.begin(), ret.end());
+            pt_buf.write(ret);
     }
 #endif
 
@@ -2545,9 +2552,9 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
-        vector<uint8_t> pt_buf;
+        ringbuf pt_buf(1048576); // FIXME - don't allocate unless we need to
 #endif
-        vector<uint8_t> in_buf;
+        ringbuf in_buf(1048576);
 
 #ifdef _WIN32
         if (pipe.get() != INVALID_HANDLE_VALUE) {

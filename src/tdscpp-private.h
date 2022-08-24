@@ -585,6 +585,8 @@ public:
     unique_handle h;
 };
 
+class ringbuf;
+
 namespace tds {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
     class tds_ssl;
@@ -651,11 +653,11 @@ namespace tds {
 #endif
         void socket_thread(std::stop_token stop);
         void socket_thread_wrap(std::stop_token stop) noexcept;
-        void socket_thread_read(std::vector<uint8_t>& in_buf);
+        void socket_thread_read(ringbuf& in_buf);
         bool socket_thread_write();
-        void socket_thread_parse_messages(std::vector<uint8_t>& in_buf);
+        void socket_thread_parse_messages(ringbuf& in_buf);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        void decrypt_messages(std::vector<uint8_t>& in_buf, std::vector<uint8_t>& pt_buf);
+        void decrypt_messages(ringbuf& in_buf, ringbuf& pt_buf);
 #endif
 #ifdef _WIN32
         void pipe_write();
