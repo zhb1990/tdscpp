@@ -657,6 +657,9 @@ namespace tds {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         void decrypt_messages(std::vector<uint8_t>& in_buf, std::vector<uint8_t>& pt_buf);
 #endif
+#ifdef _WIN32
+        void pipe_write();
+#endif
 
 #ifdef _WIN32
         SOCKET sock = INVALID_SOCKET;

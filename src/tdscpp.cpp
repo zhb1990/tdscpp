@@ -2297,7 +2297,8 @@ namespace tds {
                 name = u"\\\\" + name.substr(4) + u"\\pipe\\SQLLocal\\MSSQLSERVER";
 
             do {
-                pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING, 0, nullptr));
+                pipe.reset(CreateFileW((WCHAR*)name.c_str(), FILE_READ_DATA | FILE_WRITE_DATA, 0, nullptr, OPEN_EXISTING,
+                                       FILE_FLAG_OVERLAPPED, nullptr));
 
                 if (pipe.get() != INVALID_HANDLE_VALUE)
                     break;
@@ -2473,6 +2474,50 @@ namespace tds {
     }
 #endif
 
+#ifdef _WIN32
+    void tds_impl::pipe_write() {
+        optional<event> write_event;
+
+        while (true) {
+            unique_lock lock(mess_out_lock);
+
+            if (mess_out_buf.empty())
+                return;
+
+            lock.unlock();
+
+            DWORD tmp, written;
+            OVERLAPPED async = {};
+
+            if (!write_event)
+                write_event.emplace();
+            else
+                write_event->reset();
+
+            async.hEvent = write_event->h.get();
+
+            lock.lock();
+
+            auto ret = WriteFile(pipe.get(), mess_out_buf.data(), (DWORD)mess_out_buf.size(),
+                                 &tmp, &async);
+
+            if (!ret && GetLastError() != ERROR_IO_PENDING)
+                throw last_error("WriteFile", GetLastError());
+
+            if (!GetOverlappedResult(pipe.get(), &async, &written, true))
+                throw last_error("GetOverlappedResult", GetLastError());
+
+            if (written > 0) {
+                vector<uint8_t> newbuf{mess_out_buf.data() + written, mess_out_buf.data() + mess_out_buf.size()};
+                mess_out_buf.swap(newbuf);
+            }
+
+            if (mess_out_buf.empty())
+                return;
+        }
+    }
+#endif
+
     void tds_impl::socket_thread(stop_token stop) {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         bool do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
@@ -2481,63 +2526,119 @@ namespace tds {
         vector<uint8_t> in_buf;
 
 #ifdef _WIN32
-        // FIXME - Windows pipes (overlapped I/O?)
+        if (pipe.get() != INVALID_HANDLE_VALUE) {
+            event read_event;
+            char buf[4096];
+            DWORD tmp;
+            OVERLAPPED async = {};
 
-        event winsock_event;
-        bool can_write = false;
+            async.hEvent = read_event.h.get();
 
-        if (WSAEventSelect(sock, winsock_event.h.get(), FD_READ | FD_WRITE | FD_CLOSE) == SOCKET_ERROR)
-            throw formatted_error("WSAEventSelect failed (error {}).", wsa_error_to_string(WSAGetLastError()));
+            while (!stop.stop_requested()) {
+                read_event.reset();
 
-        array<HANDLE, 2> objs;
+                auto read_result = ReadFile(pipe.get(), buf, sizeof(buf), &tmp, &async);
 
-        objs[0] = winsock_event.h.get();
-        objs[1] = mess_event.h.get();
+                if (!read_result && GetLastError() != ERROR_IO_PENDING)
+                    throw last_error("ReadFile", GetLastError());
 
-        while (!stop.stop_requested()) {
-            WSANETWORKEVENTS netev;
+                while (true) {
+                    array<HANDLE, 2> objs;
 
-            auto ret = WaitForMultipleObjects(objs.size(), objs.data(), false, INFINITE);
+                    objs[0] = read_event.h.get();
+                    objs[1] = mess_event.h.get();
 
-            if (ret == WAIT_FAILED)
-                throw formatted_error("WaitForSingleObject failed (error {}).", GetLastError());
+                    auto ret = WaitForMultipleObjects(objs.size(), objs.data(), false, INFINITE);
 
-            if (ret == WAIT_OBJECT_0) {
-                if (WSAEnumNetworkEvents(sock, winsock_event.h.get(), &netev))
-                    throw formatted_error("WSAEnumNetworkEvents failed (error {}).", wsa_error_to_string(WSAGetLastError()));
+                    if (ret == WAIT_FAILED)
+                        throw formatted_error("WaitForMultipleObjects failed (error {}).", GetLastError());
 
-                if (netev.lNetworkEvents & FD_READ) {
-                    socket_thread_read(in_buf);
+                    if (ret == WAIT_OBJECT_0) {
+                        DWORD read;
 
-                    if (do_ssl) {
-                        decrypt_messages(in_buf, pt_buf);
-                        socket_thread_parse_messages(pt_buf);
-                    } else
-                        socket_thread_parse_messages(in_buf);
-                }
+                        if (!GetOverlappedResult(pipe.get(), &async, &read, true))
+                            throw last_error("GetOverlappedResult", GetLastError());
 
-                if (netev.lNetworkEvents & FD_WRITE) {
-                    lock_guard lg(mess_out_lock);
+                        if (read > 0) {
+                            in_buf.insert(in_buf.end(), buf, buf + read);
 
-                    can_write = socket_thread_write();
-                }
+                            if (do_ssl) {
+                                decrypt_messages(in_buf, pt_buf);
+                                socket_thread_parse_messages(pt_buf);
+                            } else
+                                socket_thread_parse_messages(in_buf);
+                        }
 
-                if (netev.lNetworkEvents & FD_CLOSE) {
-                    if (stop.stop_requested())
                         break;
+                    } else if (ret == WAIT_OBJECT_0 + 1) {
+                        mess_event.reset();
 
-                    throw runtime_error("Disconnected.");
+                        do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+
+                        if (stop.stop_requested())
+                            break;
+
+                        pipe_write();
+                    }
                 }
-            } else if (ret == WAIT_OBJECT_0 + 1) {
-                mess_event.reset();
+            }
+        } else {
+            event winsock_event;
+            bool can_write = false;
 
-                do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+            if (WSAEventSelect(sock, winsock_event.h.get(), FD_READ | FD_WRITE | FD_CLOSE) == SOCKET_ERROR)
+                throw formatted_error("WSAEventSelect failed (error {}).", wsa_error_to_string(WSAGetLastError()));
 
-                {
-                    lock_guard lg(mess_out_lock);
+            array<HANDLE, 2> objs;
 
-                    if (can_write && !mess_out_buf.empty())
+            objs[0] = winsock_event.h.get();
+            objs[1] = mess_event.h.get();
+
+            while (!stop.stop_requested()) {
+                WSANETWORKEVENTS netev;
+
+                auto ret = WaitForMultipleObjects(objs.size(), objs.data(), false, INFINITE);
+
+                if (ret == WAIT_FAILED)
+                    throw formatted_error("WaitForMultipleObjects failed (error {}).", GetLastError());
+
+                if (ret == WAIT_OBJECT_0) {
+                    if (WSAEnumNetworkEvents(sock, winsock_event.h.get(), &netev))
+                        throw formatted_error("WSAEnumNetworkEvents failed (error {}).", wsa_error_to_string(WSAGetLastError()));
+
+                    if (netev.lNetworkEvents & FD_READ) {
+                        socket_thread_read(in_buf);
+
+                        if (do_ssl) {
+                            decrypt_messages(in_buf, pt_buf);
+                            socket_thread_parse_messages(pt_buf);
+                        } else
+                            socket_thread_parse_messages(in_buf);
+                    }
+
+                    if (netev.lNetworkEvents & FD_WRITE) {
+                        lock_guard lg(mess_out_lock);
+
                         can_write = socket_thread_write();
+                    }
+
+                    if (netev.lNetworkEvents & FD_CLOSE) {
+                        if (stop.stop_requested())
+                            break;
+
+                        throw runtime_error("Disconnected.");
+                    }
+                } else if (ret == WAIT_OBJECT_0 + 1) {
+                    mess_event.reset();
+
+                    do_ssl = ssl && (server_enc == encryption_type::ENCRYPT_ON || server_enc == encryption_type::ENCRYPT_REQ);
+
+                    {
+                        lock_guard lg(mess_out_lock);
+
+                        if (can_write && !mess_out_buf.empty())
+                            can_write = socket_thread_write();
+                    }
                 }
             }
         }
