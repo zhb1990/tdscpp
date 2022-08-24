@@ -2385,6 +2385,9 @@ namespace tds {
 #endif
             }
 
+            if (ret == 0)
+                break;
+
             in_buf.insert(in_buf.end(), buf, buf + ret);
         } while (true);
     }
