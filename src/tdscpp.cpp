@@ -2398,7 +2398,7 @@ namespace tds {
             if (to_read == 0)
                 break;
 
-            auto ret = recv(sock, (char*)buf, to_read, 0);
+            auto ret = recv(sock, (char*)buf, (int)to_read, 0);
 
             if (ret < 0) {
 #ifdef _WIN32
