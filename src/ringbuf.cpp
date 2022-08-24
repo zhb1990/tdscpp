@@ -60,3 +60,7 @@ size_t ringbuf::size() {
 size_t ringbuf::available() {
     return length - used;
 }
+
+bool ringbuf::empty() {
+    return used == 0;
+}

@@ -14,6 +14,7 @@ public:
     void discard(size_t bytes);
     size_t size();
     size_t available();
+    [[nodiscard]] bool empty();
 
 private:
     uint8_t* data;

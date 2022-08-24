@@ -1,5 +1,6 @@
 #include "tdscpp.h"
 #include "tdscpp-private.h"
+#include "ringbuf.h"
 #if !defined(WITH_OPENSSL) && defined(_WIN32)
 #include <schannel.h>
 #endif
@@ -291,10 +292,10 @@ namespace tds {
             return 0;
 
         if (established) {
-            auto to_copy = (uint32_t)min(sp.size(), ssl_recv_span.size());
+            auto& rb = ssl_recv_rb->get();
+            auto to_copy = (uint32_t)min(sp.size(), rb.size());
 
-            memcpy(sp.data(), ssl_recv_span.data(), to_copy);
-            ssl_recv_span = ssl_recv_span.subspan(to_copy);
+            rb.read(span(sp.data(), to_copy));
 
             return to_copy;
         } else {
@@ -476,13 +477,13 @@ namespace tds {
         return ssl_send_buf;
     }
 
-    vector<uint8_t> tds_ssl::dec(span<const uint8_t>& sp) {
+    vector<uint8_t> tds_ssl::dec(ringbuf& in_buf) {
         vector<uint8_t> out;
         uint8_t buf[4096];
 
-        ssl_recv_span = sp;
+        ssl_recv_rb = in_buf;
 
-        while (!ssl_recv_span.empty()) {
+        while (!in_buf.empty()) {
             auto ret = SSL_read(ssl.get(), buf, sizeof(buf));
 
             if (ret <= 0) {
@@ -494,8 +495,6 @@ namespace tds {
 
             out.insert(out.end(), buf, buf + ret);
         }
-
-        sp = ssl_recv_span;
 
         return out;
     }

@@ -2489,14 +2489,7 @@ namespace tds {
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
     void tds_impl::decrypt_messages(ringbuf& in_buf, ringbuf& pt_buf) {
-        auto sp = span((const uint8_t*)in_buf.data(), in_buf.size());
-
-        auto ret = ssl->dec(sp);
-
-        if (sp.size() != in_buf.size()) {
-            vector<uint8_t> newbuf{sp.begin(), sp.end()};
-            in_buf.swap(newbuf);
-        }
+        auto ret = ssl->dec(in_buf);
 
         if (!ret.empty())
             pt_buf.write(ret);

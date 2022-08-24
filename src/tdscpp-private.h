@@ -704,7 +704,7 @@ namespace tds {
         ~tds_ssl();
 #endif
         [[nodiscard]] std::vector<uint8_t> enc(std::span<const uint8_t> sp);
-        [[nodiscard]] std::vector<uint8_t> dec(std::span<const uint8_t>& sp);
+        [[nodiscard]] std::vector<uint8_t> dec(ringbuf& in_buf);
 
         std::exception_ptr exception;
 
@@ -712,7 +712,7 @@ namespace tds {
         tds_impl& tds;
         std::vector<uint8_t> ssl_recv_buf;
         std::vector<uint8_t> ssl_send_buf;
-        std::span<const uint8_t> ssl_recv_span;
+        std::optional<std::reference_wrapper<ringbuf>> ssl_recv_rb;
 #ifdef WITH_OPENSSL
         bool established = false;
         BIO* bio;
