@@ -5337,7 +5337,8 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         {
             auto sp = parse_tokens(buf, tokens, buf_columns);
 
-            buf.assign((uint8_t*)sp.data(), (uint8_t*)sp.data() + sp.size());
+            vector<uint8_t> newbuf{sp.begin(), sp.end()};
+            buf.swap(newbuf);
         }
 
         if (last_packet && !buf.empty())
