@@ -3085,6 +3085,19 @@ namespace tds {
     };
 #endif
 
+#if !defined(_WIN32) && defined(HAVE_GSSAPI)
+    class gss_name_deleter {
+    public:
+        typedef gss_name_t pointer;
+
+        void operator()(gss_name_t n) {
+            OM_uint32 status;
+
+            gss_release_name(&status, &n);
+        }
+    };
+#endif
+
     void tds_impl::send_login_msg(string_view user, string_view password, string_view server,
                                   string_view app_name, string_view db) {
         enum tds_msg type;
@@ -3143,7 +3156,7 @@ namespace tds {
 
             OM_uint32 major_status, minor_status;
             gss_buffer_desc recv_tok, send_tok, name_buf;
-            gss_name_t gss_name;
+            unique_ptr<gss_name_t, gss_name_deleter> gss_name;
 
             if (cred_handle != 0) {
                 major_status = gss_acquire_cred(&minor_status, GSS_C_NO_NAME, GSS_C_INDEFINITE, GSS_C_NO_OID_SET,
@@ -3156,18 +3169,26 @@ namespace tds {
             name_buf.length = spn.length();
             name_buf.value = (void*)spn.data();
 
-            major_status = gss_import_name(&minor_status, &name_buf, GSS_C_NO_OID, &gss_name);
-            if (major_status != GSS_S_COMPLETE) {
-                gss_release_cred(&minor_status, &cred_handle);
-                throw gss_error("gss_import_name", major_status, minor_status);
+            {
+                gss_name_t tmp = nullptr;
+
+                major_status = gss_import_name(&minor_status, &name_buf, GSS_C_NO_OID, &tmp);
+
+                gss_name.reset(tmp);
+
+                if (major_status != GSS_S_COMPLETE) {
+                    gss_release_cred(&minor_status, &cred_handle);
+                    throw gss_error("gss_import_name", major_status, minor_status);
+                }
             }
 
             recv_tok.length = 0;
             recv_tok.value = nullptr;
 
-            major_status = gss_init_sec_context(&minor_status, cred_handle, &ctx_handle, gss_name, GSS_C_NO_OID,
-                                                GSS_C_DELEG_FLAG, GSS_C_INDEFINITE, GSS_C_NO_CHANNEL_BINDINGS,
-                                                &recv_tok, nullptr, &send_tok, nullptr, nullptr);
+            major_status = gss_init_sec_context(&minor_status, cred_handle, &ctx_handle, gss_name.get(),
+                                                GSS_C_NO_OID, GSS_C_DELEG_FLAG, GSS_C_INDEFINITE,
+                                                GSS_C_NO_CHANNEL_BINDINGS, &recv_tok, nullptr, &send_tok,
+                                                nullptr, nullptr);
 
             if (major_status != GSS_S_CONTINUE_NEEDED && major_status != GSS_S_COMPLETE) {
                 gss_release_cred(&minor_status, &cred_handle);
