@@ -5286,9 +5286,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
                 parse_tokens(payload, tokens, buf_columns);
 
-                while (!tokens.empty()) {
-                    auto t = move(tokens.front());
+                vector<uint8_t> t;
 
+                while (!tokens.empty()) {
+                    t.swap(tokens.front());
                     tokens.pop_front();
 
                     auto type = (token)t[0];
