@@ -40,17 +40,20 @@ void ringbuf::read(span<uint8_t> sp) {
 }
 
 void ringbuf::write(span<const uint8_t> sp) {
-    size_t to_copy = min(sp.size(), length - offset);
+    if (offset + used < length) {
+        size_t to_copy = min(sp.size(), length - offset - used);
 
-    memcpy(data + offset + used, sp.data(), to_copy);
+        memcpy(data + offset + used, sp.data(), to_copy);
+        used += to_copy;
+
+        if (sp.size() == to_copy)
+            return;
+
+        sp = sp.subspan(to_copy);
+    }
+
+    memcpy(data + offset + used - length, sp.data(), sp.size());
     used += sp.size();
-
-    if (sp.size() == to_copy)
-        return;
-
-    sp = sp.subspan(to_copy);
-
-    memcpy(data, sp.data(), sp.size());
 }
 
 size_t ringbuf::size() const {
