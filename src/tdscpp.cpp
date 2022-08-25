@@ -2356,24 +2356,30 @@ namespace tds {
 
         t = jthread([this](stop_token stop) { socket_thread_wrap(stop); });
 
-        send_prelogin_msg(enc, mars);
+        try {
+            send_prelogin_msg(enc, mars);
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (server_enc != encryption_type::ENCRYPT_NOT_SUP) {
-            ssl = make_unique<tds_ssl>(*this);
+            if (server_enc != encryption_type::ENCRYPT_NOT_SUP) {
+                ssl = make_unique<tds_ssl>(*this);
+                mess_event.set();
+            }
+#endif
+
+            send_login_msg(user, password, server, app_name, db);
+
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+            if (server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ)
+                ssl.reset();
+#endif
+
+//             if (this->mars)
+//                 mars_sess = make_unique<smp_session>(*this);
+        } catch (...) {
+            t.request_stop();
             mess_event.set();
+            throw;
         }
-#endif
-
-        send_login_msg(user, password, server, app_name, db);
-
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (server_enc != encryption_type::ENCRYPT_ON && server_enc != encryption_type::ENCRYPT_REQ)
-            ssl.reset();
-#endif
-
-//         if (this->mars)
-//             mars_sess = make_unique<smp_session>(*this);
     }
 
     void tds_impl::socket_thread_wrap(stop_token stop) noexcept {
