@@ -4443,12 +4443,13 @@ namespace tds {
         if (last_packet && !buf.empty())
             throw formatted_error("Data remaining in buffer");
 
-        while (!tokens.empty()) {
-            const auto t = move(tokens.front());
+        vector<uint8_t> t;
 
+        while (!tokens.empty()) {
+            t.swap(tokens.front());
             tokens.pop_front();
 
-            span sp = t;
+            span<const uint8_t> sp = t;
 
             auto type = (token)sp[0];
             sp = sp.subspan(1);
