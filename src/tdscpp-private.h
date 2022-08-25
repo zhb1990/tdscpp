@@ -616,6 +616,7 @@ namespace tds {
         std::condition_variable mess_in_cv;
         std::mutex mess_in_lock;
         std::list<mess> mess_list;
+        std::condition_variable_any rate_limit_cv;
         std::exception_ptr socket_thread_exc;
     };
 
@@ -625,7 +626,7 @@ namespace tds {
                  std::string_view app_name, std::string_view db,
                  const msg_handler& message_handler,
                  const func_count_handler& count_handler, uint16_t port, encryption_type enc,
-                 bool check_certificate, bool mars);
+                 bool check_certificate, bool mars, unsigned int rate_limit);
         ~tds_impl();
         void handle_info_msg(std::span<const uint8_t> sp, bool error);
         void handle_envchange_msg(std::span<const uint8_t> sp);
@@ -655,7 +656,7 @@ namespace tds {
         void socket_thread_wrap(std::stop_token stop) noexcept;
         void socket_thread_read(ringbuf& in_buf);
         bool socket_thread_write();
-        void socket_thread_parse_messages(ringbuf& in_buf);
+        void socket_thread_parse_messages(std::stop_token stop, ringbuf& in_buf);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         void decrypt_messages(ringbuf& in_buf, ringbuf& pt_buf);
 #endif
@@ -688,6 +689,7 @@ namespace tds {
         session sess{*this};
         std::mutex mess_out_lock;
         std::vector<uint8_t> mess_out_buf;
+        unsigned int rate_limit;
         std::jthread t;
     };
 

@@ -575,10 +575,12 @@ namespace tds {
                 std::string_view app_name = "tdscpp", std::string_view db = "",
                 const msg_handler& message_handler = nullptr, const func_count_handler& count_handler = nullptr,
                 uint16_t port = 1433, encryption_type encrypt = encryption_type::ENCRYPT_OFF,
-                bool check_certificate = false, unsigned int codepage = 0, bool mars = false) :
+                bool check_certificate = false, unsigned int codepage = 0, bool mars = false,
+                unsigned int rate_limit = 0) :
                 server(server), user(user), password(password), app_name(app_name), db(db),
                 message_handler(message_handler), count_handler(count_handler), port(port),
-                encrypt(encrypt), check_certificate(check_certificate), codepage(codepage), mars(mars) {
+                encrypt(encrypt), check_certificate(check_certificate), codepage(codepage),
+                mars(mars), rate_limit(rate_limit) {
         }
 
         std::string server;
@@ -593,6 +595,7 @@ namespace tds {
         bool check_certificate;
         unsigned int codepage;
         bool mars;
+        unsigned int rate_limit;
     };
 
     template<typename T, size_t arg_count>

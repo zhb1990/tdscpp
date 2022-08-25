@@ -2278,7 +2278,7 @@ namespace tds {
     tds::tds(const options& opts) {
         impl = make_unique<tds_impl>(opts.server, opts.user, opts.password, opts.app_name, opts.db,
                                      opts.message_handler, opts.count_handler, opts.port,
-                                     opts.encrypt, opts.check_certificate, opts.mars);
+                                     opts.encrypt, opts.check_certificate, opts.mars, opts.rate_limit);
 
         codepage = opts.codepage;
 
@@ -2303,8 +2303,8 @@ namespace tds {
     tds_impl::tds_impl(const string& server, string_view user, string_view password,
                        string_view app_name, string_view db, const msg_handler& message_handler,
                        const func_count_handler& count_handler, uint16_t port, encryption_type enc,
-                       bool check_certificate, bool mars) :
-                       message_handler(message_handler), count_handler(count_handler), check_certificate(check_certificate) {
+                       bool check_certificate, bool mars, unsigned int rate_limit) :
+                       message_handler(message_handler), count_handler(count_handler), check_certificate(check_certificate), rate_limit(rate_limit) {
 #ifdef _WIN32
         WSADATA wsa_data;
 
@@ -2454,7 +2454,7 @@ namespace tds {
         return true;
     }
 
-    void tds_impl::socket_thread_parse_messages(ringbuf& in_buf) {
+    void tds_impl::socket_thread_parse_messages(stop_token stop, ringbuf& in_buf) {
         while (in_buf.size() >= sizeof(tds_header)) {
             tds_header h;
 
@@ -2484,7 +2484,14 @@ namespace tds {
             spid = htons(h.spid);
 
             {
-                lock_guard lg(sess.mess_in_lock);
+                unique_lock ul(sess.mess_in_lock);
+
+                if (rate_limit != 0) {
+                    sess.rate_limit_cv.wait(ul, stop, [&]() { return sess.mess_list.size() < rate_limit; });
+
+                    if (stop.stop_requested())
+                        return;
+                }
 
                 sess.mess_list.emplace_back(move(m));
             }
@@ -2594,9 +2601,9 @@ namespace tds {
 
                             if (do_ssl) {
                                 decrypt_messages(in_buf, pt_buf);
-                                socket_thread_parse_messages(pt_buf);
+                                socket_thread_parse_messages(stop, pt_buf);
                             } else
-                                socket_thread_parse_messages(in_buf);
+                                socket_thread_parse_messages(stop, in_buf);
                         }
 
                         break;
@@ -2641,9 +2648,9 @@ namespace tds {
 
                         if (do_ssl) {
                             decrypt_messages(in_buf, pt_buf);
-                            socket_thread_parse_messages(pt_buf);
+                            socket_thread_parse_messages(stop, pt_buf);
                         } else
-                            socket_thread_parse_messages(in_buf);
+                            socket_thread_parse_messages(stop, in_buf);
                     }
 
                     if (netev.lNetworkEvents & FD_WRITE) {
@@ -2712,10 +2719,10 @@ namespace tds {
 #ifdef WITH_OPENSSL
                         if (do_ssl) {
                             decrypt_messages(in_buf, pt_buf);
-                            socket_thread_parse_messages(pt_buf);
+                            socket_thread_parse_messages(stop, pt_buf);
                         } else
 #endif
-                            socket_thread_parse_messages(in_buf);
+                            socket_thread_parse_messages(stop, in_buf);
                     }
 
                     if (ev.events & EPOLLOUT) {
@@ -3734,6 +3741,9 @@ namespace tds {
 
         if (socket_thread_exc)
             rethrow_exception(socket_thread_exc);
+
+        if (tds.rate_limit != 0)
+            rate_limit_cv.notify_one();
 
         type = m.type;
         payload.swap(m.payload);
