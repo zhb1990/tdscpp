@@ -3251,14 +3251,15 @@ namespace tds {
 
                 received_loginack = false;
 
-                while (!tokens.empty()) {
-                    auto t = move(tokens.front());
+                vector<uint8_t> t;
 
+                while (!tokens.empty()) {
+                    t.swap(tokens.front());
                     tokens.pop_front();
 
                     auto type = (token)t[0];
 
-                    auto sp = span(t).subspan(1);
+                    auto sp = span<const uint8_t>(t).subspan(1);
 
                     switch (type) {
                         case token::DONE:
