@@ -3699,7 +3699,12 @@ namespace tds {
             mess_in_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc; });
 
             if (!socket_thread_exc) {
-                m = move(mess_list.front());
+                auto& m2 = mess_list.front();
+
+                m.type = m2.type;
+                m.payload.swap(m2.payload);
+                m.last_packet = m2.last_packet;
+
                 mess_list.pop_front();
             }
         }
