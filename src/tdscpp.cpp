@@ -46,56 +46,49 @@ using namespace std;
 
 static const uint32_t tds_74_version = 0x4000074;
 
-static constexpr size_t fixed_len_size(enum tds::sql_type type) {
-    switch (type) {
-        case tds::sql_type::TINYINT:
-        case tds::sql_type::BIT:
-            return 1;
-
-        case tds::sql_type::SMALLINT:
-            return 2;
-
-        case tds::sql_type::INT:
-        case tds::sql_type::DATETIM4:
-        case tds::sql_type::SMALLMONEY:
-        case tds::sql_type::REAL:
-            return 4;
-
-        case tds::sql_type::BIGINT:
-        case tds::sql_type::DATETIME:
-        case tds::sql_type::MONEY:
-        case tds::sql_type::FLOAT:
-            return 8;
-
-        default:
-            return 0;
-    }
-}
-
 static bool parse_row_col(enum tds::sql_type type, unsigned int max_length, span<const uint8_t>& sp) {
     switch (type) {
-        case tds::sql_type::SQL_NULL:
         case tds::sql_type::TINYINT:
         case tds::sql_type::BIT:
-        case tds::sql_type::SMALLINT:
-        case tds::sql_type::INT:
-        case tds::sql_type::DATETIM4:
-        case tds::sql_type::REAL:
-        case tds::sql_type::MONEY:
-        case tds::sql_type::DATETIME:
-        case tds::sql_type::FLOAT:
-        case tds::sql_type::SMALLMONEY:
-        case tds::sql_type::BIGINT:
-        {
-            auto len = fixed_len_size(type);
-
-            if (sp.size() < len)
+            if (sp.empty())
                 return false;
 
-            sp = sp.subspan(len);
+            sp = sp.subspan(1);
 
             break;
-        }
+
+        case tds::sql_type::SMALLINT:
+            if (sp.size() < 2)
+                return false;
+
+            sp = sp.subspan(2);
+
+            break;
+
+        case tds::sql_type::INT:
+        case tds::sql_type::DATETIM4:
+        case tds::sql_type::SMALLMONEY:
+        case tds::sql_type::REAL:
+            if (sp.size() < 4)
+                return false;
+
+            sp = sp.subspan(4);
+
+            break;
+
+        case tds::sql_type::BIGINT:
+        case tds::sql_type::DATETIME:
+        case tds::sql_type::MONEY:
+        case tds::sql_type::FLOAT:
+            if (sp.size() < 8)
+                return false;
+
+            sp = sp.subspan(8);
+
+            break;
+
+        case tds::sql_type::SQL_NULL:
+            break;
 
         case tds::sql_type::UNIQUEIDENTIFIER:
         case tds::sql_type::INTN:
@@ -3871,19 +3864,31 @@ namespace tds {
 
         for (const auto& p : params) {
             switch (p.type) {
-                case sql_type::SQL_NULL:
                 case sql_type::TINYINT:
                 case sql_type::BIT:
+                    bufsize += sizeof(tds_param_header) + 1;
+                    break;
+
                 case sql_type::SMALLINT:
+                    bufsize += sizeof(tds_param_header) + 2;
+                    break;
+
                 case sql_type::INT:
                 case sql_type::DATETIM4:
-                case sql_type::REAL:
-                case sql_type::MONEY:
-                case sql_type::DATETIME:
-                case sql_type::FLOAT:
                 case sql_type::SMALLMONEY:
+                case sql_type::REAL:
+                    bufsize += sizeof(tds_param_header) + 4;
+                    break;
+
                 case sql_type::BIGINT:
-                    bufsize += sizeof(tds_param_header) + fixed_len_size(p.type);
+                case sql_type::DATETIME:
+                case sql_type::MONEY:
+                case sql_type::FLOAT:
+                    bufsize += sizeof(tds_param_header) + 8;
+                    break;
+
+                case sql_type::SQL_NULL:
+                    bufsize += sizeof(tds_param_header);
                     break;
 
                 case sql_type::DATETIMN:
