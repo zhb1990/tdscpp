@@ -6190,6 +6190,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         return cols[i];
     }
 
+    column& rpc::operator[](uint16_t i) {
+        return cols[i];
+    }
+
     uint16_t tds::spid() const {
         return impl->spid;
     }
