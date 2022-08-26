@@ -891,30 +891,56 @@ unsigned int coll_to_cp(const tds::collation& coll) {
 static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_type type,
                            unsigned int max_length, span<const uint8_t>& sp) {
     switch (type) {
-        case tds::sql_type::SQL_NULL:
         case tds::sql_type::TINYINT:
         case tds::sql_type::BIT:
-        case tds::sql_type::SMALLINT:
-        case tds::sql_type::INT:
-        case tds::sql_type::DATETIM4:
-        case tds::sql_type::REAL:
-        case tds::sql_type::MONEY:
-        case tds::sql_type::DATETIME:
-        case tds::sql_type::FLOAT:
-        case tds::sql_type::SMALLMONEY:
-        case tds::sql_type::BIGINT:
-        {
-            auto len = fixed_len_size(type);
+            if (sp.empty())
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 1).", sp.size());
 
-            if (sp.size() < len)
-                throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), len);
+            val.assign(sp.data(), sp.data() + 1);
 
-            val.assign(sp.data(), sp.data() + len);
-
-            sp = sp.subspan(len);
+            sp = sp.subspan(1);
 
             break;
-        }
+
+        case tds::sql_type::SMALLINT:
+            if (sp.size() < 2)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 2).", sp.size());
+
+            val.assign(sp.data(), sp.data() + 2);
+
+            sp = sp.subspan(2);
+
+            break;
+
+        case tds::sql_type::INT:
+        case tds::sql_type::DATETIM4:
+        case tds::sql_type::SMALLMONEY:
+        case tds::sql_type::REAL:
+            if (sp.size() < 4)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 4).", sp.size());
+
+            val.assign(sp.data(), sp.data() + 4);
+
+            sp = sp.subspan(4);
+
+            break;
+
+        case tds::sql_type::BIGINT:
+        case tds::sql_type::DATETIME:
+        case tds::sql_type::MONEY:
+        case tds::sql_type::FLOAT:
+            if (sp.size() < 8)
+                throw formatted_error("Short ROW message ({} bytes left, expected at least 8).", sp.size());
+
+            val.assign(sp.data(), sp.data() + 8);
+
+            sp = sp.subspan(8);
+
+            break;
+
+        case tds::sql_type::SQL_NULL:
+            val.clear();
+            break;
 
         case tds::sql_type::UNIQUEIDENTIFIER:
         case tds::sql_type::INTN:
