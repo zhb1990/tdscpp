@@ -1616,6 +1616,7 @@ namespace tds {
 
         uint16_t num_columns() const;
         const column& operator[](uint16_t i) const;
+        column& operator[](uint16_t i);
         bool fetch_row();
 
     private:

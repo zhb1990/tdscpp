@@ -5777,6 +5777,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         return impl->cols[i];
     }
 
+    column& batch::operator[](uint16_t i) {
+        return impl->cols[i];
+    }
+
     void tds_impl::handle_envchange_msg(span<const uint8_t> sp) {
         auto ec = (tds_envchange*)(sp.data() - offsetof(tds_envchange, type));
 
