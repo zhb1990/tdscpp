@@ -46,43 +46,26 @@ using namespace std;
 
 static const uint32_t tds_74_version = 0x4000074;
 
-static size_t fixed_len_size(enum tds::sql_type type) {
+static constexpr size_t fixed_len_size(enum tds::sql_type type) {
     switch (type) {
         case tds::sql_type::TINYINT:
+        case tds::sql_type::BIT:
             return 1;
 
         case tds::sql_type::SMALLINT:
             return 2;
 
         case tds::sql_type::INT:
-            return 4;
-
-        case tds::sql_type::BIGINT:
-            return 8;
-
-        case tds::sql_type::DATETIME:
-            return 8;
-
         case tds::sql_type::DATETIM4:
-            return 4;
-
         case tds::sql_type::SMALLMONEY:
-            return 4;
-
-        case tds::sql_type::MONEY:
-            return 8;
-
         case tds::sql_type::REAL:
             return 4;
 
+        case tds::sql_type::BIGINT:
+        case tds::sql_type::DATETIME:
+        case tds::sql_type::MONEY:
         case tds::sql_type::FLOAT:
             return 8;
-
-        case tds::sql_type::BIT:
-            return 1;
-
-        case tds::sql_type::SQL_NULL:
-            return 0;
 
         default:
             return 0;
