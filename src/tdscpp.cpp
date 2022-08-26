@@ -4147,7 +4147,7 @@ namespace tds {
 
                         ptr += sizeof(tds_VARCHAR_param) - sizeof(tds_param_header);
 
-                        if (!p.is_null) {
+                        if (!p.is_null && h2->length > 0) {
                             memcpy(ptr, p.val.data(), h2->length);
                             ptr += h2->length;
                         }
