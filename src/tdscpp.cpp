@@ -4992,10 +4992,6 @@ namespace tds {
         return (uint16_t)r2->cols.size();
     }
 
-    const column& query::operator[](uint16_t i) const {
-        return r2->cols[i];
-    }
-
     bool query::fetch_row() {
         return r2->fetch_row();
     }

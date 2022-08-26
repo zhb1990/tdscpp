@@ -1494,7 +1494,9 @@ namespace tds {
 
         uint16_t num_columns() const;
 
-        const column& operator[](uint16_t i) const;
+        const column& operator[](uint16_t i) const {
+            return r2->operator[](i);
+        }
 
         bool fetch_row();
         bool fetch_row_no_wait();
