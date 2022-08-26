@@ -909,9 +909,7 @@ static void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_
             if (sp.size() < len)
                 throw formatted_error("Short ROW message ({} bytes left, expected at least {}).", sp.size(), len);
 
-            val.resize(len);
-
-            memcpy(val.data(), sp.data(), len);
+            val.assign(sp.data(), sp.data() + len);
 
             sp = sp.subspan(len);
 
