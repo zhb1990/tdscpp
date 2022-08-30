@@ -598,7 +598,6 @@ namespace tds {
 #if defined(WITH_OPENSSL) || defined(_WIN32)
     class tds_ssl;
 #endif
-    class smp_session;
 
     struct mess {
         enum tds_msg type;

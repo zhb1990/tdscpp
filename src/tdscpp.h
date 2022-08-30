@@ -1670,6 +1670,17 @@ namespace tds {
         bool committed = false;
     };
 
+    class smp_session;
+
+    class TDSCPP session {
+    public:
+        session(tds& conn);
+        ~session();
+
+    private:
+        std::unique_ptr<smp_session> impl;
+    };
+
     void TDSCPP to_json(nlohmann::json& j, const value& v);
 
     static void __inline to_json(nlohmann::json& j, const column& c) {

@@ -2480,6 +2480,13 @@ namespace tds {
                 if (!mars_sess)
                     throw runtime_error("SMP message received in non-MARS session.");
 
+                if (smp.flags == smp_message_type::FIN) { // ignore FIN acknowledgements
+                    if (in_buf.size() >= smp.length)
+                        in_buf.discard(smp.length);
+
+                    return;
+                }
+
                 if (mars_sess->sid != smp.sid)
                     throw formatted_error("SMP message for SID {} received, expected {}.", mars_sess->sid, smp.sid);
 
@@ -6353,6 +6360,17 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         }
 
         committed = true;
+    }
+
+    session::session(tds& conn) {
+        if (!conn.impl->mars)
+            throw runtime_error("Cannot create session unless MARS is in use.");
+
+        impl = make_unique<smp_session>(*conn.impl.get());
+    }
+
+    session::~session() {
+        // defined so that unique_ptr destructor gets called
     }
 
     void TDSCPP to_json(nlohmann::json& j, const value& v) {
