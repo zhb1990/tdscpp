@@ -608,9 +608,9 @@ namespace tds {
 
     class tds_impl;
 
-    class session {
+    class main_session {
     public:
-        session(tds_impl& tds) : tds(tds) { }
+        main_session(tds_impl& tds) : tds(tds) { }
 
         void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
@@ -697,7 +697,7 @@ namespace tds {
         std::mutex mars_lock;
         uint16_t last_sid = 0;
         event mess_event;
-        session sess{*this};
+        main_session sess{*this};
         std::mutex mess_out_lock;
         std::vector<uint8_t> mess_out_buf;
         unsigned int rate_limit;

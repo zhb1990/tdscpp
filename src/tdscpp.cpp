@@ -3823,9 +3823,9 @@ namespace tds {
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-    void session::send_raw(span<const uint8_t> buf, bool do_ssl)
+    void main_session::send_raw(span<const uint8_t> buf, bool do_ssl)
 #else
-    void session::send_raw(span<const uint8_t> buf)
+    void main_session::send_raw(span<const uint8_t> buf)
 #endif
     {
         lock_guard lg(tds.mess_out_lock);
@@ -3847,9 +3847,9 @@ namespace tds {
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
-    void session::send_msg(enum tds_msg type, span<const uint8_t> msg, bool do_ssl)
+    void main_session::send_msg(enum tds_msg type, span<const uint8_t> msg, bool do_ssl)
 #else
-    void session::send_msg(enum tds_msg type, span<const uint8_t> msg)
+    void main_session::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
         while (!msg.empty()) {
@@ -3880,7 +3880,7 @@ namespace tds {
         }
     }
 
-    void session::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
+    void main_session::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
         mess m;
 
         {
