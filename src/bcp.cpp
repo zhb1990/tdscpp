@@ -1508,12 +1508,19 @@ namespace tds {
     }
 
     void tds::bcp_sendmsg(span<const uint8_t> data) {
-        impl->sess.send_msg(tds_msg::bulk_load_data, data);
+        if (impl->mars_sess)
+            impl->mars_sess->send_msg(tds_msg::bulk_load_data, data);
+        else
+            impl->sess.send_msg(tds_msg::bulk_load_data, data);
 
         enum tds_msg type;
         vector<uint8_t> payload;
 
-        impl->sess.wait_for_msg(type, payload);
+        if (impl->mars_sess)
+            impl->mars_sess->wait_for_msg(type, payload);
+        else
+            impl->sess.wait_for_msg(type, payload);
+
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
