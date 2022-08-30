@@ -687,6 +687,8 @@ namespace tds {
         bool check_certificate;
         bool mars = false;
         std::unique_ptr<smp_session> mars_sess;
+        std::mutex mars_lock;
+        uint16_t last_sid = 0;
         event mess_event;
         session sess{*this};
         std::mutex mess_out_lock;
@@ -756,6 +758,7 @@ namespace tds {
 
         tds_impl& impl;
         uint32_t seqnum = 1;
+        uint16_t sid;
     };
 };
 

@@ -2780,14 +2780,20 @@ namespace tds {
 
         h.smid = 0x53;
         h.flags = 0x01; // SYN
-        h.sid = 0; // FIXME
         h.length = sizeof(smp_header);
         h.seqnum = 0;
         h.wndw = 4; // FIXME?
 
         auto sp = span((const uint8_t*)&h, sizeof(smp_header));
 
-        impl.sess.send_raw(sp);
+        {
+            lock_guard lg(impl.mars_lock);
+
+            h.sid = sid = impl.last_sid;
+            impl.last_sid++;
+
+            impl.sess.send_raw(sp);
+        }
     }
 
     void smp_session::send_msg(enum tds_msg type, span<const uint8_t> msg) {
@@ -2803,7 +2809,7 @@ namespace tds {
 
             h1.smid = 0x53;
             h1.flags = 0x08; // DATA
-            h1.sid = 0; // FIXME
+            h1.sid = sid;
             h1.length = (uint32_t)(sizeof(smp_header) + sizeof(tds_header) + to_send);
             h1.seqnum = seqnum;
             h1.wndw = 4; // FIXME?
