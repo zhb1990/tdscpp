@@ -2836,6 +2836,24 @@ namespace tds {
         }
     }
 
+    smp_session::~smp_session() {
+        try {
+            smp_header h;
+
+            h.smid = 0x53;
+            h.flags = smp_message_type::FIN;
+            h.sid = sid;
+            h.length = sizeof(smp_header);
+            h.seqnum = seqnum - 1;
+            h.wndw = recv_wndw;
+
+            auto sp = span((const uint8_t*)&h, sizeof(smp_header));
+
+            impl.sess.send_raw(sp);
+        } catch (...) {
+        }
+    }
+
     void smp_session::send_msg(enum tds_msg type, span<const uint8_t> msg) {
         vector<uint8_t> buf;
 

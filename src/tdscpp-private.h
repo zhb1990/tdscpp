@@ -761,6 +761,7 @@ namespace tds {
     class smp_session {
     public:
         smp_session(tds_impl& impl);
+        ~smp_session();
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
         void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
         void parse_message(std::stop_token stop, std::span<const uint8_t> msg);
