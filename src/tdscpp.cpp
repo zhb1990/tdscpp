@@ -2392,6 +2392,15 @@ namespace tds {
             }
 
             sess.mess_in_cv.notify_all();
+
+            if (mars_sess) {
+                {
+                    lock_guard lg(mars_sess->mess_in_lock);
+                    mars_sess->socket_thread_exc = current_exception();
+                }
+
+                mars_sess->mess_in_cv.notify_all();
+            }
         }
     }
 
@@ -2460,43 +2469,71 @@ namespace tds {
 
             in_buf.peek(span((uint8_t*)&h, sizeof(tds_header)));
 
-            auto len = htons(h.length);
+            if ((uint8_t)h.type == 0x53) {
+                if (in_buf.size() < sizeof(smp_header))
+                    return;
 
-            if (len < sizeof(tds_header))
-                throw formatted_error("message length was {}, expected at least {}", len, sizeof(tds_header));
+                smp_header smp;
 
-            if (in_buf.size() < len)
-                return;
+                in_buf.peek(span((uint8_t*)&smp, sizeof(smp_header)));
 
-            in_buf.discard(sizeof(tds_header));
+                if (!mars_sess)
+                    throw runtime_error("SMP message received in non-MARS session.");
 
-            mess m;
+                if (mars_sess->sid != smp.sid)
+                    throw formatted_error("SMP message for SID {} received, expected {}.", mars_sess->sid, smp.sid);
 
-            m.type = h.type;
+                if (smp.length < sizeof(smp_header))
+                    throw formatted_error("SMP message length was {}, expected at least {}", smp.length, sizeof(smp_header));
 
-            if (len >= sizeof(tds_header)) {
-                m.payload.resize(len - sizeof(tds_header));
-                in_buf.read(m.payload);
-            }
+                if (in_buf.size() < smp.length)
+                    return;
 
-            m.last_packet = h.status & 1;
+                vector<uint8_t> buf;
 
-            spid = htons(h.spid);
+                buf.resize(smp.length);
+                in_buf.read(buf);
 
-            {
-                unique_lock ul(sess.mess_in_lock);
+                mars_sess->parse_message(stop, buf);
+            } else {
+                auto len = htons(h.length);
 
-                if (rate_limit != 0) {
-                    sess.rate_limit_cv.wait(ul, stop, [&]() { return sess.mess_list.size() < rate_limit; });
+                if (len < sizeof(tds_header))
+                    throw formatted_error("message length was {}, expected at least {}", len, sizeof(tds_header));
 
-                    if (stop.stop_requested())
-                        return;
+                if (in_buf.size() < len)
+                    return;
+
+                in_buf.discard(sizeof(tds_header));
+
+                mess m;
+
+                m.type = h.type;
+
+                if (len >= sizeof(tds_header)) {
+                    m.payload.resize(len - sizeof(tds_header));
+                    in_buf.read(m.payload);
                 }
 
-                sess.mess_list.emplace_back(move(m));
-            }
+                m.last_packet = h.status & 1;
 
-            sess.mess_in_cv.notify_one();
+                spid = htons(h.spid);
+
+                {
+                    unique_lock ul(sess.mess_in_lock);
+
+                    if (rate_limit != 0) {
+                        sess.rate_limit_cv.wait(ul, stop, [&]() { return sess.mess_list.size() < rate_limit; });
+
+                        if (stop.stop_requested())
+                            return;
+                    }
+
+                    sess.mess_list.emplace_back(move(m));
+                }
+
+                sess.mess_in_cv.notify_one();
+            }
         }
     }
 
@@ -2779,7 +2816,7 @@ namespace tds {
         smp_header h;
 
         h.smid = 0x53;
-        h.flags = 0x01; // SYN
+        h.flags = smp_message_type::SYN;
         h.length = sizeof(smp_header);
         h.seqnum = 0;
         h.wndw = 4; // FIXME?
@@ -2808,7 +2845,7 @@ namespace tds {
             auto& h1 = *(smp_header*)buf.data();
 
             h1.smid = 0x53;
-            h1.flags = 0x08; // DATA
+            h1.flags = smp_message_type::DATA;
             h1.sid = sid;
             h1.length = (uint32_t)(sizeof(smp_header) + sizeof(tds_header) + to_send);
             h1.seqnum = seqnum;
@@ -2830,6 +2867,92 @@ namespace tds {
             impl.sess.send_raw(buf);
 
             msg = msg.subspan(to_send);
+        }
+    }
+
+    void smp_session::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
+        mess m;
+
+        {
+            unique_lock ul(mess_in_lock);
+
+            mess_in_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc; });
+
+            if (!socket_thread_exc) {
+                auto& m2 = mess_list.front();
+
+                m.type = m2.type;
+                m.payload.swap(m2.payload);
+                m.last_packet = m2.last_packet;
+
+                mess_list.pop_front();
+            }
+        }
+
+        if (socket_thread_exc)
+            rethrow_exception(socket_thread_exc);
+
+        if (impl.rate_limit != 0)
+            rate_limit_cv.notify_one();
+
+        type = m.type;
+        payload.swap(m.payload);
+
+        if (last_packet)
+            *last_packet = m.last_packet;
+    }
+
+    void smp_session::parse_message(stop_token stop, span<const uint8_t> msg) {
+        auto& s = *(smp_header*)msg.data();
+
+        switch (s.flags) {
+            case smp_message_type::ACK:
+                throw runtime_error("FIXME - handle SMP ACK message");
+
+            case smp_message_type::DATA: {
+                if (msg.size() < sizeof(smp_header) + sizeof(tds_header))
+                    throw formatted_error("SMP DATA message was {} bytes, expected at least {}.", msg.size(), sizeof(smp_header) + sizeof(tds_header));
+
+                auto& h = *(tds_header*)(msg.data() + sizeof(smp_header));
+
+                auto len = htons(h.length);
+
+                if (len < sizeof(tds_header))
+                    throw formatted_error("message length was {}, expected at least {}", len, sizeof(tds_header));
+
+                mess m;
+
+                m.type = h.type;
+
+                if (len >= sizeof(tds_header)) {
+                    m.payload.assign(msg.data() + sizeof(smp_header) + sizeof(tds_header),
+                                     msg.data() + sizeof(smp_header) + len);
+                }
+
+                m.last_packet = h.status & 1;
+
+                // FIXME - do SMP sessions have separate SPIDs?
+
+                {
+                    unique_lock ul(mess_in_lock);
+
+                    if (impl.rate_limit != 0) {
+                        rate_limit_cv.wait(ul, stop, [&]() { return mess_list.size() < impl.rate_limit; });
+
+                        if (stop.stop_requested())
+                            return;
+                    }
+
+                    mess_list.emplace_back(move(m));
+                }
+
+                mess_in_cv.notify_one();
+
+                break;
+            }
+
+            default:
+                throw formatted_error("Server sent unexpected SMP message type {:02x}.", (uint8_t)s.flags);
         }
     }
 
@@ -4391,7 +4514,11 @@ namespace tds {
                 enum tds_msg type;
                 vector<uint8_t> payload;
 
-                conn.impl->sess.wait_for_msg(type, payload);
+                if (conn.impl->mars_sess)
+                    conn.impl->mars_sess->wait_for_msg(type, payload);
+                else
+                    conn.impl->sess.wait_for_msg(type, payload);
+
                 // FIXME - timeout
 
                 if (type != tds_msg::tabular_result)
@@ -4471,7 +4598,11 @@ namespace tds {
         vector<uint8_t> payload;
         bool last_packet;
 
-        conn.impl->sess.wait_for_msg(type, payload, &last_packet);
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->wait_for_msg(type, payload, &last_packet);
+        else
+            conn.impl->sess.wait_for_msg(type, payload, &last_packet);
+
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -5327,7 +5458,11 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 enum tds_msg type;
                 vector<uint8_t> payload;
 
-                conn.impl->sess.wait_for_msg(type, payload);
+                if (conn.impl->mars_sess)
+                    conn.impl->mars_sess->wait_for_msg(type, payload);
+                else
+                    conn.impl->sess.wait_for_msg(type, payload);
+
                 // FIXME - timeout
 
                 if (type != tds_msg::tabular_result)
@@ -5370,7 +5505,11 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         vector<uint8_t> payload;
         bool last_packet;
 
-        conn.impl->sess.wait_for_msg(type, payload, &last_packet);
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->wait_for_msg(type, payload, &last_packet);
+        else
+            conn.impl->sess.wait_for_msg(type, payload, &last_packet);
+
         // FIXME - timeout
 
         if (type != tds_msg::tabular_result)
@@ -5926,7 +6065,11 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         vector<uint8_t> payload;
 
         // FIXME - timeout
-        conn.impl->sess.wait_for_msg(type, payload);
+
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->wait_for_msg(type, payload);
+        else
+            conn.impl->sess.wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);
@@ -6011,7 +6154,11 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             vector<uint8_t> payload;
 
             // FIXME - timeout
-            conn.impl->sess.wait_for_msg(type, payload);
+
+            if (conn.impl->mars_sess)
+                conn.impl->mars_sess->wait_for_msg(type, payload);
+            else
+                conn.impl->sess.wait_for_msg(type, payload);
 
             if (type != tds_msg::tabular_result)
                 throw formatted_error("Received message type {}, expected tabular_result", (int)type);
@@ -6101,7 +6248,11 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         vector<uint8_t> payload;
 
         // FIXME - timeout
-        conn.impl->sess.wait_for_msg(type, payload);
+
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->wait_for_msg(type, payload);
+        else
+            conn.impl->sess.wait_for_msg(type, payload);
 
         if (type != tds_msg::tabular_result)
             throw formatted_error("Received message type {}, expected tabular_result", (int)type);

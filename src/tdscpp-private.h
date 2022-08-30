@@ -421,9 +421,16 @@ enum class tds_feature : uint8_t {
     TERMINATOR = 0xff
 };
 
+enum class smp_message_type : uint8_t {
+    SYN = 0x01,
+    ACK = 0x02,
+    FIN = 0x04,
+    DATA = 0x08
+};
+
 struct smp_header {
     uint8_t smid;
-    uint8_t flags;
+    smp_message_type flags;
     uint16_t sid;
     uint32_t length;
     uint32_t seqnum;
@@ -755,10 +762,17 @@ namespace tds {
     public:
         smp_session(tds_impl& impl);
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
+        void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
+        void parse_message(std::stop_token stop, std::span<const uint8_t> msg);
 
         tds_impl& impl;
         uint32_t seqnum = 1;
         uint16_t sid;
+        std::condition_variable mess_in_cv;
+        std::mutex mess_in_lock;
+        std::list<mess> mess_list;
+        std::condition_variable_any rate_limit_cv;
+        std::exception_ptr socket_thread_exc;
     };
 };
 
