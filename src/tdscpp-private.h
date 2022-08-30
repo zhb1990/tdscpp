@@ -764,6 +764,7 @@ namespace tds {
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
         void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
         void parse_message(std::stop_token stop, std::span<const uint8_t> msg);
+        void send_ack();
 
         tds_impl& impl;
         uint32_t seqnum = 1;
@@ -773,6 +774,7 @@ namespace tds {
         std::list<mess> mess_list;
         std::condition_variable_any rate_limit_cv;
         std::exception_ptr socket_thread_exc;
+        uint32_t recv_wndw;
     };
 };
 

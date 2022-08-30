@@ -2815,11 +2815,14 @@ namespace tds {
     smp_session::smp_session(tds_impl& impl) : impl(impl) {
         smp_header h;
 
+        // FIXME - link this to rate_limit option
+        recv_wndw = 4;
+
         h.smid = 0x53;
         h.flags = smp_message_type::SYN;
         h.length = sizeof(smp_header);
         h.seqnum = 0;
-        h.wndw = 4; // FIXME?
+        h.wndw = recv_wndw;
 
         auto sp = span((const uint8_t*)&h, sizeof(smp_header));
 
@@ -2849,7 +2852,7 @@ namespace tds {
             h1.sid = sid;
             h1.length = (uint32_t)(sizeof(smp_header) + sizeof(tds_header) + to_send);
             h1.seqnum = seqnum;
-            h1.wndw = 4; // FIXME?
+            h1.wndw = recv_wndw;
 
             seqnum++;
 
@@ -2902,8 +2905,31 @@ namespace tds {
             *last_packet = m.last_packet;
     }
 
+    void smp_session::send_ack() {
+        smp_header h;
+
+        h.smid = 0x53;
+        h.flags = smp_message_type::ACK;
+        h.sid = sid;
+        h.length = sizeof(smp_header);
+        h.seqnum = seqnum - 1;
+        h.wndw = recv_wndw;
+
+        auto sp = span((const uint8_t*)&h, sizeof(smp_header));
+
+        impl.sess.send_raw(sp);
+    }
+
     void smp_session::parse_message(stop_token stop, span<const uint8_t> msg) {
         auto& s = *(smp_header*)msg.data();
+
+        // FIXME - honour server-side rate limiting
+
+        if (s.seqnum == recv_wndw) {
+            recv_wndw += 4;
+
+            send_ack();
+        }
 
         switch (s.flags) {
             case smp_message_type::ACK:
