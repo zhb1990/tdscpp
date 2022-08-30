@@ -2790,37 +2790,42 @@ namespace tds {
         impl.sess.send_raw(sp);
     }
 
-// #if defined(WITH_OPENSSL) || defined(_WIN32)
-//     void smp_session::send(span<const uint8_t> sp, bool do_ssl)
-// #else
-//     void smp_session::send(span<const uint8_t> sp)
-// #endif
-//     {
-//         smp_header h;
-//
-//         h.smid = 0x53;
-//         h.flags = 0x08; // DATA
-//         h.sid = 0; // FIXME
-//         h.length = (uint32_t)(sizeof(smp_header) + sp.size());
-//         h.seqnum = seqnum;
-//         h.wndw = 4; // FIXME?
-//
-//         seqnum++;
-//
-//         auto hsp = span((const uint8_t*)&h, sizeof(smp_header));
-//
-// #if defined(WITH_OPENSSL) || defined(_WIN32)
-//         if (do_ssl && impl.ssl) {
-//             impl.ssl->send(hsp);
-//             impl.ssl->send(sp);
-//         } else {
-// #endif
-//             impl.send_raw(hsp);
-//             impl.send_raw(sp);
-// #if defined(WITH_OPENSSL) || defined(_WIN32)
-//         }
-// #endif
-//     }
+    void smp_session::send_msg(enum tds_msg type, span<const uint8_t> msg) {
+        vector<uint8_t> buf;
+
+        while (!msg.empty()) {
+            size_t to_send = min(msg.size(), impl.packet_size - sizeof(tds_header));
+
+            buf.reserve(sizeof(smp_header) + sizeof(tds_header) + to_send);
+            buf.resize(sizeof(smp_header) + sizeof(tds_header));
+
+            auto& h1 = *(smp_header*)buf.data();
+
+            h1.smid = 0x53;
+            h1.flags = 0x08; // DATA
+            h1.sid = 0; // FIXME
+            h1.length = (uint32_t)(sizeof(smp_header) + sizeof(tds_header) + to_send);
+            h1.seqnum = seqnum;
+            h1.wndw = 4; // FIXME?
+
+            seqnum++;
+
+            auto& h2 = *(tds_header*)(buf.data() + sizeof(smp_header));
+
+            h2.type = type;
+            h2.status = to_send == msg.size() ? 1 : 0; // 1 == last message
+            h2.length = htons((uint16_t)(to_send + sizeof(tds_header)));
+            h2.spid = 0;
+            h2.packet_id = 0; // FIXME? "Currently ignored" according to spec
+            h2.window = 0;
+
+            buf.insert(buf.end(), msg.data(), msg.data() + to_send);
+
+            impl.sess.send_raw(buf);
+
+            msg = msg.subspan(to_send);
+        }
+    }
 
     tds_impl::~tds_impl() {
         if (t.joinable()) {
@@ -4348,7 +4353,10 @@ namespace tds {
             }
         }
 
-        conn.impl->sess.send_msg(tds_msg::rpc, buf);
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->send_msg(tds_msg::rpc, buf);
+        else
+            conn.impl->sess.send_msg(tds_msg::rpc, buf);
 
         wait_for_packet();
     }
@@ -4360,7 +4368,10 @@ namespace tds {
         try {
             received_attn = false;
 
-            conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
+            if (conn.impl->mars_sess)
+                conn.impl->mars_sess->send_msg(tds_msg::attention_signal, span<uint8_t>());
+            else
+                conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
 
             while (!finished) {
                 wait_for_packet();
@@ -5278,7 +5289,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
         memcpy(ptr, q.data(), q.length() * sizeof(char16_t));
 
-        conn.impl->sess.send_msg(tds_msg::sql_batch, buf);
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->send_msg(tds_msg::sql_batch, buf);
+        else
+            conn.impl->sess.send_msg(tds_msg::sql_batch, buf);
 
         wait_for_packet();
     }
@@ -5290,7 +5304,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         try {
             received_attn = false;
 
-            conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
+            if (conn.impl->mars_sess)
+                conn.impl->mars_sess->send_msg(tds_msg::attention_signal, span<uint8_t>());
+            else
+                conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
 
             while (!finished) {
                 wait_for_packet();
@@ -5894,7 +5911,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.isolation_level = 0;
         msg.name_len = 0;
 
-        conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+        else
+            conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         vector<uint8_t> payload;
@@ -5976,7 +5996,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             msg.name_len = 0;
             msg.flags = 0;
 
-            conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+            if (conn.impl->mars_sess)
+                conn.impl->mars_sess->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+            else
+                conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
             enum tds_msg type;
             vector<uint8_t> payload;
@@ -6063,7 +6086,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.name_len = 0;
         msg.flags = 0;
 
-        conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+        if (conn.impl->mars_sess)
+            conn.impl->mars_sess->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+        else
+            conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
 
         enum tds_msg type;
         vector<uint8_t> payload;
