@@ -3650,71 +3650,58 @@ namespace tds {
     }
 
 #if defined(WITH_OPENSSL) || defined(_WIN32)
+    void session::send_raw(span<const uint8_t> buf, bool do_ssl)
+#else
+    void session::send_raw(span<const uint8_t> buf)
+#endif
+    {
+        lock_guard lg(tds.mess_out_lock);
+
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        if (do_ssl && tds.ssl) {
+            auto enc = tds.ssl->enc(buf);
+
+            tds.mess_out_buf.insert(tds.mess_out_buf.end(), enc.begin(), enc.end());
+        } else {
+#endif
+            tds.mess_out_buf.insert(tds.mess_out_buf.end(), buf.begin(), buf.end());
+
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+        }
+#endif
+
+        tds.mess_event.set();
+    }
+
+#if defined(WITH_OPENSSL) || defined(_WIN32)
     void session::send_msg(enum tds_msg type, span<const uint8_t> msg, bool do_ssl)
 #else
     void session::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
-#if defined(WITH_OPENSSL) || defined(_WIN32)
-        if (do_ssl && tds.ssl) {
-            while (!msg.empty()) {
-                size_t to_send = min(msg.size(), tds.packet_size - sizeof(tds_header));
-
-                vector<uint8_t> buf;
-
-                buf.resize(to_send + sizeof(tds_header));
-
-                auto& h = *(tds_header*)buf.data();
-
-                h.type = type;
-                h.status = to_send == msg.size() ? 1 : 0; // 1 == last message
-                h.length = htons((uint16_t)(to_send + sizeof(tds_header)));
-                h.spid = 0;
-                h.packet_id = 0; // FIXME? "Currently ignored" according to spec
-                h.window = 0;
-
-                memcpy(buf.data() + sizeof(tds_header), msg.data(), to_send);
-
-                {
-                    lock_guard lg(tds.mess_out_lock);
-
-                    auto enc = tds.ssl->enc(buf);
-
-                    tds.mess_out_buf.insert(tds.mess_out_buf.end(), enc.begin(), enc.end());
-
-                    tds.mess_event.set();
-                }
-
-                msg = msg.subspan(to_send);
-            }
-
-            return;
-        }
-#endif
-
         while (!msg.empty()) {
             size_t to_send = min(msg.size(), tds.packet_size - sizeof(tds_header));
 
-            {
-                lock_guard lg(tds.mess_out_lock);
+            vector<uint8_t> buf;
 
-                auto old_size = tds.mess_out_buf.size();
+            buf.resize(to_send + sizeof(tds_header));
 
-                tds.mess_out_buf.resize(old_size + sizeof(tds_header) + to_send);
+            auto& h = *(tds_header*)buf.data();
 
-                auto& h = *(tds_header*)(tds.mess_out_buf.data() + old_size);
+            h.type = type;
+            h.status = to_send == msg.size() ? 1 : 0; // 1 == last message
+            h.length = htons((uint16_t)(to_send + sizeof(tds_header)));
+            h.spid = 0;
+            h.packet_id = 0; // FIXME? "Currently ignored" according to spec
+            h.window = 0;
 
-                h.type = type;
-                h.status = to_send == msg.size() ? 1 : 0; // 1 == last message
-                h.length = htons((uint16_t)(to_send + sizeof(tds_header)));
-                h.spid = 0;
-                h.packet_id = 0; // FIXME? "Currently ignored" according to spec
-                h.window = 0;
+            memcpy(buf.data() + sizeof(tds_header), msg.data(), to_send);
 
-                memcpy(tds.mess_out_buf.data() + old_size + sizeof(tds_header), msg.data(), to_send);
-
-                tds.mess_event.set();
-            }
+#if defined(WITH_OPENSSL) || defined(_WIN32)
+            send_raw(buf, do_ssl);
+#else
+            send_raw(buf);
+#endif
 
             msg = msg.subspan(to_send);
         }

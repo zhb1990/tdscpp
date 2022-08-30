@@ -608,8 +608,10 @@ namespace tds {
         void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg, bool do_ssl = true);
+        void send_raw(std::span<const uint8_t> msg, bool do_ssl = true);
 #else
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
+        void send_raw(std::span<const uint8_t> msg);
 #endif
 
         tds_impl& tds;
