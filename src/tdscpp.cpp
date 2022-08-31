@@ -2394,12 +2394,18 @@ namespace tds {
             sess.mess_in_cv.notify_all();
 
             if (mars_sess) {
-                {
-                    lock_guard lg(mars_sess->mess_in_lock);
-                    mars_sess->socket_thread_exc = current_exception();
-                }
+                lock_guard lg(mars_lock);
 
-                mars_sess->mess_in_cv.notify_all();
+                for (auto& sess_rw : mars_list) {
+                    auto& sess = sess_rw.get();
+
+                    {
+                        lock_guard lg(sess.mess_in_lock);
+                        sess.socket_thread_exc = current_exception();
+                    }
+
+                    sess.mess_in_cv.notify_all();
+                }
             }
         }
     }
@@ -2487,9 +2493,6 @@ namespace tds {
                     return;
                 }
 
-                if (mars_sess->sid != smp.sid)
-                    throw formatted_error("SMP message for SID {} received, expected {}.", mars_sess->sid, smp.sid);
-
                 if (smp.length < sizeof(smp_header))
                     throw formatted_error("SMP message length was {}, expected at least {}", smp.length, sizeof(smp_header));
 
@@ -2501,7 +2504,18 @@ namespace tds {
                 buf.resize(smp.length);
                 in_buf.read(buf);
 
-                mars_sess->parse_message(stop, buf);
+                {
+                    lock_guard lg(mars_lock);
+
+                    for (auto& sess_rw : mars_list) {
+                        auto& sess = sess_rw.get();
+
+                        if (sess.sid == smp.sid) {
+                            sess.parse_message(stop, buf);
+                            break;
+                        }
+                    }
+                }
             } else {
                 auto len = htons(h.length);
 
@@ -2840,10 +2854,25 @@ namespace tds {
             impl.last_sid++;
 
             impl.sess.send_raw(sp);
+
+            impl.mars_list.emplace_back(*this);
         }
     }
 
     smp_session::~smp_session() {
+        {
+            lock_guard lg(impl.mars_lock);
+
+            for (auto it = impl.mars_list.begin(); it != impl.mars_list.end(); it++) {
+                auto& sess = it->get();
+
+                if (&sess == this) {
+                    impl.mars_list.erase(it);
+                    break;
+                }
+            }
+        }
+
         try {
             smp_header h;
 
@@ -5454,6 +5483,10 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         impl = new batch_impl(conn, q);
     }
 
+    void batch::do_batch(session& sess, u16string_view q) {
+        impl = new batch_impl(sess, q);
+    }
+
     batch::~batch() {
         delete impl;
     }
@@ -5485,6 +5518,32 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         wait_for_packet();
     }
 
+    batch_impl::batch_impl(session& sess, u16string_view q) : conn(sess.conn) {
+        size_t bufsize;
+
+        this->sess.emplace(*sess.impl.get());
+
+        bufsize = sizeof(tds_all_headers) + (q.length() * sizeof(uint16_t));
+
+        vector<uint8_t> buf(bufsize);
+
+        auto all_headers = (tds_all_headers*)&buf[0];
+
+        all_headers->total_size = sizeof(tds_all_headers);
+        all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
+        all_headers->trans_desc.type = 2; // transaction descriptor
+        all_headers->trans_desc.descriptor = conn.impl->trans_id;
+        all_headers->trans_desc.outstanding = 1;
+
+        auto ptr = (char16_t*)&all_headers[1];
+
+        memcpy(ptr, q.data(), q.length() * sizeof(char16_t));
+
+        sess.impl->send_msg(tds_msg::sql_batch, buf);
+
+        wait_for_packet();
+    }
+
     batch_impl::~batch_impl() {
         if (finished)
             return;
@@ -5492,7 +5551,9 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         try {
             received_attn = false;
 
-            if (conn.impl->mars_sess)
+            if (sess)
+                sess.value().get().send_msg(tds_msg::attention_signal, span<uint8_t>());
+            else if (conn.impl->mars_sess)
                 conn.impl->mars_sess->send_msg(tds_msg::attention_signal, span<uint8_t>());
             else
                 conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
@@ -5509,7 +5570,9 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 enum tds_msg type;
                 vector<uint8_t> payload;
 
-                if (conn.impl->mars_sess)
+                if (sess)
+                    sess.value().get().wait_for_msg(type, payload);
+                else if (conn.impl->mars_sess)
                     conn.impl->mars_sess->wait_for_msg(type, payload);
                 else
                     conn.impl->sess.wait_for_msg(type, payload);
@@ -5556,7 +5619,9 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         vector<uint8_t> payload;
         bool last_packet;
 
-        if (conn.impl->mars_sess)
+        if (sess)
+            sess.value().get().wait_for_msg(type, payload, &last_packet);
+        else if (conn.impl->mars_sess)
             conn.impl->mars_sess->wait_for_msg(type, payload, &last_packet);
         else
             conn.impl->sess.wait_for_msg(type, payload, &last_packet);
@@ -6362,7 +6427,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         committed = true;
     }
 
-    session::session(tds& conn) {
+    session::session(tds& conn) : conn(conn) {
         if (!conn.impl->mars)
             throw runtime_error("Cannot create session unless MARS is in use.");
 

@@ -692,8 +692,9 @@ namespace tds {
         encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
         bool mars = false;
-        std::unique_ptr<smp_session> mars_sess;
         std::mutex mars_lock;
+        std::list<std::reference_wrapper<smp_session>> mars_list;
+        std::unique_ptr<smp_session> mars_sess;
         uint16_t last_sid = 0;
         event mess_event;
         main_session sess{*this};
@@ -743,6 +744,7 @@ namespace tds {
     class batch_impl {
     public:
         batch_impl(tds& conn, std::u16string_view q);
+        batch_impl(session& sess, std::u16string_view q);
         ~batch_impl();
 
         bool fetch_row();
@@ -752,6 +754,7 @@ namespace tds {
         bool finished = false, received_attn = false;
         std::list<std::vector<std::pair<value_data_t, bool>>> rows;
         tds& conn;
+        std::optional<std::reference_wrapper<smp_session>> sess;
         std::list<std::vector<uint8_t>> tokens;
         std::vector<uint8_t> buf;
         std::vector<column> buf_columns;

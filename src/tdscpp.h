@@ -1593,6 +1593,17 @@ namespace tds {
 
     class batch_impl;
 
+    class smp_session;
+
+    class TDSCPP session {
+    public:
+        session(tds& conn);
+        ~session();
+
+        tds& conn;
+        std::unique_ptr<smp_session> impl;
+    };
+
     class TDSCPP batch {
     public:
         batch(tds& conn, std::type_identity_t<checker<char, 0>> q) {
@@ -1617,6 +1628,28 @@ namespace tds {
                 do_batch(conn, q.sv);
         }
 
+        batch(session& sess, std::type_identity_t<checker<char, 0>> q) {
+            do_batch(sess, cp_to_utf16(q.sv, sess.conn.codepage));
+        }
+
+        batch(session& sess, std::type_identity_t<checker<char8_t, 0>> q) {
+            do_batch(sess, utf8_to_utf16(q.sv));
+        }
+
+        batch(session& sess, std::type_identity_t<checker<char16_t, 0>> q) {
+            do_batch(sess, q.sv);
+        }
+
+        template<typename T>
+        batch(session& sess, no_check<T> q) {
+            if constexpr (std::is_same_v<T, char>)
+                do_batch(sess, cp_to_utf16(q.sv, sess.conn.codepage));
+            else if constexpr (std::is_same_v<T, char8_t>)
+                do_batch(sess, utf8_to_utf16(q.sv));
+            else
+                do_batch(sess, q.sv);
+        }
+
         ~batch();
 
         uint16_t num_columns() const;
@@ -1626,6 +1659,7 @@ namespace tds {
 
     private:
         void do_batch(tds& conn, std::u16string_view q);
+        void do_batch(session& sess, std::u16string_view q);
 
         batch_impl* impl;
     };
@@ -1668,17 +1702,6 @@ namespace tds {
     private:
         tds& conn;
         bool committed = false;
-    };
-
-    class smp_session;
-
-    class TDSCPP session {
-    public:
-        session(tds& conn);
-        ~session();
-
-    private:
-        std::unique_ptr<smp_session> impl;
     };
 
     void TDSCPP to_json(nlohmann::json& j, const value& v);
