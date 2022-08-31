@@ -2490,7 +2490,7 @@ namespace tds {
                     if (in_buf.size() >= smp.length)
                         in_buf.discard(smp.length);
 
-                    return;
+                    continue;
                 }
 
                 if (smp.length < sizeof(smp_header))
