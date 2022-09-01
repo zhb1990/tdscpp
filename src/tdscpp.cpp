@@ -2833,7 +2833,7 @@ namespace tds {
 #endif
     }
 
-    smp_session::smp_session(tds_impl& impl) : impl(impl) {
+    smp_session::smp_session(tds_impl& impl) : impl(impl), db_name(impl.sess.db_name) {
         smp_header h;
 
         // FIXME - link this to rate_limit option
@@ -3535,7 +3535,7 @@ namespace tds {
 
                                 throw formatted_error("Login failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
                             } else if (type == token::ENVCHANGE)
-                                handle_envchange_msg(sp.subspan(0, len));
+                                sess.handle_envchange_msg(sp.subspan(0, len));
 
                             break;
                         }
@@ -4208,7 +4208,7 @@ namespace tds {
         if (conn.impl->mars_sess)
             all_headers->trans_desc.descriptor = conn.impl->mars_sess->trans_id;
         else
-            all_headers->trans_desc.descriptor = conn.impl->trans_id;
+            all_headers->trans_desc.descriptor = conn.impl->sess.trans_id;
 
         all_headers->trans_desc.outstanding = 1;
 
@@ -4758,8 +4758,12 @@ namespace tds {
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
                         else
                             throw formatted_error("RPC {} failed: {}", utf16_to_utf8(name), utf16_to_utf8(extract_message(sp.subspan(0, len))));
-                    } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                    } else if (type == token::ENVCHANGE) {
+                        if (conn.impl->mars_sess)
+                            conn.impl->mars_sess.get()->handle_envchange_msg(sp.subspan(0, len));
+                        else
+                            conn.impl->sess.handle_envchange_msg(sp.subspan(0, len));
+                    }
 
                     break;
                 }
@@ -5512,7 +5516,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         if (conn.impl->mars_sess)
             all_headers->trans_desc.descriptor = conn.impl->mars_sess->trans_id;
         else
-            all_headers->trans_desc.descriptor = conn.impl->trans_id;
+            all_headers->trans_desc.descriptor = conn.impl->sess.trans_id;
 
         all_headers->trans_desc.outstanding = 1;
 
@@ -5708,7 +5712,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                         else if (conn.impl->mars_sess)
                             conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
                         else
-                            conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                            conn.impl->sess.handle_envchange_msg(sp.subspan(0, len));
                     }
 
                     break;
@@ -6069,7 +6073,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         return impl->cols[i];
     }
 
-    void tds_impl::handle_envchange_msg(span<const uint8_t> sp) {
+    void main_session::handle_envchange_msg(span<const uint8_t> sp) {
         auto ec = (tds_envchange*)(sp.data() - offsetof(tds_envchange, type));
 
         switch (ec->type) {
@@ -6160,7 +6164,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                         throw formatted_error("Server returned invalid packet size \"{}\".", utf16_to_utf8(s));
                 }
 
-                packet_size = v;
+                tds.packet_size = v;
 
                 break;
             }
@@ -6272,6 +6276,13 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
     }
 
     u16string tds::db_name() const {
+        if (impl->mars_sess)
+            return impl->mars_sess.get()->db_name;
+        else
+            return impl->sess.db_name;
+    }
+
+    u16string session::db_name() const {
         return impl->db_name;
     }
 
@@ -6287,7 +6298,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         if (conn.impl->mars_sess)
             msg.header.all_headers.trans_desc.descriptor = conn.impl->mars_sess->trans_id;
         else
-            msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->sess.trans_id;
 
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_BEGIN_XACT;
@@ -6354,7 +6365,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                         if (conn.impl->mars_sess)
                             conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
                         else
-                            conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                            conn.impl->sess.handle_envchange_msg(sp.subspan(0, len));
                     }
 
                     sp = sp.subspan(len);
@@ -6459,7 +6470,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         else if (conn.impl->mars_sess)
             trans_id = conn.impl->mars_sess->trans_id;
         else
-            trans_id = conn.impl->trans_id;
+            trans_id = conn.impl->sess.trans_id;
 
         if (trans_id == 0)
             return;
@@ -6551,7 +6562,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                             else if (conn.impl->mars_sess)
                                 conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
                             else
-                                conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                                conn.impl->sess.handle_envchange_msg(sp.subspan(0, len));
                         }
 
                         sp = sp.subspan(len);
@@ -6580,7 +6591,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         else if (conn.impl->mars_sess)
             msg.header.all_headers.trans_desc.descriptor = conn.impl->mars_sess->trans_id;
         else
-            msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->sess.trans_id;
 
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_COMMIT_XACT;
@@ -6653,7 +6664,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                         else if (conn.impl->mars_sess)
                             conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
                         else
-                            conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                            conn.impl->sess.handle_envchange_msg(sp.subspan(0, len));
                     }
 
                     sp = sp.subspan(len);

@@ -1574,8 +1574,12 @@ namespace tds {
                             impl->handle_info_msg(sp.subspan(0, len), true);
 
                         throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
-                    } else if (type == token::ENVCHANGE)
-                        impl->handle_envchange_msg(sp.subspan(0, len));
+                    } else if (type == token::ENVCHANGE) {
+                        if (impl->mars_sess)
+                            impl->mars_sess.get()->handle_envchange_msg(sp.subspan(0, len));
+                        else
+                            impl->sess.handle_envchange_msg(sp.subspan(0, len));
+                    }
 
                     sp = sp.subspan(len);
 

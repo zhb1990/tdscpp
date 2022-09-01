@@ -1607,6 +1607,8 @@ namespace tds {
         template<typename T>
         void run(no_check<T> s);
 
+        std::u16string db_name() const;
+
         tds& conn;
         std::unique_ptr<smp_session> impl;
     };

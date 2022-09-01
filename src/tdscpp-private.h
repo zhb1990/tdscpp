@@ -619,6 +619,7 @@ namespace tds {
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
         void send_raw(std::span<const uint8_t> msg);
 #endif
+        void handle_envchange_msg(std::span<const uint8_t> sp);
 
         tds_impl& tds;
         std::condition_variable mess_in_cv;
@@ -626,6 +627,8 @@ namespace tds {
         std::list<mess> mess_list;
         std::condition_variable_any rate_limit_cv;
         std::exception_ptr socket_thread_exc;
+        uint64_t trans_id = 0;
+        std::u16string db_name;
     };
 
     class tds_impl {
@@ -637,7 +640,6 @@ namespace tds {
                  bool check_certificate, bool mars, unsigned int rate_limit);
         ~tds_impl();
         void handle_info_msg(std::span<const uint8_t> sp, bool error) const;
-        void handle_envchange_msg(std::span<const uint8_t> sp);
 
         template<typename... Args>
         void run(std::string_view s, Args&&... args);
@@ -681,11 +683,9 @@ namespace tds {
         std::string fqdn, hostname;
         msg_handler message_handler;
         func_count_handler count_handler;
-        uint64_t trans_id = 0;
         uint32_t packet_size = 4096;
         uint16_t spid = 0;
         bool has_utf8 = false;
-        std::u16string db_name;
 #if defined(WITH_OPENSSL) || defined(_WIN32)
         std::unique_ptr<tds_ssl> ssl;
 #endif
