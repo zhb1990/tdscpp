@@ -1592,6 +1592,81 @@ namespace tds {
         }
     }
 
+    void session::bcp_sendmsg(span<const uint8_t> data) {
+        impl->send_msg(tds_msg::bulk_load_data, data);
+
+        enum tds_msg type;
+        vector<uint8_t> payload;
+
+        impl->wait_for_msg(type, payload);
+
+        // FIXME - timeout
+
+        if (type != tds_msg::tabular_result)
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
+
+        span sp = payload;
+
+        while (!sp.empty()) {
+            auto type = (token)sp[0];
+            sp = sp.subspan(1);
+
+            // FIXME - parse unknowns according to numeric value of type
+
+            switch (type) {
+                case token::DONE:
+                case token::DONEINPROC:
+                case token::DONEPROC:
+                    if (sp.size() < sizeof(tds_done_msg))
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), sizeof(tds_done_msg));
+
+                    if (conn.impl->count_handler) {
+                        auto msg = (tds_done_msg*)sp.data();
+
+                        if (msg->status & 0x10) // row count valid
+                            conn.impl->count_handler(msg->rowcount, msg->curcmd);
+                    }
+
+                    sp = sp.subspan(sizeof(tds_done_msg));
+
+                    break;
+
+                case token::INFO:
+                case token::TDS_ERROR:
+                case token::ENVCHANGE:
+                {
+                    if (sp.size() < sizeof(uint16_t))
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sp.size());
+
+                    auto len = *(uint16_t*)&sp[0];
+
+                    sp = sp.subspan(sizeof(uint16_t));
+
+                    if (sp.size() < len)
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), len);
+
+                    if (type == token::INFO) {
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sp.subspan(0, len), false);
+                    } else if (type == token::TDS_ERROR) {
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sp.subspan(0, len), true);
+
+                        throw formatted_error("BCP failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
+                    } else if (type == token::ENVCHANGE)
+                        impl->handle_envchange_msg(sp.subspan(0, len));
+
+                    sp = sp.subspan(len);
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error("Unhandled token type {} in BCP response.", type);
+            }
+        }
+    }
+
     size_t bcp_colmetadata_size(const col_info& col) {
         switch (col.type) {
             case sql_type::SQL_NULL:

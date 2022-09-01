@@ -4383,11 +4383,11 @@ namespace tds {
         return s;
     }
 
-    map<u16string, col_info> get_col_info(tds& tds, u16string_view table, u16string_view db) {
+    map<u16string, col_info> get_col_info(tds_or_session auto& n, u16string_view table, u16string_view db) {
         map<u16string, col_info> info;
 
         {
-            query sq(tds, no_check(uR"(SELECT columns.name,
+            query sq(n, no_check(uR"(SELECT columns.name,
     columns.system_type_id,
     columns.max_length,
     columns.precision,
@@ -4441,6 +4441,12 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
         return info;
     }
+
+    template
+    map<u16string, col_info> TDSCPP get_col_info(tds& n, u16string_view table, u16string_view db);
+
+    template
+    map<u16string, col_info> TDSCPP get_col_info(session& n, u16string_view table, u16string_view db);
 
     void main_session::handle_envchange_msg(span<const uint8_t> sp) {
         auto ec = (tds_envchange*)(sp.data() - offsetof(tds_envchange, type));

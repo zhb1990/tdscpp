@@ -563,6 +563,12 @@ namespace tds {
     template<typename T>
     concept is_optional = std::is_convertible_v<std::nullopt_t, T>;
 
+    class tds;
+    class session;
+
+    template<typename T>
+    concept tds_or_session = std::is_same_v<T, tds> || std::is_same_v<T, session>;
+
     enum class encryption_type : uint8_t {
         ENCRYPT_OFF,
         ENCRYPT_ON,
@@ -1344,6 +1350,49 @@ namespace tds {
 
         tds& conn;
         std::unique_ptr<smp_session> impl;
+
+        template<string_or_u16string T = std::u16string_view>
+        void bcp(const string_or_u16string auto& table, const list_of_u16string auto& np,
+                 const list_of_list_of_values auto& vp, const T& db = u"") {
+            std::vector<col_info> cols;
+
+            if constexpr (is_u16string<decltype(table)> && is_u16string<decltype(db)>)
+                cols = bcp_start(*this, table, np, db);
+            else if constexpr (is_u16string<decltype(table)>)
+                cols = bcp_start(*this, table, np, utf8_to_utf16(db));
+            else if constexpr (is_u16string<decltype(db)>)
+                cols = bcp_start(*this, utf8_to_utf16(table), np, db);
+            else
+                cols = bcp_start(*this, utf8_to_utf16(table), np, utf8_to_utf16(db));
+
+            // send COLMETADATA for rows
+            auto buf = bcp_colmetadata(np, cols);
+
+            for (const auto& v : vp) {
+                auto buf2 = bcp_row(v, np, cols);
+
+                auto oldlen = buf.size();
+                buf.resize(oldlen + buf2.size());
+                memcpy(&buf[oldlen], buf2.data(), buf2.size());
+            }
+
+            bcp_sendmsg(buf);
+        }
+
+        template<string_or_u16string T = std::u16string_view>
+        void bcp(const string_or_u16string auto& table, const list_of_string auto& np,
+                 const list_of_list_of_values auto& vp, const T& db = u"") {
+            std::vector<std::u16string> np2;
+
+            for (const auto& s : np) {
+                np2.emplace_back(utf8_to_utf16(s));
+            }
+
+            bcp(table, np2, vp, db);
+        }
+
+    private:
+        void bcp_sendmsg(std::span<const uint8_t> msg);
     };
 
     class TDSCPP rpc {
@@ -2041,11 +2090,14 @@ namespace tds {
         return buf;
     }
 
-    std::map<std::u16string, col_info> TDSCPP get_col_info(tds& tds, std::u16string_view table, std::u16string_view db);
+    std::map<std::u16string, col_info> get_col_info(tds_or_session auto& n, std::u16string_view table,
+                                                    std::u16string_view db);
+
     std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale,
                                          std::u16string_view collation, std::u16string_view clr_name);
 
-    std::vector<col_info> bcp_start(tds& tds, std::u16string_view table, const list_of_u16string auto& np, std::u16string_view db) {
+    std::vector<col_info> bcp_start(tds_or_session auto& n, std::u16string_view table, const list_of_u16string auto& np,
+                                    std::u16string_view db) {
         if (np.empty())
             throw std::runtime_error("List of columns not supplied.");
 
@@ -2054,7 +2106,7 @@ namespace tds {
         std::vector<col_info> cols;
 
         {
-            auto col_info = get_col_info(tds, table, db);
+            auto col_info = get_col_info(n, table, db);
 
             if constexpr (std::ranges::sized_range<decltype(np)>)
                 cols.reserve(np.size());
@@ -2091,7 +2143,7 @@ namespace tds {
 
             q += u") WITH (TABLOCK)";
 
-            batch b(tds, no_check(q));
+            batch b(n, no_check(q));
         }
 
         // FIXME - handle INT NULLs and VARCHAR NULLs
