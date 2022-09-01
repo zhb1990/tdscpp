@@ -1332,6 +1332,26 @@ namespace tds {
         }
     };
 
+    class smp_session;
+
+    class TDSCPP session {
+    public:
+        session(tds& conn);
+        ~session();
+
+        void run(std::type_identity_t<checker<char, 0>> s);
+        void run(std::type_identity_t<checker<char16_t, 0>> s);
+        void run(std::type_identity_t<checker<char8_t, 0>> s);
+
+        template<typename T>
+        void run(no_check<T> s);
+
+        std::u16string db_name() const;
+
+        tds& conn;
+        std::unique_ptr<smp_session> impl;
+    };
+
     class TDSCPP rpc {
     public:
         ~rpc();
@@ -1360,6 +1380,32 @@ namespace tds {
 
         rpc(tds& tds, std::string_view rpc_name) : conn(tds) {
             do_rpc(conn, rpc_name);
+        }
+
+        template<typename... Args>
+        rpc(session& sess, std::u16string_view rpc_name, Args&&... args) : conn(sess.conn) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_rpc(sess, rpc_name);
+        }
+
+        rpc(session& sess, std::u16string_view rpc_name) : conn(sess.conn) {
+            do_rpc(sess, rpc_name);
+        }
+
+        template<typename... Args>
+        rpc(session& sess, std::string_view rpc_name, Args&&... args) : conn(sess.conn) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_rpc(sess, rpc_name);
+        }
+
+        rpc(session& sess, std::string_view rpc_name) : conn(sess.conn) {
+            do_rpc(sess, rpc_name);
         }
 
         uint16_t num_columns() const;
@@ -1411,6 +1457,8 @@ namespace tds {
 
         void do_rpc(tds& conn, std::u16string_view name);
         void do_rpc(tds& conn, std::string_view name);
+        void do_rpc(session& sess, std::u16string_view name);
+        void do_rpc(session& sess, std::string_view name);
         void wait_for_packet();
 
         tds& conn;
@@ -1422,6 +1470,7 @@ namespace tds {
         std::vector<uint8_t> buf;
         std::vector<column> buf_columns;
         std::u16string name;
+        std::optional<std::reference_wrapper<smp_session>> sess;
     };
 
     class TDSCPP query {
@@ -1592,26 +1641,6 @@ namespace tds {
     }
 
     class batch_impl;
-
-    class smp_session;
-
-    class TDSCPP session {
-    public:
-        session(tds& conn);
-        ~session();
-
-        void run(std::type_identity_t<checker<char, 0>> s);
-        void run(std::type_identity_t<checker<char16_t, 0>> s);
-        void run(std::type_identity_t<checker<char8_t, 0>> s);
-
-        template<typename T>
-        void run(no_check<T> s);
-
-        std::u16string db_name() const;
-
-        tds& conn;
-        std::unique_ptr<smp_session> impl;
-    };
 
     class TDSCPP batch {
     public:

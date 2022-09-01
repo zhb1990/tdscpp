@@ -4205,7 +4205,9 @@ namespace tds {
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
 
-        if (conn.impl->mars_sess)
+        if (sess)
+            all_headers->trans_desc.descriptor = sess->get().trans_id;
+        else if (conn.impl->mars_sess)
             all_headers->trans_desc.descriptor = conn.impl->mars_sess->trans_id;
         else
             all_headers->trans_desc.descriptor = conn.impl->sess.trans_id;
@@ -4567,12 +4569,24 @@ namespace tds {
             }
         }
 
-        if (conn.impl->mars_sess)
+        if (sess)
+            sess->get().send_msg(tds_msg::rpc, buf);
+        else if (conn.impl->mars_sess)
             conn.impl->mars_sess->send_msg(tds_msg::rpc, buf);
         else
             conn.impl->sess.send_msg(tds_msg::rpc, buf);
 
         wait_for_packet();
+    }
+
+    void rpc::do_rpc(session& sess, string_view name) {
+        do_rpc(sess, utf8_to_utf16(name));
+    }
+
+    void rpc::do_rpc(session& sess, u16string_view name) {
+        this->sess.emplace(*sess.impl.get());
+
+        do_rpc(sess.conn, name);
     }
 
     rpc::~rpc() {
@@ -4582,7 +4596,9 @@ namespace tds {
         try {
             received_attn = false;
 
-            if (conn.impl->mars_sess)
+            if (sess)
+                sess->get().send_msg(tds_msg::attention_signal, span<uint8_t>());
+            else if (conn.impl->mars_sess)
                 conn.impl->mars_sess->send_msg(tds_msg::attention_signal, span<uint8_t>());
             else
                 conn.impl->sess.send_msg(tds_msg::attention_signal, span<uint8_t>());
@@ -4599,7 +4615,9 @@ namespace tds {
                 enum tds_msg type;
                 vector<uint8_t> payload;
 
-                if (conn.impl->mars_sess)
+                if (sess)
+                    sess->get().wait_for_msg(type, payload);
+                else if (conn.impl->mars_sess)
                     conn.impl->mars_sess->wait_for_msg(type, payload);
                 else
                     conn.impl->sess.wait_for_msg(type, payload);
@@ -4683,7 +4701,9 @@ namespace tds {
         vector<uint8_t> payload;
         bool last_packet;
 
-        if (conn.impl->mars_sess)
+        if (sess)
+            sess->get().wait_for_msg(type, payload, &last_packet);
+        else if (conn.impl->mars_sess)
             conn.impl->mars_sess->wait_for_msg(type, payload, &last_packet);
         else
             conn.impl->sess.wait_for_msg(type, payload, &last_packet);
