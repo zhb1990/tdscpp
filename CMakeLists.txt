@@ -44,6 +44,7 @@ set(SRC_FILES src/tdscpp.cpp
     src/value.cpp
     src/ssl.cpp
     src/ringbuf.cpp
+    src/rpc.cpp
     src/collation.cpp
     src/ver80coll.cpp
     src/ver90coll.cpp

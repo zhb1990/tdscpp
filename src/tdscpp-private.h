@@ -1522,8 +1522,35 @@ static void buf_rshift(uint8_t* scratch) {
     }
 }
 
+static constexpr bool is_byte_len_type(enum tds::sql_type type) noexcept {
+    switch (type) {
+        case tds::sql_type::UNIQUEIDENTIFIER:
+        case tds::sql_type::INTN:
+        case tds::sql_type::DECIMAL:
+        case tds::sql_type::NUMERIC:
+        case tds::sql_type::BITN:
+        case tds::sql_type::FLTN:
+        case tds::sql_type::MONEYN:
+        case tds::sql_type::DATETIMN:
+        case tds::sql_type::DATE:
+        case tds::sql_type::TIME:
+        case tds::sql_type::DATETIME2:
+        case tds::sql_type::DATETIMEOFFSET:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 // tdscpp.cpp
 unsigned int coll_to_cp(const tds::collation& coll);
+std::span<const uint8_t> parse_tokens(std::span<const uint8_t> sp, std::list<std::vector<uint8_t>>& tokens,
+                                      std::vector<tds::column>& buf_columns);
+void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_type type,
+                    unsigned int max_length, std::span<const uint8_t>& sp);
+void handle_nbcrow(std::span<const uint8_t>& sp, const std::vector<tds::column>& cols,
+                   std::list<std::vector<std::pair<tds::value_data_t, bool>>>& rows);
 
 // ver80coll.cpp
 std::weak_ordering compare_strings_80(std::u16string_view val1, std::u16string_view val2,
