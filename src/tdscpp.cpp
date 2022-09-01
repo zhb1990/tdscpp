@@ -4124,6 +4124,48 @@ namespace tds {
         r2 = make_unique<rpc>(conn, u"sp_execute", static_cast<value>(handle), params);
     }
 
+    void query::do_query(session& sess, u16string_view q) {
+        this->sess = sess;
+
+        if (!params.empty()) {
+            u16string q2;
+            bool in_quotes = false;
+            unsigned int param_num = 1;
+
+            // replace ? in q with parameters
+
+            q2.reserve(q.length());
+
+            for (unsigned int i = 0; i < q.length(); i++) {
+                if (q[i] == '\'')
+                    in_quotes = !in_quotes;
+
+                if (q[i] == '?' && !in_quotes) {
+                    q2 += u"@P" + to_u16string(param_num);
+                    param_num++;
+                } else
+                    q2 += q[i];
+            }
+
+            rpc r1(sess, u"sp_prepare", handle, create_params_string(), q2, 1); // 1 means return metadata
+
+            while (r1.fetch_row()) { }
+
+            cols = r1.cols;
+        } else {
+            rpc r1(sess, u"sp_prepare", handle, u"", q, 1); // 1 means return metadata
+
+            while (r1.fetch_row()) { }
+
+            cols = r1.cols;
+        }
+
+        if (handle.is_null)
+            throw runtime_error("sp_prepare failed.");
+
+        r2 = make_unique<rpc>(sess, u"sp_execute", static_cast<value>(handle), params);
+    }
+
     uint16_t query::num_columns() const {
         return (uint16_t)r2->cols.size();
     }
@@ -4141,9 +4183,16 @@ namespace tds {
             r2.reset(nullptr);
 
             // FIXME
-            rpc r(conn, u"sp_unprepare", static_cast<value>(handle));
 
-            while (r.fetch_row()) { }
+            if (sess) {
+                rpc r(sess->get(), u"sp_unprepare", static_cast<value>(handle));
+
+                while (r.fetch_row()) { }
+            } else {
+                rpc r(conn, u"sp_unprepare", static_cast<value>(handle));
+
+                while (r.fetch_row()) { }
+            }
         } catch (...) {
             // can't throw inside destructor
         }

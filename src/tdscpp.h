@@ -1538,6 +1538,69 @@ namespace tds {
                 do_query(conn, q.sv);
         }
 
+        query(session& sess, std::type_identity_t<checker<char, 0>> q) : conn(sess.conn) {
+            do_query(sess, cp_to_utf16(q.sv, sess.conn.codepage));
+        }
+
+        query(session& sess, std::type_identity_t<checker<char8_t, 0>> q) : conn(sess.conn) {
+            do_query(sess, utf8_to_utf16(q.sv));
+        }
+
+        query(session& sess, std::type_identity_t<checker<char16_t, 0>> q) : conn(sess.conn) {
+            do_query(sess, q.sv);
+        }
+
+        template<typename T>
+        query(session& sess, no_check<T> q) : conn(sess.conn) {
+            if constexpr (std::is_same_v<T, char>)
+                do_query(sess, cp_to_utf16(q.sv, sess.conn.codepage));
+            else if constexpr (std::is_same_v<T, char8_t>)
+                do_query(sess, utf8_to_utf16(q.sv));
+            else
+                do_query(sess, q.sv);
+        }
+
+        template<typename... Args>
+        query(session& sess, std::type_identity_t<checker<char, sizeof...(Args)>> q, Args&&... args) : conn(sess.conn) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_query(sess, cp_to_utf16(q.sv, sess.conn.codepage));
+        }
+
+        template<typename... Args>
+        query(session& sess, std::type_identity_t<checker<char8_t, sizeof...(Args)>> q, Args&&... args) : conn(sess.conn) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_query(sess, utf8_to_utf16(q.sv));
+        }
+
+        template<typename... Args>
+        query(session& sess, std::type_identity_t<checker<char16_t, sizeof...(Args)>> q, Args&&... args) : conn(sess.conn) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            do_query(sess, q.sv);
+        }
+
+        template<typename T, typename... Args>
+        query(session& sess, no_check<T> q, Args&&... args) : conn(sess.conn) {
+            params.reserve(sizeof...(args));
+
+            add_param(args...);
+
+            if constexpr (std::is_same_v<T, char>)
+                do_query(sess, cp_to_utf16(q.sv, sess.conn.codepage));
+            else if constexpr (std::is_same_v<T, char8_t>)
+                do_query(sess, utf8_to_utf16(q.sv));
+            else
+                do_query(sess, q.sv);
+        }
+
         query(const query&) = delete;
 
         ~query();
@@ -1557,6 +1620,7 @@ namespace tds {
 
     private:
         void do_query(tds& conn, std::u16string_view q);
+        void do_query(session& sess, std::u16string_view q);
 
         template<typename T, typename... Args>
         void add_param(T&& t, Args&&... args) {
@@ -1606,6 +1670,7 @@ namespace tds {
         std::vector<column> cols;
         std::unique_ptr<rpc> r2;
         output_param<int32_t> handle;
+        std::optional<std::reference_wrapper<session>> sess;
     };
 
     template<typename... Args>
