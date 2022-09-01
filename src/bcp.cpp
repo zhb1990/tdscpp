@@ -275,7 +275,7 @@ namespace tds {
         return us;
     }
 
-    size_t tds::bcp_row_size(const col_info& col, const value& vv) {
+    size_t bcp_row_size(const col_info& col, const value& vv) {
         size_t bufsize;
 
         switch (col.type) {
@@ -553,7 +553,7 @@ namespace tds {
 
     static const auto jan1900 = -ymd_to_num({1y, chrono::January, 1d});
 
-    void tds::bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, u16string_view col_name) {
+    void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, u16string_view col_name) {
         switch (col.type) {
             case sql_type::INTN:
                 if (vv.is_null) {

@@ -730,11 +730,7 @@ namespace tds {
     private:
         std::vector<col_info> bcp_start(std::u16string_view table, const list_of_u16string auto& np,
                                         std::u16string_view db);
-        std::vector<uint8_t> bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols);
-        std::vector<uint8_t> bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols);
         void bcp_sendmsg(std::span<const uint8_t> msg);
-        size_t bcp_row_size(const col_info& col, const value& vv);
-        void bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, std::u16string_view col_name);
     };
 
     using time_t = std::chrono::duration<int64_t, std::ratio<1, 10000000>>;
@@ -1962,8 +1958,10 @@ namespace tds {
     }
 
     uint16_t TDSCPP get_instance_port(const std::string& server, std::string_view instance);
+    size_t TDSCPP bcp_row_size(const col_info& col, const value& vv);
+    void TDSCPP bcp_row_data(uint8_t*& ptr, const col_info& col, const value& vv, std::u16string_view col_name);
 
-    std::vector<uint8_t> tds::bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols) {
+    std::vector<uint8_t> bcp_row(const list_of_values auto& v, const list_of_u16string auto& np, const std::vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t);
 
         auto it = v.begin();
@@ -2015,7 +2013,7 @@ namespace tds {
         return buf;
     }
 
-    std::vector<uint8_t> tds::bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols) {
+    std::vector<uint8_t> bcp_colmetadata(const list_of_u16string auto& np, const std::vector<col_info>& cols) {
         size_t bufsize = sizeof(uint8_t) + sizeof(uint16_t) + (cols.size() * sizeof(tds_colmetadata_col));
 
         for (const auto& col : cols) {
