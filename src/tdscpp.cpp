@@ -3988,7 +3988,7 @@ namespace tds {
             throw formatted_error("Server not using TDS 7.4. Version was {:x}, expected {:x}.", tds_version, tds_74_version);
     }
 
-    void tds_impl::handle_info_msg(span<const uint8_t> sp, bool error) {
+    void tds_impl::handle_info_msg(span<const uint8_t> sp, bool error) const {
         if (sp.size() < sizeof(tds_info_msg))
             throw formatted_error("Short INFO message ({} bytes, expected at least 6).", sp.size());
 
@@ -4204,7 +4204,12 @@ namespace tds {
         all_headers->total_size = sizeof(tds_all_headers);
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
-        all_headers->trans_desc.descriptor = conn.impl->trans_id;
+
+        if (conn.impl->mars_sess)
+            all_headers->trans_desc.descriptor = conn.impl->mars_sess->trans_id;
+        else
+            all_headers->trans_desc.descriptor = conn.impl->trans_id;
+
         all_headers->trans_desc.outstanding = 1;
 
         auto ptr = (uint8_t*)&all_headers[1];
@@ -5503,7 +5508,12 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         all_headers->total_size = sizeof(tds_all_headers);
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
-        all_headers->trans_desc.descriptor = conn.impl->trans_id;
+
+        if (conn.impl->mars_sess)
+            all_headers->trans_desc.descriptor = conn.impl->mars_sess->trans_id;
+        else
+            all_headers->trans_desc.descriptor = conn.impl->trans_id;
+
         all_headers->trans_desc.outstanding = 1;
 
         auto ptr = (char16_t*)&all_headers[1];
@@ -5532,7 +5542,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         all_headers->total_size = sizeof(tds_all_headers);
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
-        all_headers->trans_desc.descriptor = conn.impl->trans_id;
+        all_headers->trans_desc.descriptor = sess.impl.get()->trans_id;
         all_headers->trans_desc.outstanding = 1;
 
         auto ptr = (char16_t*)&all_headers[1];
@@ -5692,8 +5702,14 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
                         else
                             throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
-                    } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                    } else if (type == token::ENVCHANGE) {
+                        if (sess)
+                            sess.value().get().handle_envchange_msg(sp.subspan(0, len));
+                        else if (conn.impl->mars_sess)
+                            conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
+                        else
+                            conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                    }
 
                     break;
                 }
@@ -6154,6 +6170,107 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         }
     }
 
+    void smp_session::handle_envchange_msg(span<const uint8_t> sp) {
+        auto ec = (tds_envchange*)(sp.data() - offsetof(tds_envchange, type));
+
+        switch (ec->type) {
+            case tds_envchange_type::database: {
+                if (sp.size() < sizeof(tds_envchange_database) - offsetof(tds_envchange_database, header.type)) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sp.size(),
+                                          sizeof(tds_envchange_database) - offsetof(tds_envchange_database, header.type));
+                }
+
+                auto tedb = (tds_envchange_database*)ec;
+
+                if (tedb->header.length < sizeof(tds_envchange_database) + (tedb->name_len * sizeof(char16_t))) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).",
+                                          tedb->header.length, sizeof(tds_envchange_database) + (tedb->name_len * sizeof(char16_t)));
+                }
+
+                db_name = u16string_view{(char16_t*)&tedb[1], tedb->name_len};
+
+                break;
+            }
+
+            case tds_envchange_type::begin_trans: {
+                if (sp.size() < sizeof(tds_envchange_begin_trans) - offsetof(tds_envchange_begin_trans, header.type))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sp.size());
+
+                auto tebt = (tds_envchange_begin_trans*)ec;
+
+                if (tebt->header.length < offsetof(tds_envchange_begin_trans, new_len))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tebt->header.length);
+
+                if (tebt->new_len != 8)
+                    throw formatted_error("Unexpected transaction ID length ({} bytes, expected 8).", tebt->new_len);
+
+                trans_id = tebt->trans_id;
+
+                break;
+            }
+
+            case tds_envchange_type::rollback_trans: {
+                if (sp.size() < sizeof(tds_envchange_rollback_trans) - offsetof(tds_envchange_rollback_trans, header.type))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sp.size());
+
+                auto tert = (tds_envchange_rollback_trans*)ec;
+
+                if (tert->header.length < offsetof(tds_envchange_rollback_trans, new_len))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tert->header.length);
+
+                trans_id = 0;
+
+                break;
+            }
+
+            case tds_envchange_type::commit_trans: {
+                if (sp.size() < sizeof(tds_envchange_commit_trans) - offsetof(tds_envchange_begin_trans, header.type))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", sp.size());
+
+                auto tect = (tds_envchange_commit_trans*)ec;
+
+                if (tect->header.length < offsetof(tds_envchange_begin_trans, new_len))
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tect->header.length);
+
+                trans_id = 0;
+
+                break;
+            }
+
+            case tds_envchange_type::packet_size: {
+                if (sp.size() < sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type)) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).", sp.size(),
+                                          sizeof(tds_envchange_packet_size) - offsetof(tds_envchange_packet_size, header.type));
+                }
+
+                auto teps = (tds_envchange_packet_size*)ec;
+
+                if (teps->header.length < sizeof(tds_envchange_packet_size) + (teps->new_len * sizeof(char16_t))) {
+                    throw formatted_error("Short ENVCHANGE message ({} bytes, expected at least {}).",
+                                          teps->header.length, sizeof(tds_envchange_packet_size) + (teps->new_len * sizeof(char16_t)));
+                }
+
+                u16string_view s((char16_t*)&teps[1], teps->new_len);
+                uint32_t v = 0;
+
+                for (auto c : s) {
+                    if (c >= '0' && c <= '9') {
+                        v *= 10;
+                        v += c - '0';
+                    } else
+                        throw formatted_error("Server returned invalid packet size \"{}\".", utf16_to_utf8(s));
+                }
+
+                impl.packet_size = v;
+
+                break;
+            }
+
+            default:
+            break;
+        }
+    }
+
     u16string tds::db_name() const {
         return impl->db_name;
     }
@@ -6166,7 +6283,12 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.header.all_headers.total_size = sizeof(tds_all_headers);
         msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
+
+        if (conn.impl->mars_sess)
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->mars_sess->trans_id;
+        else
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
+
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_BEGIN_XACT;
         msg.isolation_level = 0;
@@ -6228,8 +6350,92 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
 
                         throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
+                    } else if (type == token::ENVCHANGE) {
+                        if (conn.impl->mars_sess)
+                            conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
+                        else
+                            conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                    }
+
+                    sp = sp.subspan(len);
+
+                    break;
+                }
+
+                default:
+                    throw formatted_error("Unhandled token type {} in transaction manager response.", type);
+            }
+        }
+    }
+
+    trans::trans(session& sess) : conn(sess.conn) {
+        tds_tm_begin msg;
+
+        // FIXME - give transactions names, so that ROLLBACK works as expected?
+
+        msg.header.all_headers.total_size = sizeof(tds_all_headers);
+        msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
+        msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
+        msg.header.all_headers.trans_desc.descriptor = sess.impl.get()->trans_id;
+        msg.header.all_headers.trans_desc.outstanding = 1;
+        msg.header.type = tds_tm_type::TM_BEGIN_XACT;
+        msg.isolation_level = 0;
+        msg.name_len = 0;
+
+        this->sess.emplace(*sess.impl.get());
+
+        sess.impl.get()->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+
+        enum tds_msg type;
+        vector<uint8_t> payload;
+
+        // FIXME - timeout
+
+        sess.impl.get()->wait_for_msg(type, payload);
+
+        if (type != tds_msg::tabular_result)
+            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
+
+        span sp = payload;
+
+        while (!sp.empty()) {
+            auto type = (token)sp[0];
+            sp = sp.subspan(1);
+
+            switch (type) {
+                case token::DONE:
+                case token::DONEINPROC:
+                case token::DONEPROC:
+                    if (sp.size() < sizeof(tds_done_msg))
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), sizeof(tds_done_msg));
+
+                    sp = sp.subspan(sizeof(tds_done_msg));
+                break;
+
+                case token::INFO:
+                case token::TDS_ERROR:
+                case token::ENVCHANGE:
+                {
+                    if (sp.size() < sizeof(uint16_t))
+                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sp.size());
+
+                    auto len = *(uint16_t*)&sp[0];
+
+                    sp = sp.subspan(sizeof(uint16_t));
+
+                    if (sp.size() < len)
+                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), len);
+
+                    if (type == token::INFO) {
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sp.subspan(0, len), false);
+                    } else if (type == token::TDS_ERROR) {
+                        if (conn.impl->message_handler)
+                            conn.impl->handle_info_msg(sp.subspan(0, len), true);
+
+                        throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
                     } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                        sess.impl.get()->handle_envchange_msg(sp.subspan(0, len));
 
                     sp = sp.subspan(len);
 
@@ -6246,7 +6452,16 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         if (committed)
             return;
 
-        if (conn.impl->trans_id == 0)
+        uint64_t trans_id;
+
+        if (sess)
+            trans_id = sess.value().get().trans_id;
+        else if (conn.impl->mars_sess)
+            trans_id = conn.impl->mars_sess->trans_id;
+        else
+            trans_id = conn.impl->trans_id;
+
+        if (trans_id == 0)
             return;
 
         try {
@@ -6255,13 +6470,15 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             msg.header.all_headers.total_size = sizeof(tds_all_headers);
             msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
             msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-            msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
+            msg.header.all_headers.trans_desc.descriptor = trans_id;
             msg.header.all_headers.trans_desc.outstanding = 1;
             msg.header.type = tds_tm_type::TM_ROLLBACK_XACT;
             msg.name_len = 0;
             msg.flags = 0;
 
-            if (conn.impl->mars_sess)
+            if (sess)
+                sess.value().get().send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+            else if (conn.impl->mars_sess)
                 conn.impl->mars_sess->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
             else
                 conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
@@ -6271,7 +6488,9 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
             // FIXME - timeout
 
-            if (conn.impl->mars_sess)
+            if (sess)
+                sess.value().get().wait_for_msg(type, payload);
+            else if (conn.impl->mars_sess)
                 conn.impl->mars_sess->wait_for_msg(type, payload);
             else
                 conn.impl->sess.wait_for_msg(type, payload);
@@ -6326,8 +6545,14 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                             }
 
                             throw formatted_error("TM_ROLLBACK_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
-                        } else if (type == token::ENVCHANGE)
-                            conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                        } else if (type == token::ENVCHANGE) {
+                            if (sess)
+                                sess.value().get().handle_envchange_msg(sp.subspan(0, len));
+                            else if (conn.impl->mars_sess)
+                                conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
+                            else
+                                conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                        }
 
                         sp = sp.subspan(len);
 
@@ -6349,13 +6574,22 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.header.all_headers.total_size = sizeof(tds_all_headers);
         msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
+
+        if (sess)
+            msg.header.all_headers.trans_desc.descriptor = sess.value().get().trans_id;
+        else if (conn.impl->mars_sess)
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->mars_sess->trans_id;
+        else
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
+
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_COMMIT_XACT;
         msg.name_len = 0;
         msg.flags = 0;
 
-        if (conn.impl->mars_sess)
+        if (sess)
+            sess.value().get().send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
+        else if (conn.impl->mars_sess)
             conn.impl->mars_sess->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
         else
             conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
@@ -6365,7 +6599,9 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
         // FIXME - timeout
 
-        if (conn.impl->mars_sess)
+        if (sess)
+            sess.value().get().wait_for_msg(type, payload);
+        else if (conn.impl->mars_sess)
             conn.impl->mars_sess->wait_for_msg(type, payload);
         else
             conn.impl->sess.wait_for_msg(type, payload);
@@ -6411,8 +6647,14 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
 
                         throw formatted_error("TM_COMMIT_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
-                    } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                    } else if (type == token::ENVCHANGE) {
+                        if (sess)
+                            sess.value().get().handle_envchange_msg(sp.subspan(0, len));
+                        else if (conn.impl->mars_sess)
+                            conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
+                        else
+                            conn.impl->handle_envchange_msg(sp.subspan(0, len));
+                    }
 
                     sp = sp.subspan(len);
 

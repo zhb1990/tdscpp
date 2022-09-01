@@ -636,7 +636,7 @@ namespace tds {
                  const func_count_handler& count_handler, uint16_t port, encryption_type enc,
                  bool check_certificate, bool mars, unsigned int rate_limit);
         ~tds_impl();
-        void handle_info_msg(std::span<const uint8_t> sp, bool error);
+        void handle_info_msg(std::span<const uint8_t> sp, bool error) const;
         void handle_envchange_msg(std::span<const uint8_t> sp);
 
         template<typename... Args>
@@ -768,6 +768,7 @@ namespace tds {
         void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
         void parse_message(std::stop_token stop, std::span<const uint8_t> msg);
         void send_ack();
+        void handle_envchange_msg(std::span<const uint8_t> sp);
 
         tds_impl& impl;
         uint32_t seqnum = 1;
@@ -778,6 +779,8 @@ namespace tds {
         std::condition_variable_any rate_limit_cv;
         std::exception_ptr socket_thread_exc;
         uint32_t recv_wndw;
+        uint64_t trans_id = 0;
+        std::u16string db_name;
     };
 };
 
