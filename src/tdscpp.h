@@ -1600,6 +1600,13 @@ namespace tds {
         session(tds& conn);
         ~session();
 
+        void run(std::type_identity_t<checker<char, 0>> s);
+        void run(std::type_identity_t<checker<char16_t, 0>> s);
+        void run(std::type_identity_t<checker<char8_t, 0>> s);
+
+        template<typename T>
+        void run(no_check<T> s);
+
         tds& conn;
         std::unique_ptr<smp_session> impl;
     };
@@ -1687,6 +1694,35 @@ namespace tds {
 
     template<typename T>
     void tds::run(no_check<T> s) {
+        batch b(*this, s);
+
+        while (b.fetch_row()) {
+        }
+    }
+
+    void __inline session::run(std::type_identity_t<checker<char, 0>> s) {
+        batch b(*this, no_check(s.sv));
+
+        while (b.fetch_row()) {
+        }
+    }
+
+    void __inline session::run(std::type_identity_t<checker<char16_t, 0>> s) {
+        batch b(*this, no_check(s.sv));
+
+        while (b.fetch_row()) {
+        }
+    }
+
+    void __inline session::run(std::type_identity_t<checker<char8_t, 0>> s) {
+        batch b(*this, no_check(s.sv));
+
+        while (b.fetch_row()) {
+        }
+    }
+
+    template<typename T>
+    void session::run(no_check<T> s) {
         batch b(*this, s);
 
         while (b.fetch_row()) {
