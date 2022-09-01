@@ -687,13 +687,13 @@ namespace tds {
             std::vector<col_info> cols;
 
             if constexpr (is_u16string<decltype(table)> && is_u16string<decltype(db)>)
-                cols = bcp_start(table, np, db);
+                cols = bcp_start(*this, table, np, db);
             else if constexpr (is_u16string<decltype(table)>)
-                cols = bcp_start(table, np, utf8_to_utf16(db));
+                cols = bcp_start(*this, table, np, utf8_to_utf16(db));
             else if constexpr (is_u16string<decltype(db)>)
-                cols = bcp_start(utf8_to_utf16(table), np, db);
+                cols = bcp_start(*this, utf8_to_utf16(table), np, db);
             else
-                cols = bcp_start(utf8_to_utf16(table), np, utf8_to_utf16(db));
+                cols = bcp_start(*this, utf8_to_utf16(table), np, utf8_to_utf16(db));
 
             // send COLMETADATA for rows
             auto buf = bcp_colmetadata(np, cols);
@@ -728,8 +728,6 @@ namespace tds {
         unsigned int codepage;
 
     private:
-        std::vector<col_info> bcp_start(std::u16string_view table, const list_of_u16string auto& np,
-                                        std::u16string_view db);
         void bcp_sendmsg(std::span<const uint8_t> msg);
     };
 
@@ -2047,7 +2045,7 @@ namespace tds {
     std::u16string TDSCPP type_to_string(enum sql_type type, size_t length, uint8_t precision, uint8_t scale,
                                          std::u16string_view collation, std::u16string_view clr_name);
 
-    std::vector<col_info> tds::bcp_start(std::u16string_view table, const list_of_u16string auto& np, std::u16string_view db) {
+    std::vector<col_info> bcp_start(tds& tds, std::u16string_view table, const list_of_u16string auto& np, std::u16string_view db) {
         if (np.empty())
             throw std::runtime_error("List of columns not supplied.");
 
@@ -2056,7 +2054,7 @@ namespace tds {
         std::vector<col_info> cols;
 
         {
-            auto col_info = get_col_info(*this, table, db);
+            auto col_info = get_col_info(tds, table, db);
 
             if constexpr (std::ranges::sized_range<decltype(np)>)
                 cols.reserve(np.size());
@@ -2093,7 +2091,7 @@ namespace tds {
 
             q += u") WITH (TABLOCK)";
 
-            batch b(*this, no_check(q));
+            batch b(tds, no_check(q));
         }
 
         // FIXME - handle INT NULLs and VARCHAR NULLs
