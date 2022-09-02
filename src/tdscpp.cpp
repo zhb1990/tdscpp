@@ -4171,19 +4171,35 @@ namespace tds {
     }
 
     bool query::fetch_row() {
-        return r2->fetch_row();
+        if (!r2->fetch_row())
+            return false;
+
+        for (size_t i = 0; i < cols.size(); i++) {
+            cols[i].val.swap(r2->cols[i].val);
+            cols[i].is_null = r2->cols[i].is_null;
+        }
+
+        return true;
     }
 
     bool query::fetch_row_no_wait() {
-        return r2->fetch_row_no_wait();
+        if (!r2->fetch_row_no_wait())
+            return false;
+
+        for (size_t i = 0; i < cols.size(); i++) {
+            cols[i].val.swap(r2->cols[i].val);
+            cols[i].is_null = r2->cols[i].is_null;
+        }
+
+        return true;
     }
 
     const column& query::operator[](uint16_t i) const {
-        return r2->operator[](i);
+        return cols[i];
     }
 
     column& query::operator[](uint16_t i) {
-        return r2->operator[](i);
+        return cols[i];
     }
 
     query::~query() {
