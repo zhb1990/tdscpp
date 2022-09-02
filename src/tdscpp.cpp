@@ -4178,6 +4178,14 @@ namespace tds {
         return r2->fetch_row_no_wait();
     }
 
+    const column& query::operator[](uint16_t i) const {
+        return r2->operator[](i);
+    }
+
+    column& query::operator[](uint16_t i) {
+        return r2->operator[](i);
+    }
+
     query::~query() {
         try {
             r2.reset(nullptr);
