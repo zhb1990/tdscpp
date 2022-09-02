@@ -2463,12 +2463,15 @@ namespace tds {
             auto ret = send(sock, (char*)mess_out_buf.data(), (int)mess_out_buf.size(), 0);
 
             if (ret < 0) {
+#ifdef _WIN32
+                if (WSAGetLastError() == WSAEWOULDBLOCK)
+                    return false;
+
+                throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
+#else
                 if (errno == EWOULDBLOCK)
                     return false;
 
-#ifdef _WIN32
-                throw formatted_error("send failed (error {})", wsa_error_to_string(WSAGetLastError()));
-#else
                 throw formatted_error("send failed (error {})", errno_to_string(errno));
 #endif
             }
