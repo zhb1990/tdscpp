@@ -4167,7 +4167,7 @@ namespace tds {
     }
 
     uint16_t query::num_columns() const {
-        return (uint16_t)r2->cols.size();
+        return (uint16_t)cols.size();
     }
 
     bool query::fetch_row() {
