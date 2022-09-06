@@ -3907,7 +3907,7 @@ namespace tds {
     void main_session::send_msg(enum tds_msg type, span<const uint8_t> msg)
 #endif
     {
-        while (!msg.empty()) {
+        do {
             size_t to_send = min(msg.size(), tds.packet_size - sizeof(tds_header));
 
             vector<uint8_t> buf;
@@ -3932,7 +3932,7 @@ namespace tds {
 #endif
 
             msg = msg.subspan(to_send);
-        }
+        } while (!msg.empty());
     }
 
     void main_session::wait_for_msg(enum tds_msg& type, vector<uint8_t>& payload, bool* last_packet) {
