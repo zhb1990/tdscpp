@@ -2852,7 +2852,7 @@ namespace tds {
 #endif
     }
 
-    smp_session::smp_session(tds_impl& impl) : impl(impl), db_name(impl.sess.db_name) {
+    smp_session::smp_session(tds_impl& impl) : impl(impl) {
         smp_header h;
 
         // FIXME - link this to rate_limit option
@@ -4492,7 +4492,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                                           tedb->header.length, sizeof(tds_envchange_database) + (tedb->name_len * sizeof(char16_t)));
                 }
 
-                db_name = u16string_view{(char16_t*)&tedb[1], tedb->name_len};
+                tds.db_name = u16string_view{(char16_t*)&tedb[1], tedb->name_len};
 
                 break;
             }
@@ -4593,7 +4593,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                                           tedb->header.length, sizeof(tds_envchange_database) + (tedb->name_len * sizeof(char16_t)));
                 }
 
-                db_name = u16string_view{(char16_t*)&tedb[1], tedb->name_len};
+                impl.db_name = u16string_view{(char16_t*)&tedb[1], tedb->name_len};
 
                 break;
             }
@@ -4678,13 +4678,6 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
     }
 
     u16string tds::db_name() const {
-        if (impl->mars_sess)
-            return impl->mars_sess.get()->db_name;
-        else
-            return impl->sess.db_name;
-    }
-
-    u16string session::db_name() const {
         return impl->db_name;
     }
 
