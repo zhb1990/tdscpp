@@ -217,14 +217,8 @@ namespace tds {
                             conn.impl->handle_info_msg(sp.subspan(0, len), true);
                         else
                             throw formatted_error("SQL batch failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
-                    } else if (type == token::ENVCHANGE) {
-                        if (sess)
-                            sess.value().get().handle_envchange_msg(sp.subspan(0, len));
-                        else if (conn.impl->mars_sess)
-                            conn.impl->mars_sess->handle_envchange_msg(sp.subspan(0, len));
-                        else
-                            conn.impl->sess.handle_envchange_msg(sp.subspan(0, len));
-                    }
+                    } else if (type == token::ENVCHANGE)
+                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
 
                     break;
                 }

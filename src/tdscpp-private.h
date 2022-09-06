@@ -619,7 +619,6 @@ namespace tds {
         void send_msg(enum tds_msg type, std::span<const uint8_t> msg);
         void send_raw(std::span<const uint8_t> msg);
 #endif
-        void handle_envchange_msg(std::span<const uint8_t> sp);
 
         tds_impl& tds;
         std::condition_variable mess_in_cv;
@@ -671,6 +670,7 @@ namespace tds {
 #ifdef _WIN32
         void pipe_write();
 #endif
+        void handle_envchange_msg(std::span<const uint8_t> sp);
 
 #ifdef _WIN32
         SOCKET sock = INVALID_SOCKET;
@@ -768,7 +768,6 @@ namespace tds {
         void wait_for_msg(enum tds_msg& type, std::vector<uint8_t>& payload, bool* last_packet = nullptr);
         void parse_message(std::stop_token stop, std::span<const uint8_t> msg);
         void send_ack();
-        void handle_envchange_msg(std::span<const uint8_t> sp);
 
         tds_impl& impl;
         uint32_t seqnum = 1;
