@@ -28,12 +28,7 @@ namespace tds {
         all_headers->total_size = sizeof(tds_all_headers);
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
-
-        if (conn.impl->mars_sess)
-            all_headers->trans_desc.descriptor = conn.impl->mars_sess->trans_id;
-        else
-            all_headers->trans_desc.descriptor = conn.impl->sess.trans_id;
-
+        all_headers->trans_desc.descriptor = conn.impl->trans_id;
         all_headers->trans_desc.outstanding = 1;
 
         auto ptr = (char16_t*)&all_headers[1];
@@ -62,7 +57,7 @@ namespace tds {
         all_headers->total_size = sizeof(tds_all_headers);
         all_headers->size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         all_headers->trans_desc.type = 2; // transaction descriptor
-        all_headers->trans_desc.descriptor = sess.impl.get()->trans_id;
+        all_headers->trans_desc.descriptor = conn.impl->trans_id;
         all_headers->trans_desc.outstanding = 1;
 
         auto ptr = (char16_t*)&all_headers[1];

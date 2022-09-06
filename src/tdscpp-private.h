@@ -627,7 +627,6 @@ namespace tds {
         std::list<mess> mess_list;
         std::condition_variable_any rate_limit_cv;
         std::exception_ptr socket_thread_exc;
-        uint64_t trans_id = 0;
     };
 
     class tds_impl {
@@ -691,6 +690,7 @@ namespace tds {
         encryption_type server_enc = encryption_type::ENCRYPT_NOT_SUP;
         bool check_certificate;
         std::u16string db_name;
+        uint64_t trans_id = 0;
         bool mars = false;
         std::mutex mars_lock;
         std::list<std::reference_wrapper<smp_session>> mars_list;
@@ -779,7 +779,6 @@ namespace tds {
         std::condition_variable_any rate_limit_cv;
         std::exception_ptr socket_thread_exc;
         uint32_t recv_wndw;
-        uint64_t trans_id = 0;
     };
 };
 

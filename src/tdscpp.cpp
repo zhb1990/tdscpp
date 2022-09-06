@@ -4509,7 +4509,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 if (tebt->new_len != 8)
                     throw formatted_error("Unexpected transaction ID length ({} bytes, expected 8).", tebt->new_len);
 
-                trans_id = tebt->trans_id;
+                tds.trans_id = tebt->trans_id;
 
                 break;
             }
@@ -4523,7 +4523,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 if (tert->header.length < offsetof(tds_envchange_rollback_trans, new_len))
                     throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tert->header.length);
 
-                trans_id = 0;
+                tds.trans_id = 0;
 
                 break;
             }
@@ -4537,7 +4537,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 if (tect->header.length < offsetof(tds_envchange_begin_trans, new_len))
                     throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tect->header.length);
 
-                trans_id = 0;
+                tds.trans_id = 0;
 
                 break;
             }
@@ -4610,7 +4610,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 if (tebt->new_len != 8)
                     throw formatted_error("Unexpected transaction ID length ({} bytes, expected 8).", tebt->new_len);
 
-                trans_id = tebt->trans_id;
+                impl.trans_id = tebt->trans_id;
 
                 break;
             }
@@ -4624,7 +4624,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 if (tert->header.length < offsetof(tds_envchange_rollback_trans, new_len))
                     throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tert->header.length);
 
-                trans_id = 0;
+                impl.trans_id = 0;
 
                 break;
             }
@@ -4638,7 +4638,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
                 if (tect->header.length < offsetof(tds_envchange_begin_trans, new_len))
                     throw formatted_error("Short ENVCHANGE message ({} bytes, expected 11).", tect->header.length);
 
-                trans_id = 0;
+                impl.trans_id = 0;
 
                 break;
             }
@@ -4689,12 +4689,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.header.all_headers.total_size = sizeof(tds_all_headers);
         msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-
-        if (conn.impl->mars_sess)
-            msg.header.all_headers.trans_desc.descriptor = conn.impl->mars_sess->trans_id;
-        else
-            msg.header.all_headers.trans_desc.descriptor = conn.impl->sess.trans_id;
-
+        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_BEGIN_XACT;
         msg.isolation_level = 0;
@@ -4782,7 +4777,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.header.all_headers.total_size = sizeof(tds_all_headers);
         msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-        msg.header.all_headers.trans_desc.descriptor = sess.impl.get()->trans_id;
+        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_BEGIN_XACT;
         msg.isolation_level = 0;
@@ -4858,16 +4853,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         if (committed)
             return;
 
-        uint64_t trans_id;
-
-        if (sess)
-            trans_id = sess.value().get().trans_id;
-        else if (conn.impl->mars_sess)
-            trans_id = conn.impl->mars_sess->trans_id;
-        else
-            trans_id = conn.impl->sess.trans_id;
-
-        if (trans_id == 0)
+        if (conn.impl->trans_id == 0)
             return;
 
         try {
@@ -4876,7 +4862,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             msg.header.all_headers.total_size = sizeof(tds_all_headers);
             msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
             msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-            msg.header.all_headers.trans_desc.descriptor = trans_id;
+            msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
             msg.header.all_headers.trans_desc.outstanding = 1;
             msg.header.type = tds_tm_type::TM_ROLLBACK_XACT;
             msg.name_len = 0;
@@ -4980,14 +4966,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.header.all_headers.total_size = sizeof(tds_all_headers);
         msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
         msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-
-        if (sess)
-            msg.header.all_headers.trans_desc.descriptor = sess.value().get().trans_id;
-        else if (conn.impl->mars_sess)
-            msg.header.all_headers.trans_desc.descriptor = conn.impl->mars_sess->trans_id;
-        else
-            msg.header.all_headers.trans_desc.descriptor = conn.impl->sess.trans_id;
-
+        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
         msg.header.all_headers.trans_desc.outstanding = 1;
         msg.header.type = tds_tm_type::TM_COMMIT_XACT;
         msg.name_len = 0;
