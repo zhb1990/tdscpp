@@ -4664,86 +4664,6 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         }
     }
 
-    trans::trans(session& sess) : conn(sess.conn) {
-        tds_tm_begin msg;
-
-        // FIXME - give transactions names, so that ROLLBACK works as expected?
-
-        msg.header.all_headers.total_size = sizeof(tds_all_headers);
-        msg.header.all_headers.size = sizeof(uint32_t) + sizeof(tds_header_trans_desc);
-        msg.header.all_headers.trans_desc.type = 2; // transaction descriptor
-        msg.header.all_headers.trans_desc.descriptor = conn.impl->trans_id;
-        msg.header.all_headers.trans_desc.outstanding = 1;
-        msg.header.type = tds_tm_type::TM_BEGIN_XACT;
-        msg.isolation_level = 0;
-        msg.name_len = 0;
-
-        this->sess.emplace(*sess.impl.get());
-
-        sess.impl.get()->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
-
-        enum tds_msg type;
-        vector<uint8_t> payload;
-
-        // FIXME - timeout
-
-        sess.impl.get()->wait_for_msg(type, payload);
-
-        if (type != tds_msg::tabular_result)
-            throw formatted_error("Received message type {}, expected tabular_result", (int)type);
-
-        span sp = payload;
-
-        while (!sp.empty()) {
-            auto type = (token)sp[0];
-            sp = sp.subspan(1);
-
-            switch (type) {
-                case token::DONE:
-                case token::DONEINPROC:
-                case token::DONEPROC:
-                    if (sp.size() < sizeof(tds_done_msg))
-                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), sizeof(tds_done_msg));
-
-                    sp = sp.subspan(sizeof(tds_done_msg));
-                break;
-
-                case token::INFO:
-                case token::TDS_ERROR:
-                case token::ENVCHANGE:
-                {
-                    if (sp.size() < sizeof(uint16_t))
-                        throw formatted_error("Short {} message ({} bytes, expected at least 2).", type, sp.size());
-
-                    auto len = *(uint16_t*)&sp[0];
-
-                    sp = sp.subspan(sizeof(uint16_t));
-
-                    if (sp.size() < len)
-                        throw formatted_error("Short {} message ({} bytes, expected {}).", type, sp.size(), len);
-
-                    if (type == token::INFO) {
-                        if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(sp.subspan(0, len), false);
-                    } else if (type == token::TDS_ERROR) {
-                        if (conn.impl->message_handler)
-                            conn.impl->handle_info_msg(sp.subspan(0, len), true);
-
-                        throw formatted_error("TM_BEGIN_XACT request failed: {}", utf16_to_utf8(extract_message(sp.subspan(0, len))));
-                    } else if (type == token::ENVCHANGE)
-                        conn.impl->handle_envchange_msg(sp.subspan(0, len));
-
-                    sp = sp.subspan(len);
-
-                    break;
-                }
-
-                default:
-                    throw formatted_error("Unhandled token type {} in transaction manager response.", type);
-            }
-        }
-    }
-
     trans::~trans() {
         if (committed)
             return;
@@ -4763,9 +4683,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
             msg.name_len = 0;
             msg.flags = 0;
 
-            if (sess)
-                sess.value().get().send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
-            else if (conn.impl->mars_sess)
+            if (conn.impl->mars_sess)
                 conn.impl->mars_sess->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
             else
                 conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
@@ -4775,9 +4693,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
             // FIXME - timeout
 
-            if (sess)
-                sess.value().get().wait_for_msg(type, payload);
-            else if (conn.impl->mars_sess)
+            if (conn.impl->mars_sess)
                 conn.impl->mars_sess->wait_for_msg(type, payload);
             else
                 conn.impl->sess.wait_for_msg(type, payload);
@@ -4861,9 +4777,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
         msg.name_len = 0;
         msg.flags = 0;
 
-        if (sess)
-            sess.value().get().send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
-        else if (conn.impl->mars_sess)
+        if (conn.impl->mars_sess)
             conn.impl->mars_sess->send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
         else
             conn.impl->sess.send_msg(tds_msg::trans_man_req, span((uint8_t*)&msg, sizeof(msg)));
@@ -4873,9 +4787,7 @@ WHERE columns.object_id = OBJECT_ID(?))"), db.empty() ? table : (u16string(db) +
 
         // FIXME - timeout
 
-        if (sess)
-            sess.value().get().wait_for_msg(type, payload);
-        else if (conn.impl->mars_sess)
+        if (conn.impl->mars_sess)
             conn.impl->mars_sess->wait_for_msg(type, payload);
         else
             conn.impl->sess.wait_for_msg(type, payload);

@@ -1864,13 +1864,11 @@ namespace tds {
     class TDSCPP trans {
     public:
         trans(tds& conn);
-        trans(session& sess);
         ~trans();
         void commit();
 
     private:
         tds& conn;
-        std::optional<std::reference_wrapper<smp_session>> sess;
         bool committed = false;
     };
 
