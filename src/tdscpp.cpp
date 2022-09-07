@@ -3499,8 +3499,10 @@ namespace tds {
                 {
                     auto sp = parse_tokens(buf, tokens, buf_columns);
 
-                    vector<uint8_t> newbuf{sp.begin(), sp.end()};
-                    buf.swap(newbuf);
+                    if (sp.size() != buf.size()) {
+                        vector<uint8_t> newbuf{sp.begin(), sp.end()};
+                        buf.swap(newbuf);
+                    }
                 }
 
                 if (last_packet && !buf.empty())
