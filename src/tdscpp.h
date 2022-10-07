@@ -159,12 +159,6 @@ namespace tds {
         std::u16string clr_name;
     };
 
-#if __cpp_lib_constexpr_string >= 201907L
-#define CONSTEXPR_STRING constexpr
-#else
-#define CONSTEXPR_STRING __inline
-#endif
-
     static constexpr size_t utf8_to_utf16_len(std::string_view sv) noexcept {
         size_t ret = 0;
 
@@ -299,7 +293,7 @@ namespace tds {
         utf8_to_utf16_range(std::string_view((char*)sv.data(), sv.length()), t);
     }
 
-    static CONSTEXPR_STRING std::u16string utf8_to_utf16(std::string_view sv) {
+    static constexpr std::u16string utf8_to_utf16(std::string_view sv) {
         if (sv.empty())
             return u"";
 
@@ -310,7 +304,7 @@ namespace tds {
         return ret;
     }
 
-    static CONSTEXPR_STRING std::u16string utf8_to_utf16(std::u8string_view sv) {
+    static constexpr std::u16string utf8_to_utf16(std::u8string_view sv) {
         if (sv.empty())
             return u"";
 
@@ -497,7 +491,7 @@ namespace tds {
         }
     }
 
-    static CONSTEXPR_STRING std::string utf16_to_utf8(std::u16string_view sv) {
+    static constexpr std::string utf16_to_utf8(std::u16string_view sv) {
         if (sv.empty())
             return "";
 
@@ -509,7 +503,7 @@ namespace tds {
     }
 
 #if defined(_WIN32) || __WCHAR_WIDTH__ == 16
-    static CONSTEXPR_STRING std::string utf16_to_utf8(std::wstring_view sv) {
+    static constexpr std::string utf16_to_utf8(std::wstring_view sv) {
         if (sv.empty())
             return "";
 
