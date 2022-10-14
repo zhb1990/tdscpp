@@ -681,6 +681,11 @@ namespace tds {
         template<typename T, typename... Args>
         void run(no_check<T> s, Args&&... args);
 
+        template<typename... Args>
+        void run_rpc(const string_or_u16string auto& rpc_name, Args&&... args);
+
+        void run_rpc(const string_or_u16string auto& rpc_name);
+
         template<string_or_u16string T = std::u16string_view>
         void bcp(const string_or_u16string auto& table, const list_of_u16string auto& np,
                  const list_of_list_of_values auto& vp, const T& db = u"") {
@@ -1823,6 +1828,21 @@ namespace tds {
         batch b(*this, s);
 
         while (b.fetch_row()) {
+        }
+    }
+
+    template<typename... Args>
+    void tds::run_rpc(const string_or_u16string auto& rpc_name, Args&&... args) {
+        rpc r(*this, rpc_name, args...);
+
+        while (r.fetch_row()) {
+        }
+    }
+
+    void tds::run_rpc(const string_or_u16string auto& rpc_name) {
+        rpc r(*this, rpc_name);
+
+        while (r.fetch_row()) {
         }
     }
 
