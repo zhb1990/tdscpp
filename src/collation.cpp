@@ -757,8 +757,6 @@ namespace tds {
                 return (v1 ? 1 : 0) <=> (v2 ? 1 : 0);
             }
 
-            // FIXME - XML (collation?)
-
             case sql_type::UNIQUEIDENTIFIER:
             {
                 if (v.type != sql_type::UNIQUEIDENTIFIER)
@@ -773,9 +771,6 @@ namespace tds {
 
                 return strong_ordering::equivalent;
             }
-
-            // FIXME - MONEY
-            // FIXME - SQL_VARIANT
 
             case sql_type::NUMERIC:
             case sql_type::DECIMAL:
@@ -854,11 +849,32 @@ namespace tds {
                 return n <=> n2;
             }
 
-            // FIXME - MONEYN
-            // FIXME - SMALLMONEY
-            // FIXME - IMAGE
-            // FIXME - VARBINARY
-            // FIXME - BINARY
+            case sql_type::VARBINARY:
+            case sql_type::BINARY:
+            {
+                if (v.type != sql_type::VARBINARY && v.type != sql_type::BINARY)
+                    throw formatted_error("Comparison between {} and {} unimplemented.", type, v.type);
+
+                span<const uint8_t> d1(val.data(), val.size());
+                span<const uint8_t> d2(v.val.data(), v.val.size());
+
+                while (!d1.empty() && !d2.empty()) {
+                    auto r = d1.front() <=> d2.front();
+
+                    if (r != strong_ordering::equal)
+                        return r;
+
+                    d1 = d1.subspan(1);
+                    d2 = d2.subspan(1);
+                }
+
+                if (d1.empty() && !d2.empty())
+                    return strong_ordering::less;
+                else if (!d1.empty() && d2.empty())
+                    return strong_ordering::greater;
+
+                return strong_ordering::equal;
+            }
 
             case sql_type::UDT: {
                 if (clr_name == u"Microsoft.SqlServer.Types.SqlHierarchyId, Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91") {
@@ -870,6 +886,13 @@ namespace tds {
 
                 throw formatted_error("Comparison for UDT type {} unimplemented.", utf16_to_utf8(v.clr_name));
             }
+
+            // FIXME - XML (collation?)
+            // FIXME - MONEY
+            // FIXME - SQL_VARIANT
+            // FIXME - MONEYN
+            // FIXME - SMALLMONEY
+            // FIXME - IMAGE
 
             default:
                 throw formatted_error("Comparison for type {} unimplemented.", type);
