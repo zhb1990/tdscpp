@@ -1927,7 +1927,7 @@ namespace tds {
         else if (type == sql_type::VARCHAR || type == sql_type::CHAR || type == sql_type::TEXT) {
             auto sv = string_view{(char*)val.data(), val.size()};
 
-            if (coll.utf8)
+            if (coll.utf8 || (coll.lcid == 0 && coll.sort_id == 0))
                 return utf8_to_utf16(sv);
 
             auto cp = coll_to_cp(coll);
