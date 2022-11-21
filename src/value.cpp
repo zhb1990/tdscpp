@@ -1127,6 +1127,201 @@ static_assert(test_parse_datetimeoffset("2021-07-02T10:05:34.12345678-08:45", fa
 static_assert(test_parse_datetimeoffset("2021-07-02 10:05:34am +09:00", true, 2021, 7, 2, 10h + 5min + 34s, 540));
 static_assert(test_parse_datetimeoffset("July 2, 2021 10:05:34 AM -10:15", true, 2021, 7, 2, 10h + 5min + 34s, -615));
 
+static unsigned int coll_to_cp(const tds::collation& coll) {
+    if (coll.sort_id == 0) { // Windows collations
+        switch (coll.lcid & 0xffff) {
+            case 1054: // th-TH
+                return 874;
+
+            case 1041: // ja-JP
+                return 932;
+
+            case 2052: // zh-CN
+                return 936;
+
+            case 1042: // ko-KR
+                return 949;
+
+            case 1028: // zh-TW
+            case 3076: // zh-HK
+            case 5124: // zh-MO
+                return 950;
+
+            case 1029: // cs-CZ
+            case 1038: // hu-HU
+            case 1045: // pl-PL
+            case 1048: // ro-RO
+            case 1050: // hr-HR
+            case 1051: // sk-SK
+            case 1052: // sq-AL
+            case 1060: // sl-SI
+            case 1090: // tk-TM
+            case 2074: // sr-Latn-CS
+            case 5146: // bs-Latn-BA
+                return 1250;
+
+            case 1049: // ru-RU
+            case 1058: // uk-UA
+            case 1071: // mk-MK
+            case 1087: // kk-KZ
+            case 1092: // tt-RU
+            case 1133: // ba-RU
+            case 1157: // sah-RU
+            case 2092: // az-Cyrl-AZ
+            case 3098: // sr-Cyrl-CS
+            case 8218: // bs-Cyrl-BA
+                return 1251;
+
+            case 1030: // da-DK
+            case 1031: // de-DE
+            case 1033: // en-US
+            case 1034: // es-ES_tradnl
+            case 1035: // fi-FI
+            case 1036: // fr-FR
+            case 1039: // is-IS
+            case 1047: // rm-CH
+            case 1044: // nb-NO
+            case 1070: // hsb-DE
+            case 1079: // ka-GE
+            case 1083: // se-NO
+            case 1106: // cy-GB
+            case 1122: // fy-NL
+            case 1146: // arn-CL
+            case 1148: // moh-CA
+            case 1150: // br-FR
+            case 1155: // co-FR
+            case 2107: // se-SE
+            case 2143: // tzm-Latn-DZ
+            case 3082: // es-ES
+                return 1252;
+
+            case 1032: // el-GR
+                return 1253;
+
+            case 1055: // tr-TR
+            case 1068: // az-Latn-AZ
+            case 1091: // uz-Latn-UZ
+                return 1254;
+
+            case 1037: // he-IL
+                return 1255;
+
+            case 1025: // ar-SA
+            case 1056: // ur-PK
+            case 1065: // fa-IR
+            case 1152: // ug-CN
+            case 1164: // prs-AF
+                return 1256;
+
+            case 1061: // et-EE
+            case 1062: // lv-LV
+            case 1063: // lt-LT
+                return 1257;
+
+            case 1066: // vi-VN
+                return 1258;
+
+            default:
+                throw formatted_error("Could not map LCID {} to codepage.", coll.lcid);
+        }
+    } else { // SQL collations
+        switch (coll.sort_id) {
+            case 30:
+            case 31:
+            case 32:
+            case 33:
+            case 34:
+                return 437;
+
+            case 40:
+            case 41:
+            case 42:
+            case 44:
+            case 49:
+            case 55:
+            case 56:
+            case 57:
+            case 58:
+            case 59:
+            case 60:
+            case 61:
+                return 850;
+
+            case 80:
+            case 81:
+            case 82:
+            case 83:
+            case 84:
+            case 85:
+            case 86:
+            case 87:
+            case 88:
+            case 89:
+            case 90:
+            case 91:
+            case 92:
+            case 93:
+            case 94:
+            case 95:
+            case 96:
+                return 1250;
+
+            case 104:
+            case 105:
+            case 106:
+            case 107:
+            case 108:
+                return 1251;
+
+            case 51:
+            case 52:
+            case 53:
+            case 54:
+            case 183:
+            case 184:
+            case 185:
+            case 186:
+                return 1252;
+
+            case 112:
+            case 113:
+            case 114:
+            case 121:
+            case 124:
+                return 1253;
+
+            case 128:
+            case 129:
+            case 130:
+                return 1254;
+
+            case 136:
+            case 137:
+            case 138:
+                return 1255;
+
+            case 144:
+            case 145:
+            case 146:
+                return 1256;
+
+            case 152:
+            case 153:
+            case 154:
+            case 155:
+            case 156:
+            case 157:
+            case 158:
+            case 159:
+            case 160:
+                return 1257;
+
+            default:
+                throw formatted_error("Could not map sort ID {} to codepage.", coll.sort_id);
+        }
+    }
+}
+
 namespace tds {
     static const auto jan1900 = -ymd_to_num({1y, chrono::January, 1d});
 

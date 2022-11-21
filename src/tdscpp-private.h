@@ -1541,7 +1541,6 @@ static constexpr bool is_byte_len_type(enum tds::sql_type type) noexcept {
 }
 
 // tdscpp.cpp
-unsigned int coll_to_cp(const tds::collation& coll);
 std::span<const uint8_t> parse_tokens(std::span<const uint8_t> sp, std::list<std::vector<uint8_t>>& tokens,
                                       std::vector<tds::column>& buf_columns);
 void handle_row_col(tds::value_data_t& val, bool& is_null, enum tds::sql_type type,
