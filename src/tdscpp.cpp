@@ -2211,22 +2211,22 @@ namespace tds {
                 lock_guard lg(sess.mess_in_lock);
                 sess.socket_thread_exc = current_exception();
             }
+        }
 
-            sess.mess_in_cv.notify_all();
+        sess.mess_in_cv.notify_all();
 
-            if (mars_sess) {
-                lock_guard lg(mars_lock);
+        if (mars_sess) {
+            lock_guard lg(mars_lock);
 
-                for (auto& sess_rw : mars_list) {
-                    auto& sess = sess_rw.get();
+            for (auto& sess_rw : mars_list) {
+                auto& sess = sess_rw.get();
 
-                    {
-                        lock_guard lg(sess.mess_in_lock);
-                        sess.socket_thread_exc = current_exception();
-                    }
-
-                    sess.mess_in_cv.notify_all();
+                {
+                    lock_guard lg(sess.mess_in_lock);
+                    sess.socket_thread_exc = current_exception();
                 }
+
+                sess.mess_in_cv.notify_all();
             }
         }
     }
@@ -2542,10 +2542,9 @@ namespace tds {
                     }
 
                     if (netev.lNetworkEvents & FD_CLOSE) {
-                        if (stop.stop_requested())
-                            break;
+                        connected = false;
 
-                        throw runtime_error("Disconnected.");
+                        break;
                     }
                 } else if (ret == WAIT_OBJECT_0 + 1) {
                     mess_event.reset();
@@ -2625,10 +2624,9 @@ namespace tds {
                     }
 
                     if (ev.events & (EPOLLRDHUP | EPOLLHUP)) {
-                        if (stop.stop_requested())
-                            break;
+                        connected = false;
 
-                        throw runtime_error("Disconnected.");
+                        break;
                     }
                 } else if (ev.data.fd == mess_event.h.get()) {
                     mess_event.reset();
@@ -2757,9 +2755,9 @@ namespace tds {
         {
             unique_lock ul(mess_in_lock);
 
-            mess_in_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc; });
+            mess_in_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc || !impl.connected; });
 
-            if (!socket_thread_exc) {
+            if (!socket_thread_exc && impl.connected) {
                 auto& m2 = mess_list.front();
 
                 m.type = m2.type;
@@ -2772,6 +2770,9 @@ namespace tds {
 
         if (socket_thread_exc)
             rethrow_exception(socket_thread_exc);
+
+        if (!impl.connected)
+            throw runtime_error("Disconnected.");
 
         if (impl.rate_limit != 0)
             rate_limit_cv.notify_one();
@@ -3748,9 +3749,9 @@ namespace tds {
         {
             unique_lock ul(mess_in_lock);
 
-            mess_in_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc; });
+            mess_in_cv.wait(ul, [&]() { return !mess_list.empty() || socket_thread_exc || !tds.connected; });
 
-            if (!socket_thread_exc) {
+            if (!socket_thread_exc && tds.connected) {
                 auto& m2 = mess_list.front();
 
                 m.type = m2.type;
@@ -3763,6 +3764,9 @@ namespace tds {
 
         if (socket_thread_exc)
             rethrow_exception(socket_thread_exc);
+
+        if (!tds.connected)
+            throw runtime_error("Disconnected.");
 
         if (tds.rate_limit != 0)
             rate_limit_cv.notify_one();

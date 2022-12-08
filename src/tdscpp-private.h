@@ -701,6 +701,7 @@ namespace tds {
         std::mutex mess_out_lock;
         std::vector<uint8_t> mess_out_buf;
         unsigned int rate_limit;
+        bool connected = true;
         std::jthread t;
     };
 
